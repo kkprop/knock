@@ -17,7 +17,7 @@
 (def div
   {:new #{"\n" }
    :indent #{"=>"  " -- ("}
-   :vanish #{"\t" }
+   :vanish #{"\t" "--------------" }
    })
 (def rev-div
   (mapcat #(interpose (get % 0)(get % 1)) div))
@@ -96,12 +96,12 @@
 
 (defn- build-layers
   ([xs]
-   (let [zp (z/vector-zip [])
+   (let [zp (z/vector-zip [[] []])
          ]
      (if (empty? xs)
        zp
        (z/root
-        (:cur (build-layers xs {:backtrace '() :cur zp})))
+        (:cur (build-layers xs {:backtrace [] :cur (z/down zp)})))
        )
      )
    )
@@ -112,30 +112,31 @@
     (if (empty? (rest xs))
       (case props
         :new (assoc zp
-                    :cur ((apply comp (:backtrace zp)) (:cur zp))
+                    :cur (z/rightmost ((apply comp (:backtrace zp)) (:cur zp)))
                     :backtrace '()
                     )
         :indent (assoc zp
                        :cur (-> (:cur zp) (z/insert-child []) z/down)
-                       :backtrace (cons z/up (:backtrace zp)) 
+                       :backtrace (conj (:backtrace zp) z/up ) 
                        )
         :vanish zp
-        nil (assoc zp :cur (z/insert-child (:cur zp) x))
-        (build-layers (rest xs)  (assoc zp :cur (z/insert-child (:cur zp) x)))
+        nil (assoc zp :cur (z/insert-left (:cur zp) x))
+        (build-layers (rest xs)  (assoc zp :cur (z/insert-left (:cur zp) x)))
         )
       (case props
         :new (build-layers (rest xs) (assoc zp
-                                            :cur ((apply comp (:backtrace zp)) (:cur zp))
+                                            :cur (z/rightmost ((apply comp (:backtrace zp)) (:cur zp)))
                                             :backtrace '()
                                  ))
         :indent (build-layers (rest xs)
                               (assoc zp
                                      :cur (-> (:cur zp) (z/insert-child []) z/down)
-                                     :backtrace (cons z/up (:backtrace zp)) 
+                                     :backtrace (conj (:backtrace zp) z/up ) 
                                      )
                               )
-        nil (build-layers (rest xs)  (assoc zp :cur (z/insert-child (:cur zp) x)))
-        (build-layers (rest xs)  (assoc zp :cur (z/insert-child (:cur zp) x)))
+        :vanish zp
+        nil (build-layers (rest xs)  (assoc zp :cur (z/insert-left (:cur zp) x)))
+        (build-layers (rest xs)  (assoc zp :cur (z/insert-left (:cur zp) x)))
          )
     ))))
 
@@ -176,7 +177,7 @@
                             "\n" "mno"])
     (build-layers [])
     )
-  (search-wn "sense")
+  (search-wn "cultivate")
   (parsing "a\nb\nc")
   (search "feeling" "-hypen")
   (search "sense" "-over")
