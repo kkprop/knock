@@ -1,13 +1,15 @@
 (ns search.wn
   (:require [clojure.java.shell :refer [sh]]
             [clojure.string :as string]
+            [clojure.zip :as z]
    )
   )
 
 (def wn
   (case (System/getProperty "os.name")
     "Mac OS X" "wn"
-    "wordnet"
+  
+  "wordnet"
     )
   )
 
@@ -15,7 +17,7 @@
 (def div
   {:new #{"\n" }
    :indent #{"=>"  " -- ("}
-   :vanish #{"\t"}
+   :vanish #{"\t" }
    })
 (def rev-div
   (mapcat #(interpose (get % 0)(get % 1)) div))
@@ -86,16 +88,62 @@
      [xk m])))
 
 (def rev-div
-  (let [kv (flatten (flatten-hashmap div))]
-    kv
-    ))
+  (let [kv (flatten (flatten-hashmap div))
+        vk (interleave (take-nth 2 (rest kv)) (take-nth 2 kv))
+        ]
+    (apply hash-map vk)
+        ))
 
+(defn- build-layers
+  ([xs]
+   (let [zp (z/vector-zip [])
+         ]
+     (if (empty? xs)
+       zp
+       (z/root
+        (:cur (build-layers xs {:backtrace '() :cur zp})))
+       )
+     )
+   )
+  ([xs zp]
+   (let [x (first xs)
+        props (get rev-div x)
+        ]
+    (if (empty? (rest xs))
+      (case props
+        :new (assoc zp
+                    :cur ((apply comp (:backtrace zp)) (:cur zp))
+                    :backtrace '()
+                    )
+        :indent (assoc zp
+                       :cur (-> (:cur zp) (z/insert-child []) z/down)
+                       :backtrace (cons z/up (:backtrace zp)) 
+                       )
+        :vanish zp
+        nil (assoc zp :cur (z/insert-child (:cur zp) x))
+        (build-layers (rest xs)  (assoc zp :cur (z/insert-child (:cur zp) x)))
+        )
+      (case props
+        :new (build-layers (rest xs) (assoc zp
+                                            :cur ((apply comp (:backtrace zp)) (:cur zp))
+                                            :backtrace '()
+                                 ))
+        :indent (build-layers (rest xs)
+                              (assoc zp
+                                     :cur (-> (:cur zp) (z/insert-child []) z/down)
+                                     :backtrace (cons z/up (:backtrace zp)) 
+                                     )
+                              )
+        nil (build-layers (rest xs)  (assoc zp :cur (z/insert-child (:cur zp) x)))
+        (build-layers (rest xs)  (assoc zp :cur (z/insert-child (:cur zp) x)))
+         )
+    ))))
 
 (defn- search [s opt]
   (let [raw (:out (sh wn s opt))
         xs (->> (partition-by-string (partial div-fn divs) raw)
                 (map #(apply str %)))] 
-    xs
+    ( build-layers xs)
     ))
 
 (defn- opts [s]
@@ -115,15 +163,25 @@
 
 
 (comment
+  (build-layers
+   (search "feeling" "-hypen"))
+  (z/vector-zip (z/root (build-layers ["\n" "abc" "\n"] )))
+  (defn-test t-build-layers []
+    (build-layers [])
+    (build-layers ["abc"])
+    (build-layers ["abc" "\n"])
+    (build-layers ["abc" "def" "\n"])
+    (build-layers ["abc" "def" "=>" "ghi"] )
+    (build-layers ["abc" "def" "=>" "ghi" "=>" "jkl"
+                            "\n" "mno"])
+    (build-layers [])
+    )
   (search-wn "sense")
   (parsing "a\nb\nc")
-  (search "sense" "-hypen")
-
+  (search "feeling" "-hypen")
   (search "sense" "-over")
-  ;;{{[[TODO]]}} pattern (; ; ;)
-  ;;{{[[TODO]]}} 
 
+  ;;{{[[TODO]]}} 
   (div-fn divs " =>ab")
- ;; {{[[TODO]]}}铪，可以写一个，一键备份当前macros到hulu里的工具了   
   (partition-by-string (partial div-fn divs) "=> a \n b \n\n c"  )
   )
