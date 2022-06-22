@@ -17,7 +17,7 @@
 (def div
   {:new #{"\n" }
    :indent #{"=>"  " -- ("}
-   :vanish #{"\t" "--------------" }
+   :vanish #{"\t" "--------------" "       "}
    })
 (def rev-div
   (mapcat #(interpose (get % 0)(get % 1)) div))
@@ -94,9 +94,14 @@
     (apply hash-map vk)
         ))
 
+
+(defn- zp-append-right [zp x]
+  (assoc zp :cur (-> (:cur zp) z/rightmost (z/insert-right []) z/rightmost (z/insert-child x)))
+  )
+
 (defn- build-layers
   ([xs]
-   (let [zp (z/vector-zip [[] []])
+   (let [zp (z/vector-zip [[]])
          ]
      (if (empty? xs)
        zp
@@ -116,35 +121,50 @@
                     :backtrace '()
                     )
         :indent (assoc zp
-                       :cur (-> (:cur zp) (z/insert-child []) z/down)
+                       :cur (-> (:cur zp) z/rightmost z/down)
                        :backtrace (conj (:backtrace zp) z/up ) 
                        )
-        :vanish zp
-        nil (assoc zp :cur (z/insert-left (:cur zp) x))
-        (build-layers (rest xs)  (assoc zp :cur (z/insert-left (:cur zp) x)))
+        :vanish  (build-layers (rest xs) zp)
+        nil  (assoc zp :cur (-> (:cur zp) z/rightmost (z/insert-right []) z/rightmost (z/insert-child x)))
+        (build-layers (rest xs)
+                      (assoc zp :cur (-> (:cur zp) z/rightmost (z/insert-right []) z/rightmost (z/insert-child x)))
+                      )
         )
       (case props
-        :new (build-layers (rest xs) (assoc zp
-                                            :cur (z/rightmost ((apply comp (:backtrace zp)) (:cur zp)))
-                                            :backtrace '()
-                                 ))
+        :new (if (string/starts-with? (first (rest xs)) " " )
+               (build-layers (rest xs) zp)
+               (build-layers (rest xs) (assoc zp
+                                              :cur (-> ((apply comp (:backtrace zp)) (:cur zp))
+                                                       z/rightmost 
+                                                       )
+                                              :backtrace '()
+                                              ))
+               )
         :indent (build-layers (rest xs)
                               (assoc zp
-                                     :cur (-> (:cur zp) (z/insert-child []) z/down)
+                                     :cur (-> (:cur zp) z/rightmost z/down )
                                      :backtrace (conj (:backtrace zp) z/up ) 
                                      )
                               )
-        :vanish zp
-        nil (build-layers (rest xs)  (assoc zp :cur (z/insert-left (:cur zp) x)))
-        (build-layers (rest xs)  (assoc zp :cur (z/insert-left (:cur zp) x)))
-         )
+        :vanish (build-layers (rest xs) zp)
+        nil (build-layers (rest xs)
+                          (assoc zp :cur (-> (:cur zp) z/rightmost (z/insert-right []) z/rightmost (z/insert-child x)))
+                          )
+        (build-layers (rest xs)  
+                      (assoc zp :cur (-> (:cur zp) z/rightmost (z/insert-right []) z/rightmost (z/insert-child x))) 
+                      ))
     ))))
+
 
 (defn- search [s opt]
   (let [raw (:out (sh wn s opt))
         xs (->> (partition-by-string (partial div-fn divs) raw)
                 (map #(apply str %)))] 
-    ( build-layers xs)
+    (->>
+     (build-layers xs)
+     ;too rude. need to fix
+     (remove #(or (< (count %) 1) ) )
+     )
     ))
 
 (defn- opts [s]
@@ -157,8 +177,7 @@
          (map first)
          )))
 (defn search-wn [s]
-  (let [raw (->> (opts s)
-                 (map (partial search s)))]
+  (let [raw (->> (opts s) (map (partial search s)))]
     raw
   ))
 
@@ -172,9 +191,11 @@
     (build-layers ["abc"])
     (build-layers ["abc" "\n"])
     (build-layers ["abc" "def" "\n"])
-    (build-layers ["abc" "def" "=>" "ghi"] )
+    (build-layers ["abc" "def" "=>" "ghi" "=>""jkl"] )
+    (build-layers ["abc" "def" "=>" "ghi" "  " "=>""jkl"  "  "] )
     (build-layers ["abc" "def" "=>" "ghi" "=>" "jkl"
                             "\n" "mno"])
+    (build-layers ["abc" "def" "=>" "\n" "ghi" "=>" "\n" "jkl"])
     (build-layers [])
     )
   (search-wn "cultivate")
@@ -186,3 +207,4 @@
   (div-fn divs " =>ab")
   (partition-by-string (partial div-fn divs) "=> a \n b \n\n c"  )
   )
+
