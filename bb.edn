@@ -1,0 +1,23 @@
+{:paths ["src"]
+ :deps {medley/medley {:mvn/version "1.3.0"}
+        org.clojure/core.logic {:mvn/version "1.0.1"}
+        etaoin/etaoin {:mvn/version "1.0.38"}
+        djblue/portal {:mvn/version "0.32.0"}
+        }
+ :repl-options {:init-ns search.main}
+ :tasks
+ {:requires ([babashka.fs :as fs]
+             [babashka.process :as p :refer [process]]
+             [babashka.wait :as wait]
+            ) nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
+              proc (process (str "bb nrepl-server " port) {:inherit true})]
+          (wait/wait-for-port "localhost" port)
+          (spit ".nrepl-port" port)
+          (fs/delete-on-exit ".nrepl-port")
+          (deref proc))
+
+  clean (do
+          (println "Removing target folder.")
+          (fs/delete-tree "target"))
+}
+}
