@@ -25,11 +25,6 @@
   (search "https://www.wikiwand.com/en/" word))
 
 
-(defn confluence [word]
-  (search "https://confluence.agoralab.co/dosearchsite.action?queryString=" word))
-
-
-
 
 (comment
   (wiki "Philip H. Dybvig")
