@@ -32,10 +32,8 @@
    (e/query-tree driver :content-root {:tag :article})
    (map #(e/get-element-text-el driver %))
    )
-
   (fun
    (f2
     (f22 ada))
    2 3 )
-
          )

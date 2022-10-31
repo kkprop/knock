@@ -1,0 +1,45 @@
+{
+    "create-page":
+    {
+        "action" : "create-page",
+        "page": {
+            "uid": "",
+            "title": "List of participants",
+            "children-view-type": "document"
+        }
+    },
+
+    "update-page":
+    {
+        "action" : "update-page", 
+        "page": {
+            "uid": "xK98D8L7U",
+            "title": "List of participants (updated)"
+        }
+    },
+ 
+    "update-block":
+    {
+        "action" : "update-block", 
+        "block": {
+            "uid": "51v-orCLm",
+            "string": "new string from the backend",
+            "open": false,
+            "heading": 2,
+            "text-align": "center",
+            "children-view-type": "document"
+        }
+    },
+    "move-block":
+    {
+        "action" : "move-block", 
+        "block": {
+            "uid": "7yYBPW-WO"
+        },
+        "location": {
+            "parent-uid": "09-27-2022",
+            "order": 3
+        }
+    }
+
+}

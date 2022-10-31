@@ -12,7 +12,7 @@
 (def base "https://api.roamresearch.com/api/graph")
 
 
-(defn join-url [& xs]
+(defn join-url [ & xs]
   (str/join "/" xs))
 
 ;;assemble url that Roam API needed
@@ -23,6 +23,10 @@
 (defn cur-daily-page []
   (cur-time-str "MM-dd-yyyy"))
 
+
+(defn cur-daily-page-title []
+  (cur-time-str "MMMM dd, yyyy")
+  )
 ;;
 (defn post [g route data]
   (let [url (api-url g route)
@@ -42,8 +46,10 @@
     )
   )
 
+(declare create-page update-page update-block  move-block)
+
 ;;create block, default in today's daily notes
-(defn write [g text & {:keys [page order open heading text-align]
+(defn write [g string & {:keys [page order open heading text-align]
                        :or {page (cur-daily-page) order "last" open false heading 3 text-align "right" children-view-type "document"}
                        :as opt
                        }]
@@ -52,14 +58,27 @@
               :location {:parent-uid page
                          :order order 
                          }
-              :block {:string text
+              :block {:string string
                       :open open
                       :heading heading
                       :text-align text-align
                       }
               }
         ]
-    (post g "write" data)
+    (try 
+      (post g "write" data)
+      (catch Exception e
+        (let [msg (.getMessage e)]
+          (if (= msg "babashka.curl: status 400")
+            ;;probably no daily note try create
+            (do 
+              (create-page g {:title "October 31st, 2022" :uid (cur-daily-page)})
+              (post g "write" data)
+              )
+            msg)
+          )
+        )
+      )
     ))
 
 (defn q [g query & args]
@@ -68,7 +87,8 @@
               :args args
               }
         ]
-    (post g "q" data)
+    (
+post g "q" data)
     )
   )
 
@@ -81,6 +101,71 @@
   )
 
 
+;;TODO
+;;"batch-actions": {"action": "batch-actions", "actions": []},
+
+;;
+
+
+(defn create-page [g {:keys [action uid title children-view-type],
+                      :or {uid "", title "List of participants", children-view-type "document",
+                                                                        action "create-page"},
+                      :as opt}]
+  (let
+      [url
+       (api-url g "write")
+       data
+       {"action" action,
+        "page"
+        {"uid" uid,
+         "title" title,
+         "children-view-type" children-view-type}}]
+    (post g "write" data)))
+(defn update-page [g {:keys [action uid title], :or
+                      {uid "xK98D8L7U",
+                       title "List of participants (updated)",
+                       action "update-page"},
+                      :as opt}]
+  (let [url (api-url g "write")
+        data {"action" action, "page" {"uid" uid, "title" title}}]
+    (post g "write" data)))
+(defn update-block [g {:keys [action uid string open heading text-align children-view-type],
+                       :or
+                       {heading 2,
+                        open false,
+                        text-align "center",
+                        uid "51v-orCLm",
+                        string "new string from the backend",
+                        children-view-type "document",
+                        action "update-block"},
+                       :as opt}]
+  (let
+      [url (api-url g "write")
+       data {"action" action,
+             "block"
+             {"uid" uid,
+              "string" string,
+              "open" open,
+              "heading" heading,
+              "text-align" text-align,
+              "children-view-type" children-view-type}}]
+    (post g "write" data)))
+(defn move-block [g {:keys [action uid parent-uid order],
+                     :or
+                     {parent-uid "09-27-2022",
+                      uid "7yYBPW-WO",
+                      order 3,
+                      action "move-block"},
+                     :as opt}]
+  (let
+      [url
+       (api-url g "write")
+       data
+       {"action" action,
+        "block" {"uid" uid},
+        "location" {"parent-uid" parent-uid, "order" order}}]
+    (post g "write" data)))
+
 (defn fn-parts [name data]
   (let [fname (symbol name)
         args (->> (flatten-hashmap data) 
@@ -89,43 +174,75 @@
         defaults (flatten
                   (into [] cat
                         (map #(map-on-key read-string %) args)))
+        json-symbols (reduce (fn [a c]
+                               (let [[k v] (first c)]
+                                    (update-in a k
+                                               (fn [v] (symbol (last k)))
+                                               )
+                                    )
+                               ) {} (flatten-hashmap data)
+                           )
                  ]
-    (list fname ks defaults)
+    (list fname ks defaults json-symbols)
          ))
 
-(defmacro update-json [j]
-  (let [m (eval j)
-        xs (flatten-hashmap m)
-        ]
-     m
-    )
+
+(defmacro replace-all [s & args]
+  `(-> s
+       ~@(for [k (eval args)]
+          (clojure.string/replace ~(re-pattern k) "")
+          )
+      )
   )
 
-(defmacro gen-json-fn [j]
+(defn append-code [file-name code]
+  (spit file-name 
+        (clojure.string/replace 
+         (with-out-str
+           (clojure.pprint/pprint code)
+           )
+         #"clojure.core/"
+         ""
+         )
+        )
+  )
+
+(defmacro gen-json-fn [j file-name]
   `(do
      ~@(for [f (keys (eval j))
              :let [d (get (eval j) f)
-                   [fname ks defaults] (fn-parts f d)
+                   [fname ks defaults json-symbols] (fn-parts f d)
                    ]
              ]
-         `(defn ~fname [g {:keys ~(apply vector ks)
-                         :or ~(apply vector defaults)
-                         :as opt}]
-            (let [url (api-url g "write")
-                    ;;TODO
-                    ;data (merge j) 
-                    ]
-                )
-            )
+         (append-code file-name 
+                      `(defn ~fname [g {:keys ~(apply vector ks)
+                                        :or ~(apply hash-map defaults)
+                                        :as opt}]
+                         (let [url (api-url g "write")
+                               ;;TODO
+                               data ~json-symbols
+                               ]
+                           (post g "write" data)
+                           )
+                         ))
          )))
+
+;;generate other write function
+;;previously declared
+;(gen-json-fn
+; (load-json "write.json")
+; "src/knock/roam.clj"
+; )
 
 (comment
   (macroexpand 
    (gen-json-fn
     (load-json "write.json")
-    )
    )
 
+  (update-block g {:uid "w-9UmjI-0" :string "Hello Roam!"} )
+  (def gt (load-edn "Tickers.edn"))
+  (write gt "Hello")
   (write g
    "Hello Roam!")
 
@@ -141,7 +258,7 @@
      "Roam" "API"
      )
 
-  (pull g '[:block/uid "10-28-2022"]
+  (pull gt '[:block/uid "10-31-2022"]
         '[:block/uid :node/title :block/string
           {:block/children [:block/uid :block/string]}
           {:block/refs [:node/title :block/string :block/uid]}]
@@ -159,4 +276,5 @@
   (def defaults ['action "update-page" 'uid "xK98D8L7U" 'title "List of participants"] )
   (fn-parts "update-page" j)
 
-  )
+  ))
+
