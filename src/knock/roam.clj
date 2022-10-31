@@ -60,7 +60,7 @@
                          }
               :block {:string string
                       :open open
-                      :heading heading
+                      ;:heading heading
                       :text-align text-align
                       }
               }
@@ -242,7 +242,7 @@ post g "q" data)
 
   (update-block g {:uid "w-9UmjI-0" :string "Hello Roam!"} )
   (def gt (load-edn "Tickers.edn"))
-  (write gt "Hello")
+  (write gt "Hello" {:heading 3 :text-align "left"})
   (write g
    "Hello Roam!")
 
