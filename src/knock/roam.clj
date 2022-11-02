@@ -93,7 +93,7 @@ post g "q" data)
   )
 
 (defn pull [g eid selector]
-  (let [data {:eid (str eid)
+  (let [data {:eid (str (eval eid))
               :selector (str selector)
               }]
     (post g "pull" data)
@@ -241,28 +241,34 @@ post g "q" data)
    )
 
   (update-block g {:uid "w-9UmjI-0" :string "Hello Roam!"} )
-  (def gt (load-edn "Tickers.edn"))
+  (def gt
+    g
+    ;(load-edn "Tickers.edn")
+    ;(load-edn "/Users/dc/dc.edn")
+    )
   (write gt "Hello" {:heading 3 :text-align "left"})
-  (write g
-   "Hello Roam!")
 
   (cur-daily-page)
 
-  (q g '[:find ?block-uid ?block-str
-              :in $ ?search-string ?search-string2
-              :where [?b :block/uid ?block-uid]
-              [?b :block/string ?block-str]
-              [(clojure.string/includes? ?block-str ?search-string)]
-         [(clojure.string/includes? ?block-str ?search-string2)]
-         ]
-     "Roam" "API"
+  (q gt '[:find ?block-uid ?block-str
+               :in $ ?search-string ?search-string2
+               :where [?b :block/uid ?block-uid]
+               [?b :block/string ?block-str]
+               [(clojure.string/includes? ?block-str ?search-string)]
+               [(clojure.string/includes? ?block-str ?search-string2)]
+               ]
+     "Roam " "API"
      )
 
-  (pull gt '[:block/uid "10-31-2022"]
+  (pull dc '[:block/uid (cur-daily-page)]
         '[:block/uid :node/title :block/string
           {:block/children [:block/uid :block/string]}
-          {:block/refs [:node/title :block/string :block/uid]}]
+          {:block/refs [:node/title :block/string :block/uid]}
+          ]
         )
+
+  (q dc
+     ')
 
   (def d (load-json "roam-api.json"))
 
