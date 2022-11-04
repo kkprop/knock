@@ -23,10 +23,13 @@
 (defn cur-daily-page []
   (cur-time-str "MM-dd-yyyy"))
 
-
 (defn cur-daily-page-title []
-  (cur-time-str "MMMM dd, yyyy")
-  )
+  (let [num-suffix {"1" "st" "2" "nd" "3" "rd" "21" "st" "22" "nd" "23" "rd" "31" "st"}
+        [m d y] (cur-time-str "MMMM " "d" ", yyyy")
+        ]
+        (str m (str d (get num-suffix d "th")) y)
+    )
+    )
 ;;
 (defn post [g route data]
   (let [url (api-url g route)
@@ -72,7 +75,7 @@
           (if (= msg "babashka.curl: status 400")
             ;;probably no daily note try create
             (do 
-              (create-page g {:title "October 31st, 2022" :uid (cur-daily-page)})
+              (create-page g {:title (cur-daily-page-title) :uid (cur-daily-page)})
               (post g "write" data)
               )
             msg)
@@ -96,7 +99,7 @@ post g "q" data)
   (let [data {:eid (str (eval eid))
               :selector (str selector)
               }]
-    (post g "pull" data)
+    ;(post g "pull" data)
     )
   )
 
@@ -198,7 +201,8 @@ post g "q" data)
 (defn append-code [file-name code]
   (spit file-name 
         (clojure.string/replace 
-         (with-out-str
+      
+   (with-out-str
            (clojure.pprint/pprint code)
            )
          #"clojure.core/"
@@ -260,15 +264,13 @@ post g "q" data)
      "Roam " "API"
      )
 
-  (pull dc '[:block/uid (cur-daily-page)]
+  (pull gt '[:block/uid (cur-daily-page)]
         '[:block/uid :node/title :block/string
           {:block/children [:block/uid :block/string]}
           {:block/refs [:node/title :block/string :block/uid]}
           ]
         )
 
-  (q dc
-     ')
 
   (def d (load-json "roam-api.json"))
 

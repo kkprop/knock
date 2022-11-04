@@ -17,10 +17,18 @@
   ([]
    (cur-time-str "yyyy-MM-dd hh:mm:ss")
    )
-  ([fmt]
-   (.format (java.text.SimpleDateFormat. fmt) (java.util.Date.))
-   )
-  )
+  ([fmt & args]
+   (let [d (java.util.Date.)
+         xs (apply conj [fmt] args)
+         res (map 
+          #(.format (java.text.SimpleDateFormat. %) d)
+          xs)
+         ]
+     (if (= 1 (count res))
+       (first res)
+       res
+       )
+     )))
 
 
 (defn map-on-key [f m]
