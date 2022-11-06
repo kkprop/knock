@@ -248,8 +248,8 @@ post g "q" data)
   (def gt
     g
     ;(load-edn "Tickers.edn")
-    ;(load-edn "/Users/dc/dc.edn")
     )
+  (def gt (load-edn "/Users/dc/dc.edn"))
   (write gt "Hello" {:heading 3 :text-align "left"})
 
   (cur-daily-page)
@@ -261,7 +261,7 @@ post g "q" data)
                [(clojure.string/includes? ?block-str ?search-string)]
                [(clojure.string/includes? ?block-str ?search-string2)]
                ]
-     "Roam " "API"
+     "library" "zlib"
      )
 
   (pull gt '[:block/uid (cur-daily-page)]

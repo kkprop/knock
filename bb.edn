@@ -11,6 +11,7 @@
              [babashka.wait :as wait]
              [knock.utils :as u]
              [knock.roam :as r]
+             [knock.wn :as w]
             )
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
               proc (process (str "bb nrepl-server " port) {:inherit true})]
@@ -22,7 +23,12 @@
   clean (do
           (println "Removing target folder.")
           (fs/delete-tree "target"))
-  write-roam (do (r/write r/g (clojure.string/join " " *command-line-args* ) :text-align "left"))
-  ;write-roam (do (r/write (u/load-edn "/Users/dc/dc.edn") (clojure.string/join " " *command-line-args* ) :text-align "left"))
+  ;write-roam (do (r/write r/g (clojure.string/join " " *command-line-args* ) :text-align "left"))
+  write-roam (do (r/write (u/load-edn "/Users/dc/dc.edn")
+                          (clojure.string/join " " *command-line-args* )
+                          :text-align "left"))
+
+  wordnet (do (println (w/search-wn (first *command-line-args*)))
+                )
 }
 }
