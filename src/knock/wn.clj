@@ -1,6 +1,7 @@
 (ns knock.wn
   (:require [clojure.java.shell :refer [sh]]
             [clojure.string :as string]
+            [knock.utils :as utils :refer :all]
    )
   )
 
@@ -64,32 +65,12 @@
        (cons run (partition-by-string f (lazy-seq (drop (count run) s))))))))
 
 
-(defn flatten-hashmap
-  ([m]
-   (if (empty? m)
-     []
-     (flatten-hashmap (seq m) [])))
-  ([m xk]
-   (if (coll? m)
-     (let [[k v] (first m)
-           ks (cons k xk)
-           nv (if (map? v)
-                (flatten-hashmap v ks)
-                (if (coll? v)
-                  (map #(flatten-hashmap % ks) v)
-                  [ks v]))]
-       (if (empty? (rest m))
-         [nv]
-         (cons nv (flatten-hashmap (rest m) xk))
-         ))
-     [xk m])))
-
 (def rev-div
   (let [kv (flatten (flatten-hashmap div))]
     kv
     ))
 
-
+;;search by one option
 (defn- search [s opt]
   (let [raw (:out (sh wn s opt))
         xs (->> (partition-by-string (partial div-fn divs) raw)
@@ -97,6 +78,7 @@
     xs
     ))
 
+;;find out all the options of wordnet for the string
 (defn- opts [s]
   (let [raw (:out (sh wn s))]
     (->> (partition-by #{\newline \tab } raw)
@@ -106,15 +88,20 @@
          ;omit the duplicated options
          (map first)
          )))
+
+;;search word net for all the options of a word
 (defn search-wn [s]
-  (let [raw (->> (opts s)
-                 (map (partial search s)))]
-    raw
+  (if-let [x s]
+    (->> (opts s)
+             (map (partial search s)))
+    "need one word to contintue"
   ))
 
 
 (comment
+  (opts "sense")
   (search-wn "sense")
+  (search-wn '())
   (parsing "a\nb\nc")
   (search "sense" "-hypen")
 

@@ -24,11 +24,15 @@
           (println "Removing target folder.")
           (fs/delete-tree "target"))
   ;write-roam (do (r/write r/g (clojure.string/join " " *command-line-args* ) :text-align "left"))
-  write-roam (do (r/write (u/load-edn "/Users/dc/dc.edn")
+  write-roam (do (r/write r/g;(u/load-edn "/Users/dc/dc.edn")
                           (clojure.string/join " " *command-line-args* )
                           :text-align "left"))
 
   wordnet (do (println (w/search-wn (first *command-line-args*)))
                 )
-}
+  uberjar (do
+            (println "Making uberjar")
+            (clojure "-X:uberjar"))
+  uberjar:clean (do (run 'clean)
+                    (run 'uberjar))}
 }
