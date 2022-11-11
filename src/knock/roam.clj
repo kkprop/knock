@@ -7,6 +7,7 @@
    ))
 
 (def g {:name "xzl"
+
         :token "roam-graph-token-dW9r1QFGTupMhchw-dmp4mC1Jdw0w4I77pRCVlp6"})
 
 (def base "https://api.roamresearch.com/api/graph")
@@ -246,13 +247,14 @@ post g "q" data)
 
   (update-block g {:uid "w-9UmjI-0" :string "Hello Roam!"} )
   (def gt
-    g
+    ;g
     ;(load-edn "Tickers.edn")
     )
   (def gt (load-edn "/Users/dc/dc.edn"))
   (write gt "Hello" {:heading 3 :text-align "left"})
 
   (cur-daily-page)
+  (write gt "Hello" )
 
   (q gt '[:find ?block-uid ?block-str
                :in $ ?search-string ?search-string2

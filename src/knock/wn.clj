@@ -1,6 +1,6 @@
 (ns knock.wn
   (:require [clojure.java.shell :refer [sh]]
-            [clojure.string :as string]
+            [clojure.string :as str]
             [knock.utils :as utils :refer :all]
    )
   )
@@ -83,15 +83,15 @@
   (let [raw (:out (sh wn s))]
     (->> (partition-by #{\newline \tab } raw)
          (map #(apply str %))
-         (filter #(string/starts-with? % "-"))
-         (map #(string/split % #", " ))
+         (filter #(str/starts-with? % "-"))
+         (map #(str/split % #", " ))
          ;omit the duplicated options
          (map first)
          )))
 
 ;;search word net for all the options of a word
-(defn search-wn [s]
-  (if-let [x s]
+(defn search-wn [& xs]
+  (if-let [s (str/join " " xs)]
     (->> (opts s)
              (map (partial search s)))
     "need one word to contintue"
