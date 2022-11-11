@@ -1,19 +1,23 @@
-* Knock 
+- Knock
+- Usage:
+    - bb -m knock.main
+    - bb -m knock.main -h
+    - change directory to the folder
+        - write to Roam:
+            - bb write-roam Hi from shell
+        - query wordnet
+            - bb wordnet reality
+            - bb wordnet Lao Zi
+    - put alias into .bashrc or .zshrc or ...
+        - · 
+            - wn='cd ~/kkprop/knock/; bb wordnet'
+            - roam="cd ~/kkprop/knock/; bb write-roam"
+        - then in the shell simply query wordnet 
+            - wn Hesse
+- dependency
+    - [babashka](https://github.com/babashka/babashka/releases)
+    - [selenium](https://www.selenium.dev/)
+        - For OSX
+            - brew install borkdude/brew/babashka
+            - brew install chromedriver
 
-
-* Usage: 
-bb -m knock.main
-
-bb -m knock.main -h
-
-
-bb write-roam Hi from shell
-
-
-* dependency 
- - [babashka](https://github.com/babashka/babashka/releases)
- - [selenium](https://www.selenium.dev/)
-    - For OSX
-
-        brew install borkdude/brew/babashka
-        brew install chromedriver
