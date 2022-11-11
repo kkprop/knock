@@ -28,7 +28,7 @@
   ;                        (clojure.string/join " " *command-line-args* )
   ;                        :text-align "left"))
 
-  wordnet (do (println (w/search-wn (first *command-line-args*)))
+  wordnet (do (println (apply w/search-wn  *command-line-args*))
                 )
   uberjar (do
             (println "Making uberjar")

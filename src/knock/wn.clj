@@ -90,10 +90,9 @@
          )))
 
 ;;search word net for all the options of a word
-(defn search-wn [& xs]
+(defn search-wn [ & xs]
   (if-let [s (str/join " " xs)]
-    (->> (opts s)
-             (map (partial search s)))
+    (->> (opts s) (map (partial search s)))
     "need one word to contintue"
   ))
 
@@ -101,6 +100,7 @@
 (comment
   (opts "sense")
   (search-wn "sense")
+  (search-wn "Hermann" "Hesse")
   (search-wn '())
   (parsing "a\nb\nc")
   (search "sense" "-hypen")
