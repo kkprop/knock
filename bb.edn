@@ -3,6 +3,11 @@
         org.clojure/core.logic {:mvn/version "1.0.1"}
         etaoin/etaoin {:mvn/version "1.0.38"}
         djblue/portal {:mvn/version "0.32.0"}
+        org.clojure/core.cache {:mvn/version "1.0.225"}
+        org.clojure/core.specs.alpha {:mvn/version "0.2.62"}
+        org.babashka/spec.alpha {:git/url "https://github.com/babashka/spec.alpha"
+                         :git/sha "1a841c4cc1d4f6dab7505a98ed2d532dd9d56b78"}
+        refactor-nrepl/refactor-nrepl {:mvn/version "2.5.1"}
         }
  :repl-options {:init-ns search.main}
  :tasks
@@ -23,10 +28,10 @@
   clean (do
           (println "Removing target folder.")
           (fs/delete-tree "target"))
-  write-roam (do (r/write r/g (clojure.string/join " " *command-line-args* ) :text-align "left"))
-  ;write-roam (do (r/write (u/load-edn "/Users/dc/dc.edn")
-  ;                        (clojure.string/join " " *command-line-args* )
-  ;                        :text-align "left"))
+  write-roam-xzl (do (r/write r/g (clojure.string/join " " *command-line-args* ) :text-align "left"))
+  write-roam (do (r/write (u/load-edn "/Users/dc/dc.edn")
+                          (clojure.string/join " " *command-line-args* )
+                          :text-align "left"))
 
   wordnet (do (println (apply w/search-wn  *command-line-args*))
                 )
