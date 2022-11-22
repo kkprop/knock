@@ -92,7 +92,7 @@
               }
         ]
     (
-post g "q" data)
+     post g "q" data)
     )
   )
 
@@ -100,16 +100,14 @@ post g "q" data)
   (let [data {:eid (str (eval eid))
               :selector (str selector)
               }]
-    ;(post g "pull" data)
+    (post g "pull" data)
     )
   )
 
 
 ;;TODO
 ;;"batch-actions": {"action": "batch-actions", "actions": []},
-
 ;;
-
 
 (defn create-page [g {:keys [action uid title children-view-type],
                       :or {uid "", title "List of participants", children-view-type "document",
@@ -208,7 +206,8 @@ post g "q" data)
            )
          #"clojure.core/"
          ""
-         )
+         
+)
         )
   )
 
@@ -239,6 +238,26 @@ post g "q" data)
 ; "src/knock/roam.clj"
 ; )
 
+(defn search-block [g s]
+  (q g '[:find ?block-uid ?block-str
+          :in $ ?search-string
+          :where [?b :block/uid ?block-uid]
+          [?b :block/string ?block-str]
+          [(clojure.string/includes? ?block-str ?search-string)]
+           ]
+     s
+     )
+  )
+
+(defn pull-daily-notes [g]
+  (pull g '[:block/uid (cur-daily-page)]
+        '[:block/uid :node/title :block/string
+          {:block/children [:block/uid :block/string]}
+          {:block/refs [:node/title :block/string :block/uid]}]
+        )
+  )
+
+
 (comment
   (macroexpand 
    (gen-json-fn
@@ -250,7 +269,6 @@ post g "q" data)
     ;g
     ;(load-edn "Tickers.edn")
     )
-  (def gt (load-edn "/Users/dc/dc.edn"))
   (write gt "Hello" {:heading 3 :text-align "left"})
 
   (cur-daily-page)
@@ -265,15 +283,6 @@ post g "q" data)
                ]
      "library" "zlib"
      )
-
-  (pull gt '[:block/uid (cur-daily-page)]
-        '[:block/uid :node/title :block/string
-          {:block/children [:block/uid :block/string]}
-          {:block/refs [:node/title :block/string :block/uid]}
-          ]
-        )
-
-
   (def d (load-json "roam-api.json"))
 
   (def j {"update-page"

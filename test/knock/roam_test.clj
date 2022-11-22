@@ -28,11 +28,8 @@
 
   ;; not working due to recent daily pages have no refs anymore
   ;; seems that the  cache is missing.
-  (pull gt '[:block/uid (cur-daily-page)]
-        '[:block/uid :node/title :block/string
-          {:block/children [:block/uid :block/string]}
-          {:block/refs [:node/title :block/string :block/uid]}]
-                    )
+  ;; fixed. Thank you Baibhav
+  (pull-daily-notes gt)
 ;
   )
 
