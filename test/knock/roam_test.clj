@@ -10,11 +10,6 @@
   (def gt (load-edn "/Users/dc/dc.edn"))
   ;;(def gt g)
 
-  (pull gt '[:find ?block-str
-          :in $ ?uid
-          :where [?b :block/uid ?block-uid]
-          ]
-     )
 
   (q gt '[:find ?e ?r
           :in $ ?uid
@@ -29,10 +24,45 @@
   ;; not working due to recent daily pages have no refs anymore
   ;; seems that the  cache is missing.
   ;; fixed. Thank you Baibhav
-  (pull-daily-notes gt)
+  (pull-daily-note gt )
+
+
+  (pull-uid gt "tUvDXXfKo")
+  (pull-uid gt (cur-daily-page))
+
+  (identity (cur-daily-page))
+
+  (str
+   (eval
+    (identity
+     '[:block/uid (cur-daily-page)]
+     )
+    ))
+
+
+  (defn f[uid]
+    (str
+     (eval
+      (identity
+       '[:block/uid (eval uid)]
+       )
+      )
+     ))
+
+  (f "uid")
+   (eval (str "abc" "-def"))
+
+;;
+
+
+
+
+
+
+
+
 ;
   )
-
 
 
 

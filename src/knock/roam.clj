@@ -97,7 +97,7 @@
   )
 
 (defn pull [g eid selector]
-  (let [data {:eid (str (eval eid))
+  (let [data {:eid (str eid)
               :selector (str selector)
               }]
     (post g "pull" data)
@@ -199,17 +199,12 @@
 
 (defn append-code [file-name code]
   (spit file-name 
-        (clojure.string/replace 
-      
-   (with-out-str
+        (clojure.string/replace (with-out-str
            (clojure.pprint/pprint code)
            )
          #"clojure.core/"
          ""
-         
-)
-        )
-  )
+)))
 
 (defmacro gen-json-fn [j file-name]
   `(do
@@ -249,12 +244,16 @@
      )
   )
 
-(defn pull-daily-notes [g]
-  (pull g '[:block/uid (cur-daily-page)]
-        '[:block/uid :node/title :block/string
-          {:block/children [:block/uid :block/string]}
-          {:block/refs [:node/title :block/string :block/uid]}]
-        )
+(defn pull-uid [g uid]
+  (let []
+    (pull g (format "[:block/uid \"%s\"]" uid)
+          '[:block/uid :node/title :block/string
+            {:block/children [:block/uid :block/string]}
+            {:block/refs [:node/title :block/string :block/uid]}]
+          )))
+
+(defn pull-daily-note [g]
+  (pull-uid g (cur-daily-page))
   )
 
 
