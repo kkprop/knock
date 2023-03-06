@@ -35,8 +35,8 @@
   )
 ;; keys:
 ;;
-(defn hello-world [{:keys [uri body headers
-                    :as request]}]
+(defn hello-world [{:keys [uri body headers]
+                    :as request}]
   (let [path uri]
     (cond
       (= path "/sdk")
