@@ -4,6 +4,9 @@
             )
   )
 
+(def j json/generate-string)
+(def e clojure.edn/read-string)
+(defn jstr-to-edn [s] (json/parse-string s true))
 
 (defn load-edn [path & {:keys [readers]}]
   (if (nil? readers)
@@ -79,5 +82,4 @@
     (->> (flatten-hashmap m)
          ;; for 
          (remove #(empty? (clojure.set/intersection hs (apply hash-set (first %))))))))
-
 

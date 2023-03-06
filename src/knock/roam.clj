@@ -7,7 +7,6 @@
    ))
 
 (def g {:name "xzl"
-
         :token "roam-graph-token-dW9r1QFGTupMhchw-dmp4mC1Jdw0w4I77pRCVlp6"})
 
 (def base "https://api.roamresearch.com/api/graph")
