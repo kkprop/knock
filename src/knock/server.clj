@@ -15,7 +15,7 @@
     (@server :timeout 1000)
     (reset! server nil)))
 
-(defn- make-body [m & {:keys [headers]
+(defn make-body [m & {:keys [headers]
                        :or {headers {"Content-Type" "application/json"}}
                        :as opts}]
   (let [orig {:headers headers
