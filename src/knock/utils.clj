@@ -1,6 +1,8 @@
 (ns knock.utils
   (:require [clojure.java.io :as io]
             [cheshire.core :as json]
+            [clojure.set :as set]
+            [clojure.edn :as edn]
             )
   )
 
@@ -10,8 +12,8 @@
 
 (defn load-edn [path & {:keys [readers]}]
   (if (nil? readers)
-    (clojure.edn/read-string (slurp path))
-    (clojure.edn/read-string {:readers readers} (slurp path))))
+    (edn/read-string (slurp path))
+    (edn/read-string {:readers readers} (slurp path))))
 
 (defn load-json [path] (json/parse-string (slurp path)))
 
@@ -81,5 +83,5 @@
   (let [hs (apply hash-set ks)]
     (->> (flatten-hashmap m)
          ;; for 
-         (remove #(empty? (clojure.set/intersection hs (apply hash-set (first %))))))))
+         (remove #(empty? (set/intersection hs (apply hash-set (first %))))))))
 
