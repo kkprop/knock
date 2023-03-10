@@ -18,6 +18,12 @@
 (defn load-json [path] (json/parse-string (slurp path)))
 
 
+(defn force-str [x]
+  (if (string? x)
+    x
+    (name x)
+    ))
+
 (defn cur-time-str
   ([]
    (cur-time-str "yyyy-MM-dd hh:mm:ss")
