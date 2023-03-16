@@ -10,14 +10,16 @@
             - bb wordnet Lao Zi
     - put alias into .bashrc or .zshrc or ...
         - · 
-            - wn='cd ~/kkprop/knock/; bb wordnet'
-            - roam="cd ~/kkprop/knock/; bb write-roam"
+            - wn='bb --config ~/kkprop/knock/bb.edn wordnet'
+            - roam="bb --config ~/kkprop/knock/bb.edn bb write-roam"
         - then in the shell simply query wordnet 
             - wn Hesse
 - dependency
     - [babashka](https://github.com/babashka/babashka/releases)
+            - brew install borkdude/brew/babashka
     - [selenium](https://www.selenium.dev/)
         - For OSX
-            - brew install borkdude/brew/babashka
             - brew install chromedriver
-
+    - [roam research](https://relemma-git-feat-frontdesk.roamresearch.com/)
+        - using links 👆 to get access token of your Graph
+          - which located in Roam Research: · · · in the up right corner -> Settings > Graph Tab -> API Tokens
