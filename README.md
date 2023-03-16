@@ -14,6 +14,7 @@
             - roam="bb --config ~/kkprop/knock/bb.edn bb write-roam"
         - then in the shell simply query wordnet 
             - wn Hesse
+            - wn Hermann von Helmholtz 
 - dependency
     - [babashka](https://github.com/babashka/babashka/releases)
             - brew install borkdude/brew/babashka

@@ -101,7 +101,8 @@
   (opts "sense")
   (search-wn "sense")
   (search-wn "Hermann" "Hesse")
-  (search-wn '())
+  (search-wn '()
+             )
   (parsing "a\nb\nc")
   (search "sense" "-hypen")
 
@@ -113,3 +114,4 @@
  ;; {{[[TODO]]}}铪，可以写一个，一键备份当前macros到hulu里的工具了   
   (partition-by-string (partial div-fn divs) "=> a \n b \n\n c"  )
   )
+
