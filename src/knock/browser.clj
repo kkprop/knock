@@ -7,7 +7,6 @@
    [portal.api :as p]
    [cheshire.core :as json]
    [knock.utils :as u]
-   
    [knock.utils :as utils])
   )
 
@@ -16,9 +15,13 @@
 (def driver
   (e/chrome {:profile chrome-profile}))
 
+(def click-multi (apply partial e/click-multi [driver]))
 
 (defn go [url]
   (e/go driver url))
+
+(defn click [& q]
+  (e/click driver (vec q)))
 
 (defn search [url word]
   (e/go driver (str url word) )
@@ -26,7 +29,6 @@
 
 (defn wiki [word]
   (search "https://www.wikiwand.com/en/" word))
-
 
 (defn kv-url [& args]
   ;app=%s&&project=media&&env=default"
@@ -74,9 +76,39 @@
   ;;calc on what version no needed
   (keys vd)
 
-  (go "https://jisho.org/search/心")
   (go "https://jisho.org/search/慈")
-  (go "https://jisho.org/search/悲")
 
 ;
   )
+
+
+
+(defn list-equal-match [xsa xsb]
+  (->>
+   (zipmap xsa xsb)
+   (filter (fn [[a b]]
+             (= a b)))
+   (map first)
+   ))
+
+(list-equal-match ['driver 'c 'd] ['driver 'c])
+
+(defn gen-single-fn [name entity & to-omit-args]
+  (let [m  (meta entity)
+        arg-matches (vec (flatten (->> to-omit-args
+                                       (map #(list-equal-match (:arglists m) %))
+                                       (remove empty?))))]
+    (list name arg-matches)))
+
+(defn gen-partial [ns & to-omit-args]
+  (->> (ns-publics ns)
+       (map #(gen-single-fn (first %) (second %) to-omit-args))
+       ))
+(gen-partial 'etaoin.api ['driver] ['non])
+
+;;TODO expose all functions in etaoin which start with a driver
+(->>
+ (ns-publics 'etaoin.api)
+ (take 2)
+ (map #(meta (second %))))
+
