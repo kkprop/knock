@@ -16,6 +16,7 @@
              [babashka.process :as p :refer [process]]
              [babashka.wait :as wait]
              [knock.utils :as u]
+             [knock.server :as s]
              [knock.roam :as r]
              [knock.wn :as w]
             )
@@ -36,6 +37,9 @@
 
   wordnet (do (println (apply w/search-wn  *command-line-args*))
                 )
+
+  local-call (apply s/local-call *command-line-args*)
+
   uberjar (do
             (println "Making uberjar")
             (clojure "-X:uberjar"))

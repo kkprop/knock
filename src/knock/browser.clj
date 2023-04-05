@@ -1,3 +1,4 @@
+
 (ns knock.browser
   (:require 
    [etaoin.api :as e]
@@ -6,18 +7,18 @@
    [portal.api :as p]
    [cheshire.core :as json]
    [knock.utils :as u]
-   )
+   
+   [knock.utils :as utils])
   )
 
+(utils/config :chrome-profile)
 
-(def chrome-profile
-  "/Users/dc/Library/Application Support/Google/Chrome/Profile 2/Confluence")
+(def driver
+  (e/chrome {:profile chrome-profile}))
 
-(def driver (e/chrome {:profile chrome-profile}))
 
 (defn go [url]
   (e/go driver url))
-
 
 (defn search [url word]
   (e/go driver (str url word) )
@@ -54,17 +55,16 @@
 
 (comment
   (wiki "Philip H. Dybvig")
-  (->> 
+  (->>
    (e/query-tree driver :content-root {:tag :article})
-   (map #(e/get-element-text-el driver %))
-   )
+   (map #(e/get-element-text-el driver %)))
   (fun
    (f2
     (f22 ada))
-   2 3 )
+   2 3)
 
-  (def h (take 1000 
-               (app-history "default" "media" "vos2" )))
+  (def h (take 1000
+               (app-history "default" "media" "vos2")))
 
   (def vd
     (u/map-on-val
@@ -73,6 +73,10 @@
 
   ;;calc on what version no needed
   (keys vd)
+
+  (go "https://jisho.org/search/心")
+  (go "https://jisho.org/search/慈")
+  (go "https://jisho.org/search/悲")
 
 ;
   )

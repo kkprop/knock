@@ -3,6 +3,7 @@
    [clojure.string :as str]
    [cheshire.core :as json]
    [knock.utils :as utils]
+   [babashka.curl :as curl]
    [org.httpkit.server :as server])
   )
 
@@ -53,8 +54,17 @@
   {:status 200 :body "ok"}
   )
 
+(defn local-call [fn-name req]
+  (let [url (str "http://127.0.0.1:16916/" (utils/force-str fn-name))]
+    (curl/get url {:body 
+                        (if (string? req)
+                            req
+                            (json/generate-string req))})))
+
 
 (comment
   (run hello-world {:port 16916})
   (run handler {:port 16916})
+
+  (local-call :prompt ["random an emoji"])
   )

@@ -63,7 +63,6 @@
     `(defn ~fname [& args]
        (apply (partial run-cmd ~name) args))))
 
-
 ;;pure sequentially list a directory
 (defn ls-f1 [path]
   (drop 2
@@ -251,6 +250,7 @@
 (defn load-conf [name]
   (load-edn (conf-path-edn name))
   )
+
 
 (defn agora-conf []
   (load-conf "agora"))
@@ -607,6 +607,16 @@
         (map #(apply exfoliation
                      (select-or-get % k)
                      (rest ks)) m)))))
+
+;; load from default config file
+;;  i.e. (config :chrome-profile)
+;;       a varible chrome-profile is defined
+(defmacro config [name & {:keys [config-path]
+                          :or {config-path "resources/config.edn"}}]
+  (let [var-name (symbol (force-str name))
+        key-word (keyword (force-str name))]
+    `(def ~var-name (~key-word (load-edn "resources/config.edn")))))
+
 
 (comment
   (tree-diff a b vcf-count)
