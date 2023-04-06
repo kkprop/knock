@@ -18,7 +18,6 @@
              [knock.utils :as u]
              [knock.server :as s]
              [knock.roam :as r]
-             [knock.jp :as jp]
              [knock.wn :as w]
             )
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
