@@ -18,6 +18,7 @@
              [knock.utils :as u]
              [knock.server :as s]
              [knock.roam :as r]
+             [knock.jp :as jp]
              [knock.wn :as w]
             )
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
@@ -39,6 +40,7 @@
                 )
 
   local-call (apply s/local-call *command-line-args*)
+  jp (apply jp/search-word *command-line-args*)
 
   uberjar (do
             (println "Making uberjar")

@@ -8,18 +8,25 @@
 
 (defn search-word [word]
   (go (str "https://jisho.org/search/" word))
-  (when-not (nil? (e/get-element-inner-html driver voice))
-    (click voice))
-  (e/get-element-text driver text)
+  (try 
+     (click voice)
+     (catch Exception e "no voice to click")
+     )
+  (try 
+    (e/get-element-text driver text)
+    (catch Exception e nil)
+    )
   ;;
   )
 
 
 
 (comment
-  (search-word "心")
+  (search-word "経度")
   (search-word "意")
-  (search-word "识")
+  (search-word "心")
   (search-word "慈")
+
+  (search-word "识")
 ;;
   )
