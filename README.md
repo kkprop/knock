@@ -1,4 +1,6 @@
 - Knock
+=======
+
 - Usage:
     - bb -m knock.main
     - bb -m knock.main -h
@@ -24,3 +26,13 @@
     - [roam research](https://relemma-git-feat-frontdesk.roamresearch.com/)
         - using links 👆 to get access token of your Graph
           - which located in Roam Research: · · · in the up right corner -> Settings > Graph Tab -> API Tokens
+
+- Lucy
+======
+
+# An etaoin browser for web pages navigation#
+  * the browser is at background
+  * things requested are piped sequencially
+  * request can be repeated.
+  
+

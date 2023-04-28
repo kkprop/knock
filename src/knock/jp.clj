@@ -27,6 +27,9 @@
   (search-word "心")
   (search-word "慈")
 
+  ;;need to convert
   (search-word "识")
+
+  (search-word "ここ")
 ;;
   )

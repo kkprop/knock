@@ -1,19 +1,53 @@
 
 (ns knock.browser
-  (:require 
+  (:require
    [etaoin.api :as e]
    [etaoin.keys :as k]
    [clojure.java.io :as io]
    [portal.api :as p]
    [cheshire.core :as json]
-   [knock.utils :as u]
-   [knock.utils :as utils])
-  )
+   [clojure.edn :as edn]
+   [knock.utils :as utils]
+   [clojure.pprint :as pp]))
+
+(defn- timeout [timeout-ms callback]
+  (let [fut (future (callback))
+        ret (deref fut timeout-ms :timed-out)]
+    (when (= ret :timed-out)
+      (future-cancel fut))
+    ret))
+
+(defn conn [driver]
+  (utils/select driver :host :port))
+
+(def driver-edn-path "etaoin-driver-conn.edn")
 
 (utils/config :chrome-profile)
 
+(defn new-driver []
+  (let [d
+        (e/chrome
+          {:profile chrome-profile}
+         )
+        c (conn d)]
+    (spit driver-edn-path (with-out-str (clojure.pprint/pprint c)))
+    d)
+  )
+
+(defn load-driver []
+  (let [d (timeout 1000 (partial
+                        e/chrome
+                        (assoc (utils/load-edn driver-edn-path)
+                               :headless :true)))]
+    (if (= d :timed-out)
+      (new-driver)
+      d
+      )
+    ))
+
 (def driver
-  (e/chrome {:profile chrome-profile}))
+  (load-driver))
+
 
 (def click-multi (apply partial e/click-multi [driver]))
 
@@ -69,7 +103,7 @@
                (app-history "default" "media" "vos2")))
 
   (def vd
-    (u/map-on-val
+    (utils/map-on-val
      #(map (fn [m] (select-keys m [:idc :operator])) %)
      (group-by #(select-keys % [:version]) h)))
 
@@ -80,8 +114,6 @@
 
 ;
   )
-
-
 
 (defn list-equal-match [xsa xsb]
   (->>
