@@ -5,10 +5,14 @@
    [etaoin.keys :as k]
    [clojure.java.io :as io]
    [portal.api :as p]
+   [taoensso.timbre :as timbre]
    [cheshire.core :as json]
    [clojure.edn :as edn]
    [knock.utils :as utils]
    [clojure.pprint :as pp]))
+
+;; disable etaoin detail log
+(timbre/set-level! :info)
 
 (defn- timeout [timeout-ms callback]
   (let [fut (future (callback))
@@ -35,15 +39,18 @@
   )
 
 (defn load-driver []
-  (let [d (timeout 1000 (partial
-                        e/chrome
-                        (assoc (utils/load-edn driver-edn-path)
-                               :headless :true)))]
+  (let [d
+        (try (timeout 1000 (partial
+                            e/chrome
+                            (assoc (utils/load-edn driver-edn-path)
+                                   :headless :true)))
+             ;;any exception happen means we need a new-driver too.
+             ;;  just return :timed-out to trigger a new-driver call
+             (catch Exception e :timed-out)
+             )]
     (if (= d :timed-out)
       (new-driver)
-      d
-      )
-    ))
+      d)))
 
 (def driver
   (load-driver))
