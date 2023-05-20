@@ -9,11 +9,17 @@
    [clojure.java.shell :as shell :refer [sh]]
    [cheshire.core :as json :refer :all]
    [babashka.fs :as fs]
+   [babashka.curl :as curl]
+   [medley.core :as m]
    [clojure.zip :as z]
    [clojure.core.async :as a]
    [clojure.edn :as edn]))
 
 (def os-name (System/getProperty "os.name"))
+
+(defn uuid []
+  (java.util.UUID/randomUUID)
+  )
 
 (defn join-cmd [& cmd]
   (str/join " " cmd))
@@ -62,6 +68,7 @@
   (let [fname (symbol name)]
     `(defn ~fname [& args]
        (apply (partial run-cmd ~name) args))))
+
 
 ;;pure sequentially list a directory
 (defn ls-f1 [path]
@@ -186,7 +193,43 @@
 (defn jstr-to-edn [s] (json/parse-string s true))
 
 ;; Provider information loading
-(defn load-json [name] (parse-string (slurp (format "resources/conf/%s.json" name))))
+(defn load-json-conf [name] (parse-string (slurp (format "resources/conf/%s.json" name))))
+
+(defn load-json [path]
+  (let [s (slurp path)
+        xs (map #(parse-string % true)
+             ;;force to be vector in order to parse multiple json objects
+                (str/split-lines s))]
+    (if (= 1 (count xs))
+      (first xs)
+      xs)
+    ))
+
+
+
+(defn curl-any [method url & {:keys [headers body]
+                              :or {headers {"Content-Type" "application/json"}}
+                              :as opts
+                              }]
+  (let [res
+        (try
+          (method url (assoc opts  
+                       :body {j body})
+                       )
+          (catch Exception e (ex-data e)))]
+
+    (assoc res :body
+           (try
+             (jstr-to-edn (:body res))
+             ;;can't convert to edn, just return
+             (catch Exception e (:body res))
+             ))) )
+
+
+(def curl-get (partial curl-any curl/get))
+(def curl-post (partial curl-any curl/post))
+
+
 
 (def ip-regex #"(?:[0-9]{1,3}\.){3}[0-9]{1,3}")
 (def dash-ip-regex #"(?:[0-9]{1,3}-){3}[0-9]{1,3}")
@@ -250,7 +293,6 @@
 (defn load-conf [name]
   (load-edn (conf-path-edn name))
   )
-
 
 (defn agora-conf []
   (load-conf "agora"))
@@ -559,13 +601,233 @@
     ))
 
 (defn slash-keys [& xs]
-  (keyword (str/join "/" (map #(force-str %) xs))))
+  (if (nil? xs)
+    nil
+    (keyword (str/join "/" (map #(force-str %) xs)))
+    )
+  )
 
+(defn slash-list [xs]
+  (apply slash-keys (reverse (flatten xs))))
+
+;;rude way of flatten members with list will only have one. lost others
 (defn slash-flatten-map [m]
   (->> (flatten-hashmap m)
        (map #(map-on-key (fn [x] (apply slash-keys x) ) %))
        (apply merge)
-       ))
+       )
+  )
+(defn slash-keep-last [m]
+  (map-on-key #(keyword (last (str/split (force-str %) #"/"))) m))
+
+(defn all-the-same?
+  ([xs]
+   (all-the-same? xs =))
+  ([xs f]
+   (let [x (first xs)]
+     (every? #(f x %) xs))))
+
+(defn longest-match [& xss]
+  (let [n (apply max (map count xss))]
+    (loop [i 0]
+      (if (= i n)
+        ;;(map #(partition-all n %) xss)
+        i
+        (if-not (all-the-same?
+                 (flatten
+                  (map #(nth % i nil) xss)))
+          i
+          (recur (+ i 1))))
+          ;;
+      )))
+
+
+
+(def db-id (atom -1))
+(defn reset-id []
+  (reset! db-id 0))
+(defn seq-id []
+  (swap! db-id dec )
+  )
+
+(defn e-kv [[k v]]
+  (println k v)
+  )
+
+(defn entities
+  ([m]
+   (let [_ (reset-id)]
+     (map second (entities m {:db/id (seq-id)
+                              :pid -1
+                              :key []}))))
+  ([m context]
+   (let [xs (tree-seq map? identity m)
+         kvs (drop 1 xs)
+         id (:db/id context)]
+     (if (= 1 (count xs))
+       {:context context}
+       (->> kvs
+            (mapcat (fn [[k v]]
+                      (if (sequential? v)
+                        ;;mapcat a list v
+                        (mapcat #(entities % (assoc context
+                                                    :db/id (seq-id)
+                                                    :p2c-key k
+                                                    :key (conj (:key context) k)
+                                                    :is-list true
+                                                    :pid id
+                                                    :v %)) v)
+                        (if (map? v)
+                          (if (< 1 (count v))
+                          ;;multiple key hash map
+                            (let [cur-id (seq-id)]
+                              (entities v (assoc context
+                                                 :db/id cur-id
+                                                 :key (conj (:key context) k)
+                                                 :pid id
+                                                 :p2c-key k
+                                                 :is-list false
+                                                 :v v)))
+                          ;;single key hash map
+                            (entities v (assoc context
+                                               :db/id id
+                                               :key (conj (:key context) k)
+                                               :v v)))
+                          (entities v
+                                    (assoc context
+                                           :db/id id
+                                           :key (conj (:key context) k)
+                                           :v v)))))))))))
+
+(defn suffix-list [xs x]
+  (loop [xs xs]
+    (if (empty? xs)
+      nil
+      (if (= x (first xs))
+        (rest xs)
+        (recur (rest xs))))))
+
+(defn prefix-list [xs x]
+  (loop [xs xs c []]
+    (if (= x (first xs))
+      (conj c x)
+      (recur (rest xs) (conj c (first xs)))
+    )
+  ))
+
+(defn slash-suffix-list [xs x]
+    (apply slash-keys (suffix-list xs x)))
+
+(defn slash-prefix-list [xs x]
+    (apply slash-keys (prefix-list xs x)))
+
+
+(defn cat-kvs [{:keys [key v pid
+                       p2c-key
+                       layer-key]
+                :as m}]
+  (let [id (:db/id m)]
+    (if (nil? p2c-key)
+      [{:db/id id
+        :key (apply slash-keys key)
+        :v v}]
+      [{:db/id id
+        :key (slash-suffix-list key p2c-key)
+        :v v}
+       {:db/id pid
+        :key (slash-prefix-list key p2c-key)
+        :is-list (:is-list m)
+        ;;put self into pid's list
+        :v [{:db/id id :key (slash-suffix-list key p2c-key) :v v}]}])))
+
+(defn merge-kvs [kvs]
+  (let []
+    (->> kvs
+         (mapcat cat-kvs)
+         )
+    )
+  )
+
+(defn merge-vals [xs]
+  (let [is-list (some true? (map :is-list xs))
+        new-v (->> (map :v xs)
+                   (flatten)
+                   (map #(if (nil? (:key %))
+                           ;;don't have to make another layer 
+                           (:v %)
+                           ;;is an object have to make another layer
+                           {:db/id (:db/id %)}))
+                   distinct
+                   vec)
+        m (first xs)]
+
+    (if is-list
+      ;;is list merge objects
+      (assoc (first xs) :v new-v :new-v true)
+      ;;is map single val
+      (if (= 1 (count xs))
+        (if (nil? (:is-list m))
+          m
+          ;;a map nest another map
+          (map-on-val #(if (sequential? %)
+                         (first %)
+                         %
+                         ) m)
+          )
+        (assoc (first xs) :v new-v :new-v true)))))
+
+(defn merge-entity-key [[id xs]]
+  (let []
+    (flatten
+     (vals
+      (map-on-val merge-vals (group-by :key xs))))
+    ;;(group-by :key xs)
+    ))
+
+(defn batch-uuid [ids]
+  (->> ids
+       (map (fn [id] {:id (uuid)}))
+       (apply
+         merge)))
+
+;;datascript way of flatten a hashmap to be entities
+;; each layer is a new entity unless all layers is single key value
+(defn flatten-entities [m]
+  (let [ids (group-by :db/id (entities m))
+        ;;entities (reverse (sort-by first (group-by :db/id (mapcat merge-kvs (vals ids)))))
+        entities (mapcat merge-kvs (vals ids))
+        id-e (group-by :db/id entities)
+        ]
+    (->>
+     (mapcat merge-entity-key id-e)
+    ;;nil key aready have it self int it's pid's field
+     (remove #(nil? (:key %)))
+     ;;(map (fn [x]{:db/id (:db/id x) (:key x) (:v x)}))
+     )))
+
+(defn full-link-flatten [m]
+  (->> m
+       )
+  )
+
+
+(comment
+
+  (def i 4)
+  (def xs '({[:publicIpv4 :subnet :isp :name] cucc}))
+
+  (def xs '({[:meta :bin] "Yin"} {[:meta :bin] "Yang"}))
+
+  (def i 2)
+  (def xss
+    [[1 2 3] [1 2]])
+  (all-the-same?
+   (map #(nth % 2 nil) xss))
+
+  (map #(partition-all  i %) xss)
+  (partition-all 2 xss)
+;;
+  )
 
 
 ;;should select pickup 
@@ -608,32 +870,12 @@
                      (select-or-get % k)
                      (rest ks)) m)))))
 
-;; load from default config file
-;;  i.e. (config :chrome-profile)
-;;       a varible chrome-profile is defined
-(defmacro config [name & {:keys [config-path]
-                          :or {config-path "resources/config.edn"}}]
-  (let [var-name (symbol (force-str name))
-        key-word (keyword (force-str name))]
-    `(def ~var-name (~key-word (load-edn "resources/config.edn")))))
-
-
 (comment
   (tree-diff a b vcf-count)
-  (def a {:a [1 2 3] :b {:bb [22 23] :d 1} :c 2}) (def a {"b" [{:bb ["1" "2" "3"] :c ""}]})
-  (def b {:a [1 2] :b {:bb [22] :d 2}  :c 1})
-  (tree-diff "abc" "def" vcf-count)
-  (tree-diff [1 2 3] [2 3 4] vcf-count)
-  (def a {"stuff" {"version" 4}})
-
   (flatten-hashmap  a)
   (flatten-hashmap  nest-a)
-  (tree-diff nest-a nest-b  (fn [a b] (= a b)))
-  ;(tree-diff nest-a nest-b  =)
+
   (map keys
        (flatten-hashmap nest-a))
-  (def ip "127.0.0.1")
-  (= ip (int-2-ip (ip-2-int ip)))
-  ;;
   )
 
