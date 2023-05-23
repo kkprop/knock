@@ -37,15 +37,33 @@
 
 (def client (d/client cfg))
 
+(d/create-database client {:db-name "chat"})
 (def conn (d/connect client {:db-name "chat"}))
 
 (def q #(d/q % (d/db conn)))
 
 (def transact (partial d/transact conn))
 
+(def pull #(d/pull (d/db conn) %))
+
+(def as-of #(d/as-of (d/db conn) %))
+(def since #(d/since (d/db conn) %))
+
 (comment
-  (d/create-database client {:db-name "chat"})
-  (d/transact )
+  (d/transact)
   (d/db conn)
 
-  )
+  (transact {:tx-data [{:db/ident :block/uid
+                          :db/valueType :db.type/uuid
+                          :db/cardinality :db.cardinality/one}]})
+
+  (def name-schema
+    [{:db/ident :block/uid
+      :db/valueType :db.type/string
+      :db/cardinality :db.cardinality/one
+      :db/doc "A person's name"}])
+
+  (d/create-database client {:db-name "demo"})
+  (def conn (d/connect client {:db-name "demo"}))
+;; using a connection named conn:
+  (d/transact conn {:tx-data name-schema}))
