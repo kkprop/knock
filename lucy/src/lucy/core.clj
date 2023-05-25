@@ -1,10 +1,10 @@
 (ns lucy.core
   (:require  [ruuter.core :as ruuter]
              [clojure.core.async :as async]
-             [manifold.stream :as s]
              [potemkin.utils :as u]
              [knock.utils :as utils]
              [datomic.client.api :as d]
+             [datomic-schema.schema :as s]
              [babashka.curl :as curl]))
 
 
@@ -41,8 +41,6 @@
          (swap! dbs merge {path cur})
          cur)))
 
-(db "chat")
-(db "demo")
 
 
 (defn to-add-expr [xs]
@@ -53,6 +51,8 @@
                ])
             )
        ))
+
+
 (comment
 
   (def chat-schema
@@ -81,20 +81,48 @@
 ;;
   )
 
-(defn filter-schema-field [schema xs]
-  (let [keys
-        (map :db/ident schema)
-        ])
-  (->> xs
-       (if :key )
-       )
+(def parts
+  (schema/generate-parts   [(s/part "app")])
   )
+
+(def schema
+  [(s/schema group
+             (s/fields
+              [name :string :indexed]
+              [chat_id :string :indexed]
+              [company_name :string]
+              [owner :string]
+              [create_time :inst]
+              [update_time :inst]))
+
+   (s/schema message
+             (s/fields
+              [roomid :string :indexed]
+              [msgtime :inst]
+              [msgtype :string]
+              [content :string]
+              [tolist :string :many]
+              [from :string :indexed]))]
+  )
+
+
+(defn chat-message []
+  (->> (utils/load-json "2023-05-18.json")
+       (take 2)
+       (map (comp :origindata :_source))
+       (map utils/jstr-to-edn)
+       ;;(map utils/flatten-entities)
+       )
+  ;;
+  )
+
 
 (defn chat-group []
   (->> (utils/load-json "chat_group.json")
        (take 2)
+       (map (comp :_source))
        ;;(map :doc)
-       (map utils/flatten-entities)
+       ;;(map utils/flatten-entities)
        ;;(map to-add-expr)
        ;;(map #(d/transact (db "chat") {:tx-data %}))
        ;;
