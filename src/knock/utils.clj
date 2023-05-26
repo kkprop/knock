@@ -13,7 +13,8 @@
    [medley.core :as m]
    [clojure.zip :as z]
    [clojure.core.async :as a]
-   [clojure.edn :as edn]))
+   [clojure.edn :as edn]
+   [clojure.walk :as walk]))
 
 (def os-name (System/getProperty "os.name"))
 
@@ -137,7 +138,7 @@
 
 (defn from-timestamp-ns [ts-ns]
   (let [ts-ns (force-int ts-ns)]
-    (java.util.Date. (/ ts-ns 1000000))))
+    (java.util.Date. (/ ts-ns 1000))))
 
 (defn from-timestamp-ms [ts-ms]
   (let [ts-ms (force-int ts-ms)]
@@ -485,6 +486,20 @@
     (->> (flatten-hashmap m)
          ;; for 
          (remove #(empty? (clojure.set/intersection hs (apply hash-set (first %))))))))
+
+(defn fuzzy-instant [n]
+  (if (< n 0xFFFFFFFF)
+    (from-timestamp n)
+    (if (< n 4294967295000)
+      (from-timestamp-ms n)
+      (from-timestamp-ns n)
+      )))
+
+(defn fuzzy-pick [m k-fn]
+  (->> m
+       (filter #(get k-fn (first %)))
+       (map (fn [[k v]] {k ((get k-fn k) v)}))
+       (apply merge)))
 
 
 (defn val-diff [a b vcf k]
