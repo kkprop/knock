@@ -35,6 +35,17 @@
 (defn join-path [& cmd]
   (str/join "/" cmd))
 
+(defn dot-split [s]
+  (str/split s #"\."))
+
+(defn ext-name [filename]
+  (last (dot-split filename))
+  )
+(defn file-name [filename]
+  (let [cols (dot-split filename)
+        n (count cols)]
+    (str/join "." (take (- n 1) cols))))
+
 (defn in?
   "true if coll contains elm"
   [coll elm]
@@ -68,7 +79,13 @@
 (defmacro make-shell-fn [name]
   (let [fname (symbol name)]
     `(defn ~fname [& args]
-       (apply (partial run-cmd ~name) args))))
+       (str/trim-newline
+        (:out
+         (apply (partial run-cmd ~name) args))))))
+
+
+(make-shell-fn "basename")
+(make-shell-fn "dirname")
 
 
 ;;pure sequentially list a directory
@@ -77,7 +94,6 @@
         (str/split-lines
          (:out
           (run-cmd "ls" "-f1" path)))))
-
 
 (defn parse-int [s]
   (if (str/blank? s) 0 (Long/parseLong (re-find #"\A-?\d+" s))))
@@ -165,6 +181,21 @@
 
 (def fmt-date-str (java.text.SimpleDateFormat. "yyyy-MM-dd"))
 
+(defn cur-ts-13 []
+  (inst-ms (java.util.Date.)))
+
+(defn cur-ts []
+  (quot (cur-ts-13) 1000))
+
+
+(def n 0)
+(defn today
+  ([] (today 0))
+  ([n]
+   (.format fmt-date-str
+            (from-timestamp (+ (cur-ts) (* n 86400))))))
+
+
 (defn range-date
   ([end-str])
 
@@ -181,11 +212,6 @@
       ))))
 
 
-(defn cur-ts-13 []
-  (inst-ms (java.util.Date.)))
-
-(defn cur-ts []
-  (quot (cur-ts-13) 1000))
 
 
 (def j json/generate-string)
@@ -196,16 +222,17 @@
 ;; Provider information loading
 (defn load-json-conf [name] (parse-string (slurp (format "resources/conf/%s.json" name))))
 
-(defn load-json [path]
-  (let [s (slurp path)
-        xs (map #(parse-string % true)
-             ;;force to be vector in order to parse multiple json objects
+
+(defn load-json-str[s]
+  (let [xs (map #(parse-string % true)
+                ;;force to be vector in order to parse multiple json objects
                 (str/split-lines s))]
     (if (= 1 (count xs))
       (first xs)
-      xs)
-    ))
+      xs)))
 
+(defn load-json [path]
+  (load-json-str (slurp path)))
 
 
 (defn curl-any [method url & {:keys [headers body]
@@ -885,6 +912,26 @@
                      (select-or-get % k)
                      (rest ks)) m)))))
 
+(defn page-select [xs current page-size]
+  (let [cols (partition-all page-size xs)
+        ;;for frontend players they seem to like use 1 as start of index
+        res (nth cols (- current 1) '())]
+    {:list res
+     :total (count cols)
+     :current current
+     :pageSize page-size}))
+
+
+;; load from default config file
+;;  i.e. (config :chrome-profile)
+;;       a varible chrome-profile is defined
+(defmacro config [name & {:keys [config-path]
+                          :or {config-path "resources/config.edn"}}]
+  (let [var-name (symbol (force-str name))
+        key-word (keyword (force-str name))]
+    `(def ~var-name (~key-word (load-edn "resources/config.edn")))))
+
+
 (comment
   (tree-diff a b vcf-count)
   (flatten-hashmap  a)
@@ -894,3 +941,6 @@
        (flatten-hashmap nest-a))
   )
 
+
+
+(file-name "1.2.3")

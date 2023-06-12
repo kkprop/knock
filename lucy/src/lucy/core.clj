@@ -54,7 +54,11 @@
   (d/q '[:find ?c ?i
          :where [?e :name ?c]
          [?e :chat_id ?i]]
-       (d/db (db "demo")))
+       (d/db (db "chat")))
+
+  (d/pull
+    (db "chat")
+    '[*])
 ;;
   )
 
@@ -77,22 +81,60 @@
                          [msgtime :inst]
                          [msgtype :string]
                          [content :string]
+                         [company_name :string]
                          [tolist :string :many]
-                         [from :string :indexed])))
+                         [from :string :indexed]))
+  )
 (def schema
   [group
-   message
-   ]
+   message]
   )
 
-(defn fuzzy-pick-by-schema [schema]
+(defn entity [db-name e]
   )
+
+(defdbfn dbinc [db e a qty] :db.part/user
+  [[:db/add e a (+ qty (or (get (entity db e) a) 0)) ]])
+
+
+(defn init [db-name schema]
+  (d/transact (db db-name)
+              {:tx-data
+               (s/generate-schema schema)
+               }
+              ;;
+              ))
+
+(comment
+  (init "chat" group)
+  (init "chat" message)
+  (d/pull
+   (d/db (db "chat"))
+   '[:db/id] 3)
+
+  (d/delete-database client
+                     (d/db (db "chat")))
+  ;;
+  )
+
+(defn kfn-schema [schema]
+  (->> (:fields schema)
+      (utils/map-on-val (fn [v] clojure.core/identity))
+      (utils/map-on-key utils/force-keyword)))
+
+(defn fuzzy-pick-by-schema [schema m & k-fn]
+  (let [default-k-fn (kfn-schema schema)
+        k-fn (merge default-k-fn k-fn)
+        ]
+    (utils/fuzzy-pick m k-fn)
+    ))
 
 (defn chat-message []
   (->> (utils/load-json "2023-05-18.json")
        (take 2)
        (map (comp :origindata :_source))
        (map utils/jstr-to-edn)
+       (map utils/slash-flatten-map)
        )
   ;;
   )
@@ -102,13 +144,14 @@
   (->> (utils/load-json "chat_group.json")
        (take 2)
        (map (comp :_source))
-       ;;(map :doc)
-       ;;(map utils/flatten-entities)
-       ;;(map to-add-expr)
-       ;;(map #(d/transact (db "chat") {:tx-data %}))
+       (map #(fuzzy-pick-by-schema group % ))
        ;;
        )
   ;;
+  )
+
+(comment
+  ()
   )
 
 
