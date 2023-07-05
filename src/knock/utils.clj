@@ -77,16 +77,29 @@
 
 ;; get all the command string of shell
 (defmacro make-shell-fn [name]
-  (let [fname (symbol name)]
-    `(defn ~fname [& args]
+  (let [fname (symbol name)
+        args (symbol "args")]
+    `(defn ~fname [& ~args]
        (str/trim-newline
         (:out
-         (apply (partial run-cmd ~name) args))))))
+         (apply (partial run-cmd ~name) ~args))))))
 
 
 (make-shell-fn "basename")
 (make-shell-fn "dirname")
+(make-shell-fn "openssl")
+(make-shell-fn "base64")
 
+
+
+(defn crt->pem [path]
+  (openssl "x509 -inform DER -in" path)
+  )
+
+
+(defn cert->chain [path]
+  (openssl "x509 -in" path "-text | grep 'CA Issuers - URI' |awk -FURI: '{print $2}' | xargs curl -s | openssl x509 -inform DER")
+  )
 
 ;;pure sequentially list a directory
 (defn ls-f1 [path]
@@ -112,12 +125,15 @@
 (defn force-float [s]
   (if (string? s) (parse-float s) (float s)))
 
-
 (defn cur-time-str
   ([]
    (cur-time-str "yyyy-MM-dd hh:mm:ss"))
   ([fmt]
      (.format (java.text.SimpleDateFormat. fmt) (java.util.Date.))))
+
+(defn cur-year []
+  (parse-int
+   (cur-time-str "YYYY")))
 
 
 (defn str-to-date-by-fmt [s fmt]
@@ -195,6 +211,17 @@
    (.format fmt-date-str
             (from-timestamp (+ (cur-ts) (* n 86400))))))
 
+(defn days [from to]
+  (quot
+   (-  (quot (inst-ms to) 1000)
+       (quot (inst-ms from) 1000)) 86400
+   ))
+
+(def days-to-now (partial days
+                   (java.util.Date.)
+                   ))
+
+
 
 (defn range-date
   ([end-str])
@@ -268,6 +295,9 @@
       (map #(str/replace % "-" ".")
            (re-seq dash-ip-regex s))
       xs)))
+
+(defn dash-ip [ip]
+  (str/replace ip #"\." "-"))
 
 (extract-ip " zen-lalan-10-11-4-229 ")
 (extract-ip " zen-lalan-10.11.4.229 ")
@@ -482,6 +512,11 @@
          (filter #(and (map-entry? %) (contains? hs (keyword (first %)))))
     )))
 
+(defn cherry-pick [m & ks]
+  (apply hash-map
+         (flatten
+          (apply cherry-pick-keys m ks))))
+
 (defn flatten-hashmap
   ([m]
    (if (empty? m)
@@ -641,6 +676,32 @@
     x
     (name x)
     ))
+
+(defn word-capitial->dash [x]
+  (let [s (force-str x)
+        words (str/split (str/replace s #"\p{Lu}" " "))]
+    (str/join "-" words)
+    )
+  )
+
+(defn dash->word-capital [x]
+  (let [s (force-str x)
+        words (str/split s #"-")
+        ]
+    (apply str (map str/capitalize words))
+    )
+  )
+
+(defn dash->camel-case [x]
+  (let [s (force-str x)
+        words (str/split s #"-")
+        [first & left] words]
+    (apply str first (map str/capitalize left))))
+
+(comment
+  (dash->camel-case "secret-access-key")
+  )
+
 
 (defn slash-keys [& xs]
   (if (nil? xs)
@@ -932,13 +993,75 @@
     `(def ~var-name (~key-word (load-edn "resources/config.edn")))))
 
 
+(defn dash-dash-kv [m & selected-keys]
+  (let [m (if (nil? selected-keys)
+            m
+            (select-keys m selected-keys))]
+    (->> m
+         (map (fn [[k v]]
+                (str "--" (force-str k) " " (force-str v)))))))
+
+
 (comment
+  (dash-dash-kv {:x 'x1 :y 'y1})
   (tree-diff a b vcf-count)
   (flatten-hashmap  a)
   (flatten-hashmap  nest-a)
 
   (map keys
        (flatten-hashmap nest-a))
+  )
+
+
+
+;;surely have issue of performance
+;;from 
+(defn var-meta [f]
+  (meta (second (first (filter #(and (var? (second %)) (= f (var-get (second %)))) (ns-map *ns*))))))
+
+;;for a slow return function.
+;;  mock will run once save the result to local edn file
+;;  the next call of mock will read local file
+;;call mock-clean to clean local file
+(defn mock [f & args]
+  (let [fm (var-meta f)
+        ns-path (str/replace (ns-name (:ns fm)) #"\." "/")
+        dir (str "resources/mock/" ns-path "/")
+        path (if (empty? args)
+               (str dir (:name fm) ".edn")
+               (str dir (:name fm) "/" (str/join "-" args) ".edn" ))
+        _ (clojure.java.io/make-parents path)]
+    (if (fs/exists? path)
+      (load-edn path)
+      (let [res (apply f args)]
+        ;;(spit path (with-out-str (clojure.pprint/write res :dispatch clojure.pprint/code-dispatch))
+        (clojure.pprint/pprint res (clojure.java.io/writer path))
+        res
+        ;;
+        ))))
+
+(defn mock-clean [f & args]
+  (let [fm (var-meta f)
+        ns-path (str/replace (ns-name (:ns fm)) #"\." "/")
+        dir (str "resources/mock/" ns-path "/")
+        path (str dir (:name fm) ".edn")]
+    (when (fs/exists? path)
+      (fs/delete path))))
+
+(defn slow-repeater [x n]
+  (let []
+    (Thread/sleep (* 1000 n))
+    (take n (repeat x))
+    ))
+
+(comment
+
+  (mock slow-repeater "abc" 3)
+
+  (mock slow-repeater "abc" 6)
+
+  (mock-clean slow-repeater "abc" 3)
+  ;;
   )
 
 
