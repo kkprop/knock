@@ -89,6 +89,7 @@
 (make-shell-fn "dirname")
 (make-shell-fn "openssl")
 (make-shell-fn "base64")
+(make-shell-fn "curl")
 
 
 
@@ -100,6 +101,8 @@
 (defn cert->chain [path]
   (openssl "x509 -in" path "-text | grep 'CA Issuers - URI' |awk -FURI: '{print $2}' | xargs curl -s | openssl x509 -inform DER")
   )
+
+
 
 ;;pure sequentially list a directory
 (defn ls-f1 [path]
@@ -196,6 +199,20 @@
      (. java.time.ZoneId of (str "Etc/GMT" gmt)))))
 
 (def fmt-date-str (java.text.SimpleDateFormat. "yyyy-MM-dd"))
+
+(def time-fmts (->> ["MMM dd HH:mm:ss yyyy" "yyyy-MM-dd HH:mm:ss"]
+                    (map #(java.text.SimpleDateFormat. %))))
+
+(defn fuzzy-parse-time [s]
+  (->> time-fmts
+       (map #(try (.parse % s)
+                  (catch Exception e nil)))
+
+       (remove nil?)
+       (first)
+       ))
+
+(fuzzy-parse-time "2024-06-21 18:40:14 GMT")
 
 (defn cur-ts-13 []
   (inst-ms (java.util.Date.)))
@@ -674,8 +691,9 @@
 (defn force-str [x]
   (if (string? x)
     x
-    (name x)
-    ))
+    (if (keyword? x)
+      (name x)
+      (str x))))
 
 (defn word-capitial->dash [x]
   (let [s (force-str x)
@@ -973,6 +991,7 @@
                      (select-or-get % k)
                      (rest ks)) m)))))
 
+;;break a large set into pages
 (defn page-select [xs current page-size]
   (let [cols (partition-all page-size xs)
         ;;for frontend players they seem to like use 1 as start of index
@@ -982,6 +1001,18 @@
      :current current
      :pageSize page-size}))
 
+;; A Paginator :: could apply to AWS API
+;; use last returned elements for next page indexing
+(defn page-query
+  ([f]
+   (page-query f {:p {} :cache []}))
+  ([f context]
+   (let [curRes (f (:p context))]
+     (if (empty? curRes) 
+       (:cache context)
+       (recur f {:p curRes
+                 :cache (conj (:cache context) curRes)
+               })))))
 
 ;; load from default config file
 ;;  i.e. (config :chrome-profile)
@@ -999,11 +1030,15 @@
             (select-keys m selected-keys))]
     (->> m
          (map (fn [[k v]]
-                (str "--" (force-str k) " " (force-str v)))))))
+                (str "--" (force-str k) " " (force-str v)))
+              )
+         (str/join " ")
+         )
+    ))
 
 
 (comment
-  (dash-dash-kv {:x 'x1 :y 'y1})
+  (dash-dash-kv {:x 'x1 :y 'y1} )
   (tree-diff a b vcf-count)
   (flatten-hashmap  a)
   (flatten-hashmap  nest-a)
@@ -1029,7 +1064,7 @@
         dir (str "resources/mock/" ns-path "/")
         path (if (empty? args)
                (str dir (:name fm) ".edn")
-               (str dir (:name fm) "/" (str/join "-" args) ".edn" ))
+               (str dir (:name fm) "/" (str/join "-" (map force-str args)) ".edn"))
         _ (clojure.java.io/make-parents path)]
     (if (fs/exists? path)
       (load-edn path)
@@ -1054,7 +1089,14 @@
     (take n (repeat x))
     ))
 
+(defn curl-cert-expire-date [domain ip port]
+  (fuzzy-parse-time
+   (curl "-vI" "--resolve" (str domain ":" port ":" ip)
+         (str "https://" domain ":" port) "2>&1" "| grep 'expire date' " "| cut -d: -f2- | xargs")))
+
+
 (comment
+  (curl-cert-expire-date "www.163.com" "111.177.39.150" 443)
 
   (mock slow-repeater "abc" 3)
 
