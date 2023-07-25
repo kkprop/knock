@@ -53,7 +53,8 @@
       d)))
 
 (def driver
-  (load-driver))
+  (load-driver)
+  )
 
 
 (def click-multi (apply partial e/click-multi [driver]))
