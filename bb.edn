@@ -1,7 +1,7 @@
 {:paths ["src"]
  :deps {medley/medley {:mvn/version "1.3.0"}
         org.clojure/core.logic {:mvn/version "1.0.1"}
-        etaoin/etaoin {:mvn/version "1.0.38"}
+        etaoin/etaoin {:mvn/version "1.0.40"}
         djblue/portal {:mvn/version "0.32.0"}
         org.clojure/core.cache {:mvn/version "1.0.225"}
         org.clojure/core.specs.alpha {:mvn/version "0.2.62"}
