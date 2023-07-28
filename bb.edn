@@ -40,7 +40,7 @@
   local-call (apply s/local-call *command-line-args*)
   jp (println (apply str (map jp/search-word *command-line-args*)))
 
-  parse (println (first *command-line-args*))
+  parse (println (b/->html (first *command-line-args*)))
 
   uberjar (do
             (println "Making uberjar")

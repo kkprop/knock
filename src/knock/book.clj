@@ -8,7 +8,7 @@
 
 (defn pdf [path]
   (:out
-   (run-cmd "pdftohtml" "-stdout" (str "'" path "'"))))
+   (run-cmd "pdftohtml" "-hidden"  "-stdout" (str "'" path "'"))))
 
 
 (defn epub [path]
