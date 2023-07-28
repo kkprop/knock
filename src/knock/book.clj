@@ -8,12 +8,12 @@
 
 (defn pdf [path]
   (:out
-   (run-cmd "pdftohtml" "-stdout" path)))
+   (run-cmd "pdftohtml" "-stdout" (str "'" path "'"))))
 
 
 (defn epub [path]
   (:out
-   (run-cmd "einfo" "-p" path)))
+   (run-cmd "einfo" "-p" (str "'" path "'"))))
 
 
 (defn ->html [path]
@@ -35,5 +35,9 @@
 
   (->html  "resources/babooka.epub")
   (->html  "resources/babooka.pdf")
+  ;; support picture 
+  (->html "/Users/dc/Downloads/books/Where The Wild Things Are (Maurice Sendak) (Z-Library).pdf")
+  (->html "/Users/dc/Downloads/books/The Ethics, Parts 1-5 by Benedict de Spinoza (Translated by R. H. M. Elwes) (z-lib.org).pdf")
+
 ;;k
   )
