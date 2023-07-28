@@ -18,7 +18,7 @@
 
 (defn ->html [path]
   (if (str/ends-with? path ".epub")
-    (epub path)
+    (mock epub path)
     (if (str/ends-with? path ".pdf")
       (mock pdf path)
       (if (str/ends-with? path ".html")
@@ -31,7 +31,7 @@
 
   (pdf "resources/babooka.pdf")
 
-  (epub "resources/babooka.epub")
+  (mock epub "resources/babooka.epub")
 
   (->html  "resources/babooka.epub")
   (->html  "resources/babooka.pdf")

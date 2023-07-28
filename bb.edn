@@ -18,7 +18,7 @@
              [knock.server :as s]
              [knock.roam :as r]
              [knock.jp :as jp]
-             [knock.book :as b]
+             [knock.book :as b :refer :all]
              [knock.wn :as w])
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
               proc (process (str "bb nrepl-server " port) {:inherit true})]

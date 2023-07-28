@@ -16,6 +16,8 @@
    [clojure.edn :as edn]
    [clojure.walk :as walk]))
 
+
+
 (def os-name (System/getProperty "os.name"))
 
 (defn uuid []
@@ -26,10 +28,23 @@
   (str/join " " cmd))
 
 (defn show-cmd [& cmd]
-  (str/join " " cmd))
+  (let [s (str/join " " cmd)
+        _ (println s)] s))
 
 (defn run-cmd [& cmd]
   (sh "sh" "-c" (str/join " " cmd))
+  )
+
+
+(comment
+  (->>
+   (str/split-lines
+    (:out
+     (run-cmd "ls")))
+   (filter #(str/ends-with? % ".json") )
+   )
+
+;;
   )
 
 (defn join-path [& cmd]
@@ -46,10 +61,26 @@
         n (count cols)]
     (str/join "." (take (- n 1) cols))))
 
-(defn in?
-  "true if coll contains elm"
-  [coll elm]
-  (some #(= elm %) coll))
+;;"true if coll contains elm"
+(defn in? [coll elm & {:keys [cmpfn]
+             :or {cmpfn =}}]
+  (some #(cmpfn % elm) coll)
+  )
+;; true if one of things in coll are included in elm
+(defn rev-in? [coll elm & {:keys [cmpfn]
+                           :or {cmpfn =}}]
+  (some #(cmpfn elm %) coll)
+  )
+
+
+;;"true if elem are contained in one of coll"
+(defn fuzzy-in? [coll elm]
+  (in? coll elm :cmpfn str/includes?) 
+  )
+
+(defn rev-fuzzy-in? [coll elm]
+  (rev-in? coll elm :cmpfn str/includes?))
+
 
 
 (defn pipeline-demo [n data f]
@@ -90,8 +121,31 @@
 (make-shell-fn "openssl")
 (make-shell-fn "base64")
 (make-shell-fn "curl")
+(make-shell-fn "grep")
 
+(defn re-escape [s]
+  (str/escape s {\. "\\."
+                 \[ "\\["
+                 \] "\\]"
+                 \{ "\\{"
+                 \} "\\}"
+                 })
+  )
 
+(defn force-re [s]
+  (if (string? s)
+    (re-pattern s)
+    s
+    ))
+
+(defn split-by [s & {:keys [re]
+                     :or {re #" "}}]
+  (str/split
+    s
+   (force-re re)))
+
+(defn split-pairs [s re & keys]
+  (apply hash-map (interleave keys (str/split s re))))
 
 (defn crt->pem [path]
   (openssl "x509 -inform DER -in" path)
@@ -203,16 +257,17 @@
 (def time-fmts (->> ["MMM dd HH:mm:ss yyyy" "yyyy-MM-dd HH:mm:ss"]
                     (map #(java.text.SimpleDateFormat. %))))
 
-(defn fuzzy-parse-time [s]
+(defn fuzzy-parse-time [s & {:keys [to-trim]
+                           :or {to-trim ".*expire date: "}}]
   (->> time-fmts
-       (map #(try (.parse % s)
+       (map #(try (.parse % (str/replace-first s (re-pattern to-trim) ""))
                   (catch Exception e nil)))
-
        (remove nil?)
-       (first)
-       ))
+       (first)))
 
 (fuzzy-parse-time "2024-06-21 18:40:14 GMT")
+(fuzzy-parse-time "*  expire date: Jul 24 23:30:12 2023 GMT")
+
 
 (defn cur-ts-13 []
   (inst-ms (java.util.Date.)))
@@ -229,14 +284,19 @@
             (from-timestamp (+ (cur-ts) (* n 86400))))))
 
 (defn days [from to]
-  (quot
-   (-  (quot (inst-ms to) 1000)
-       (quot (inst-ms from) 1000)) 86400
-   ))
+  (if (nil? to)
+    ;;its a question here. nil return 0
+    0
+    (let [from-s (quot (inst-ms to) 1000)
+          to-s (quot (inst-ms from) 1000)
+          duration-s (- from-s to-s)]
+      (if (< 86400 duration-s)
+        (quot duration-s 86400)
+        (/ (float duration-s) 86400)
+      ;;
+        ))))
 
-(def days-to-now (partial days
-                   (java.util.Date.)
-                   ))
+(def days-to-now (partial days (java.util.Date.)))
 
 
 
@@ -301,17 +361,30 @@
 (def curl-get (partial curl-any curl/get))
 (def curl-post (partial curl-any curl/post))
 
-
+(declare force-str)
 
 (def ip-regex #"(?:[0-9]{1,3}\.){3}[0-9]{1,3}")
 (def dash-ip-regex #"(?:[0-9]{1,3}-){3}[0-9]{1,3}")
 
+
+(defn parse-ips [s]
+  (re-seq ip-regex s)
+  )
+
+;;support 127-0-0-1 to be extraced to be 127.0.0.1
 (defn extract-ip [s]
-  (let [xs (re-seq ip-regex s)]
+  (let [s (if (nil? s) (force-str s) s)
+        xs (re-seq ip-regex s)]
     (if (nil? xs)
       (map #(str/replace % "-" ".")
            (re-seq dash-ip-regex s))
       xs)))
+
+
+
+(defn ip? [s]
+  (not (empty? (extract-ip s)))
+  )
 
 (defn dash-ip [ip]
   (str/replace ip #"\." "-"))
@@ -319,11 +392,31 @@
 (extract-ip " zen-lalan-10-11-4-229 ")
 (extract-ip " zen-lalan-10.11.4.229 ")
 
+
+(defn dig-domain-ips [domain]
+  (extract-ip
+   (:out (run-cmd "curl" "-s" "-v" (str "https://" domain ":15986 2>&1 | grep Trying"))))
+  ;;
+  )
+
+
 ;; File creating. cleaning. path assembling
 (defn clean-file [f-name]
   (let [mkdir (clojure.java.io/make-parents f-name)
         cleared (spit f-name "")]
     f-name))
+
+
+(defn spit-line [f s]
+  (let [line (if (str/ends-with? s "\n")
+               s
+               (str s "\n"))]
+    (spit f line :append true)
+    )
+  )
+
+
+
 
 (defn path-str-clean[s]
   (str/replace s "\n" "_"))
@@ -363,6 +456,15 @@
   (if (nil? readers)
     (clojure.edn/read-string (slurp path))
     (clojure.edn/read-string {:readers readers} (slurp path))))
+
+(defn spit-edn [path x & opts]
+  (let []
+    (if (seq? x)
+      (apply spit path (apply list x) opts)
+      (apply spit path x opts))
+    (spit path "\n" :append true)
+    )
+  )
 
 ;;load conf from resources/conf path
 (defn load-conf [name]
@@ -438,7 +540,7 @@
     )
   )
 
-(defn output-seq-map [filename smap selected-k]
+(defn output-seq-map [filename smap & selected-k]
   (let [path (output-path (str filename ".csv"))
         head (flatten (->> smap (take 1) (map keys)))
         _ (clean-file path)
@@ -447,7 +549,7 @@
     (if-not (nil? selected-k)
       (do
         ;; write selected header
-        (write-csv-line path (keep selected head))
+        (write-csv-line path selected-k)
         ;; write selected values
          (->>
            smap
@@ -1054,34 +1156,64 @@
 (defn var-meta [f]
   (meta (second (first (filter #(and (var? (second %)) (= f (var-get (second %)))) (ns-map *ns*))))))
 
-;;for a slow return function.
-;;  mock will run once save the result to local edn file
-;;  the next call of mock will read local file
-;;call mock-clean to clean local file
-(defn mock [f & args]
+
+(defn- mock-context [f & args]
   (let [fm (var-meta f)
         ns-path (str/replace (ns-name (:ns fm)) #"\." "/")
         dir (str "resources/mock/" ns-path "/")
         path (if (empty? args)
                (str dir (:name fm) ".edn")
                (str dir (:name fm) "/" (str/join "-" (map force-str args)) ".edn"))
+        tmp-path (str path "." (cur-time-str "yyyy-MM-dd-hh:mm:ss.SSS"))]
+    {:fm fm
+     :ns-path ns-path
+     :dir dir
+     :path path
+     :tmp-path tmp-path}
+    ))
+;;for a slow return function.
+;;  mock will run once save the result to local edn file
+;;  the next call of mock will read local file
+;;call mock-clean to clean local file
+(defn mock [f & args]
+  (let [{:keys [fm ns-path dir path tmp-path]} (apply mock-context f args)
         _ (clojure.java.io/make-parents path)]
     (if (fs/exists? path)
-      (load-edn path)
-      (let [res (apply f args)]
-        ;;(spit path (with-out-str (clojure.pprint/write res :dispatch clojure.pprint/code-dispatch))
-        (clojure.pprint/pprint res (clojure.java.io/writer path))
-        res
-        ;;
-        ))))
+      (try
+        (load-edn path)
+        ;; when failed try call function again and cache
+        (catch Exception e
+          (let [res (apply f args)
+                _ (fs/delete-if-exists path)] (clojure.pprint/pprint res (clojure.java.io/writer path)) res)))
+      (let [res (apply f args)
+            _ (clean-file tmp-path)]
+        (clojure.pprint/pprint res (clojure.java.io/writer tmp-path))
+        (fs/delete-if-exists path)
+        (fs/create-sym-link (fs/absolutize path) (fs/absolutize tmp-path))
+        res)
+      ;;
+      )))
 
 (defn mock-clean [f & args]
-  (let [fm (var-meta f)
-        ns-path (str/replace (ns-name (:ns fm)) #"\." "/")
-        dir (str "resources/mock/" ns-path "/")
-        path (str dir (:name fm) ".edn")]
+  (let [{:keys [fm ns-path dir path]} (apply mock-context f args)]
     (when (fs/exists? path)
       (fs/delete path))))
+
+
+(defn choose [xs]
+  (let [_ (apply list (map-indexed (fn [i x] (println i x)) xs))
+        _ (println "choose the index want to use")
+        i (force-int (read-line))]
+    (nth xs i nil)))
+
+(defn mock-choose [f & args]
+  (let [{:keys [fm ns-path dir path]} (apply mock-context f args)
+        xs (map str (fs/glob (dirname path) (str (basename path) ".*")))
+        tmp-path (choose xs)]
+    (when-not (nil? tmp-path)
+      (fs/delete-if-exists path)
+      (fs/create-sym-link path (basename tmp-path))
+      )))
 
 (defn slow-repeater [x n]
   (let []
@@ -1094,8 +1226,75 @@
    (curl "-vI" "--resolve" (str domain ":" port ":" ip)
          (str "https://" domain ":" port) "2>&1" "| grep 'expire date' " "| cut -d: -f2- | xargs")))
 
+(defn percentage [total numerator & {:keys [percision]
+                                     :or {percision 4}}]
+  (format (str "%." percision "f") (/  numerator (float total))))
+
+
+(defn while-change [cb f & args]
+  (let []
+    (loop [prev nil cur (apply f args)]
+      (when-not (= nil cur) (cb cur))
+      (recur cur (apply f args))
+      )))
+
+;;initial with time println the change
+(def while-print-change (partial while-change #(println (cur-time-str) " ")))
+;;initial with time println the change
+(def while-print-change (partial while-change #(println (cur-time-str) " " %)))
+
+
+;; start end pairs
+(defn char-in-range? [start end x]
+  (let [n (int x)]
+    (and (<= (int start) n)
+         (<= n (int end)))))
+
+(defn range-replace-string [ s to-char start end ]
+  (->> s
+       (map #(if (char-in-range? start end %)
+               to-char
+               %))
+       (apply str)
+       ))
+
+
+(defn i-pprint [x & {:keys [focus]}]
+  (let [_ (clojure.pprint/pprint x)
+        _ (when-not (nil? focus)
+            (println "")
+            (println (focus x))
+            (println ""))
+        input (read-line)]
+    (if (map? x)
+      (assoc x :input input)
+      input)))
+
+
+(defn comm [a b]
+  (let [sa (set a)
+        sb (set b)]
+    {:a-only (clojure.set/difference sa sb)
+     :b-only (clojure.set/difference sb sa)
+     :both (clojure.set/intersection sa sb)}))
+
+(declare fib)
+
+(defn fib-seq
+  "Returns a lazy sequence of Fibonacci numbers"
+  [a b]
+  (lazy-seq (cons a (fib-seq b (+ (bigint a) b)))))
+
+(def fib (fib-seq 0 1))
 
 (comment
+
+  (-> "abcAB.*?!"
+      (range-replace-string "_" \A \Z)
+      (range-replace-string "_" \a \z)
+      (range-replace-string "_" \0 \9)
+      )
+
   (curl-cert-expire-date "www.163.com" "111.177.39.150" 443)
 
   (mock slow-repeater "abc" 3)
@@ -1105,7 +1304,3 @@
   (mock-clean slow-repeater "abc" 3)
   ;;
   )
-
-
-
-(file-name "1.2.3")
