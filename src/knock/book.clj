@@ -20,9 +20,9 @@
   (if (str/ends-with? path ".epub")
     (epub path)
     (if (str/ends-with? path ".pdf")
-      (pdf path)
+      (mock pdf path)
       (if (str/ends-with? path ".html")
-        (slurp path)
+        (mock slurp path)
           nil
         )
       )))
