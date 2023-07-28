@@ -6,8 +6,7 @@
         org.clojure/core.cache {:mvn/version "1.0.225"}
         org.clojure/core.specs.alpha {:mvn/version "0.2.62"}
         org.babashka/spec.alpha {:git/url "https://github.com/babashka/spec.alpha"
-                                 :git/sha "1a841c4cc1d4f6dab7505a98ed2d532dd9d56b78"}
-        refactor-nrepl/refactor-nrepl {:mvn/version "2.5.1"}
+                                 :git/sha "1a841c4cc1d4f6dab7505a98ed2d532dd9d56b78"} refactor-nrepl/refactor-nrepl {:mvn/version "2.5.1"}
         selmer/selmer {:mvn/version "1.12.50"}}
  :repl-options {:init-ns search.main}
  :tasks
@@ -16,8 +15,7 @@
              [babashka.wait :as wait]
              [knock.utils :as u]
              [knock.server :as s]
-             [knock.roam :as r]
-             [knock.jp :as jp]
+             [knock.roam :as r] 
              [knock.book :as b :refer :all]
              [knock.wn :as w])
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
@@ -38,7 +36,7 @@
   wordnet (do (println (apply w/search-wn  *command-line-args*)))
 
   local-call (apply s/local-call *command-line-args*)
-  jp (println (apply str (map jp/search-word *command-line-args*)))
+  jp (println (apply str (map (requiring-resolve 'knock.jp/search-word) *command-line-args*)))
 
   parse (println (b/->html (first *command-line-args*)))
 
