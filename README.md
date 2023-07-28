@@ -26,6 +26,12 @@
     - [roam research](https://relemma-git-feat-frontdesk.roamresearch.com/)
         - using links 👆 to get access token of your Graph
           - which located in Roam Research: · · · in the up right corner -> Settings > Graph Tab -> API Tokens
+    - epub-tools
+        - brew install ebook-tools
+        - sudo apt-get install epub-utils
+    - pdf tools
+        - brew install poppler 
+        - sudo apt-get install pdftohtml
 
 - Lucy
 ======
