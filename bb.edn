@@ -15,8 +15,9 @@
              [babashka.wait :as wait]
              [knock.utils :as u]
              [knock.server :as s]
-             [knock.roam :as r] 
+             [knock.roam :as r]
              [knock.book :as b :refer :all]
+             [knock.poker :as poker]
              [knock.wn :as w])
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
               proc (process (str "bb nrepl-server " port) {:inherit true})]
@@ -37,6 +38,8 @@
 
   local-call (apply s/local-call *command-line-args*)
   jp (println (apply str (map (requiring-resolve 'knock.jp/search-word) *command-line-args*)))
+
+  play-poker (apply str (poker/play))
 
   parse (println (b/->html (first *command-line-args*)))
 
