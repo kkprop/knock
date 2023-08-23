@@ -11,13 +11,13 @@
 
 
 (def nums
-  (range 1 14))
+  (range 1 14)
+  )
 
 (defn mark[xs & {:keys [id]
                :or {id :id}}]
   (map (fn [x] {id x}) xs)
   )
-
 
 (defn card-alias [x]
   (get

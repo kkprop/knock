@@ -1,4 +1,4 @@
- (ns knock.utils
+(ns knock.utils
   (:require
    [clojure.data.csv :as csv]
    [clojure.java.io :as io]
@@ -341,21 +341,16 @@
 
 (defn curl-any [method url & {:keys [headers body]
                               :or {headers {"Content-Type" "application/json"}}
-                              :as opts
-                              }]
-  (let [res
-        (try
-          (method url (assoc opts  
-                       :body {j body})
-                       )
-          (catch Exception e (ex-data e)))]
-
+                              :as opts}]
+  (let [req (if (nil? body) {:headers headers} (assoc {:headers headers} :body (j body)))
+        res (try (method url req) (catch Exception e (ex-data e)))]
     (assoc res :body
            (try
              (jstr-to-edn (:body res))
              ;;can't convert to edn, just return
-             (catch Exception e (:body res))
-             ))) )
+             (catch Exception e (:body res))))
+    ;
+    ))
 
 
 (def curl-get (partial curl-any curl/get))
@@ -1286,6 +1281,31 @@
   (lazy-seq (cons a (fib-seq b (+ (bigint a) b)))))
 
 (def fib (fib-seq 0 1))
+
+
+;;filter a namespace list which called/like keyword
+;;also can remove function names in/like the neg-words 
+(defn namespaces-by [keyword & neg-words]
+  (->>
+   (all-ns)
+   (map ns-name)
+   (filter #(str/includes? (str %) (force-str keyword)))
+   (remove #(not-every? false? (map (fn [s] (str/includes? (str %) s)) neg-words)))
+   (map symbol)
+   ;;
+   ))
+
+;;select functions from a namespace called/like keyword 
+(defn fns-by-namespace [keyword & neg-words]
+  (->> (apply namespaces-by keyword neg-words)
+       (map ns-publics)
+       (apply merge)))
+
+
+(defn gen-bb-tasks [ns]
+  (fns-by-namespace ns)
+  )
+
 
 (comment
 

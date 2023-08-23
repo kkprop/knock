@@ -2,9 +2,8 @@
   (:require [knock.utils :refer :all]
             [babashka.fs :as fs]
             [clojure.string :as string]
-            [clojure.string :as str])
-  )
-
+            [babashka.pods :as pods]
+            [clojure.string :as str]))
 
 (defn pdf [path]
   (:out
@@ -35,7 +34,7 @@
 
   (->html  "resources/babooka.epub")
   (->html  "resources/babooka.pdf")
-  ;; support picture 
+  ;;TODO support picture 
   (->html "/Users/dc/Downloads/books/Where The Wild Things Are (Maurice Sendak) (Z-Library).pdf")
   (->html "/Users/dc/Downloads/books/The Ethics, Parts 1-5 by Benedict de Spinoza (Translated by R. H. M. Elwes) (z-lib.org).pdf")
 
