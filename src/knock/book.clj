@@ -3,11 +3,13 @@
             [babashka.fs :as fs]
             [clojure.string :as string]
             [babashka.pods :as pods]
+            [knock.gum :as gum]
             [clojure.string :as str]))
 
 (defn pdf [path]
   (:out
    (run-cmd "pdftohtml" "-hidden"  "-stdout" (str "'" path "'"))))
+
 
 
 (defn epub [path]
@@ -26,9 +28,30 @@
         )
       )))
 
+(defn tmp-file [s]
+  (let [f (str "/tmp/" (uuid) ".tmp")]
+    (spit f s)
+    f))
+
+(defn markdown [path]
+  (:out
+   (run-cmd "pandoc" "-f html" "-t markdown "
+            (tmp-file (->html path)
+            ;;
+                      ))))
+
+
+(defn pick [path]
+  (let [f (tmp-file (markdown path))]
+    (gum/filter f)
+    ))
+
 (comment
+  (def path "resources/babooka.pdf")
 
   (pdf "resources/babooka.pdf")
+  (markdown "resources/babooka.pdf")
+  (pick "resources/babooka.pdf")
 
   (mock epub "resources/babooka.epub")
 

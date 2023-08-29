@@ -45,8 +45,8 @@
 
   parse (println (b/->html (first *command-line-args*)))
 
-  filter (println (block/filter))
   gum (println (apply block/gum *command-line-args*))
+  filter (println (apply b/pick *command-line-args*))
 
   uberjar (do
             (println "Making uberjar")

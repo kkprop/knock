@@ -32,6 +32,9 @@
     - pdf tools
         - brew install poppler 
         - sudo apt-get install pdftohtml
+    - pandoc
+        - brew install pandoc
+        - sudo apt-get install pandoc
 
 - Lucy
 ======
