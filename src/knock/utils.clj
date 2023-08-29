@@ -625,7 +625,7 @@
     (->> (tree-seq coll? identity m)
          (filter #(and (map-entry? %) (contains? hs (keyword (first %)))))
     )))
-
+;;this one currently is limp. same key only return one result.
 (defn cherry-pick [m & ks]
   (apply hash-map
          (flatten
@@ -763,8 +763,11 @@
 
                     (str/join "&&")
                     (apply str))]
-    (str prefix path "?" params)
-    ;kv-pairs
+
+    (if (empty? params)
+      (str prefix path)
+      (str prefix path "?" params)
+      )
     ))
 
 ;;Mix :k "v" {:mk "mv" :mmk "mmv"}

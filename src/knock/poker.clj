@@ -70,8 +70,8 @@
                           ))))
 
 (defn play []
-  (let []
-    (println (apply str (repeat 80 "-")))
+  (let [_ (println (apply str (repeat 80 "-")))
+        _ (println (utils/cur-time-str))]
     (apply list
            (->> (rand-n poker 2 2 5)
                 (map print-vals))))
@@ -80,6 +80,7 @@
 
 (comment
 
+  (utils/cur-time-str)
      ;;(rand-n poker 2 2 1 3 1 1 1 1)
    ;;
   (mark nums)
