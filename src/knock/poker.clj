@@ -96,15 +96,38 @@
    )
   )
 
-(defn pick-suite [& xs]
-)
+(defn pick-suite [& xs])
+
+(defn offset [xs]
+  (let [front (drop-last xs)
+        next (rest xs)
+        ]
+    (map - next front)
+    )
+  )
+
+(defn consecutive [xs]
+  (->> xs
+       (partition-by identity)
+       (map count))
+  )
+
+(defn max-consecutive [xs]
+  (apply max
+         (consecutive [6 0 0 0 2 0])
+         )
+  )
 
 (defn straight [& xs]
-  (->
-    (apply nums xs)
-      distinct
-      )
-  )
+  (let [oxs (->
+             (apply nums xs)
+             distinct
+             sort
+             offset)
+        max-consecutive (->> (consecutive oxs) (apply max))
+        ]
+    (< 3 max-consecutive)
+  ))
 
 (defn flush [& xs]
   (map :suite xs)
@@ -112,13 +135,32 @@
 
 (defn straight-flush [& xs])
 
-(defn quads [& xs])
-
+(defn quads [& xs]
+  (let [oxs
+        (->>
+         (apply nums xs)
+         sort
+         offset)]
+    oxs 
+    ))
 
 (comment
+
+  (quads {:num 8}  {:num 8} {:num 8} {:num 8} {:num 10} {:num 10})
+  (quads {:num 8} {:num 2} {:num 8} {:num 8} {:num 8} {:num 10} {:num 10})
+
   (apply straight
-   (draw 7)
-   )
+         (do
+           (mock-clean draw 7)
+           (mock draw 7)))
+
+  (map :num
+       (mock draw 7))
+
+  ;;this is bad.
+  (straight {:num 2} {:num 4} {:num 6} {:num 8} {:num 10})
+
+  (apply straight (mock draw 7))
 
   (utils/cur-time-str)
      ;;(rand-n poker 2 2 1 3 1 1 1 1)
