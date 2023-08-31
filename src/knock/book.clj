@@ -3,7 +3,7 @@
             [babashka.fs :as fs]
             [clojure.string :as string]
             [babashka.pods :as pods]
-            [knock.gum :as gum]
+            [knock.tui :as tui]
             [clojure.string :as str]
             [knock.utils :as utils]))
 
@@ -45,7 +45,7 @@
 
 (defn pick [path]
   (let [f (tmp-file (markdown path))]
-    (gum/filter f)
+    (tui/filter f)
     ))
 
 (comment

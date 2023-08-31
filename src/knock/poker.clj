@@ -70,14 +70,51 @@
     )
   )
 
+(defn- deal-player [{:keys [players cards]}]
+  )
+;;debug
+(def n-player 3)
+
+(defn count-run [run-point]
+  {:pre-flop 5
+   :flop 2
+   :turn 1
+   :river 0
+   }
+  )
+
 (defn draw [& xs]
   (flatten
    (apply rand-n poker xs)))
 
+
+(defn deal-in [n-player & {:keys [run-point run-time]
+                 :or {run-point :pre-flop
+                      run-time 0}
+                 :as table
+                 }]
+  (let [table (assoc table
+                     :players (mark (range n-player))
+                     :run-time run-time
+                     :run-point run-point
+                     )
+        ]
+    (interleave [] :p-cards :burn-pre-flop :pre-flop :burn-turn :turn :burn-river :river 
+                (draw (* 2 n-player) 1 3 1 1 1 1)
+                )
+    )
+  )
+
+(comment
+  (deal-in 2 {:run-point :flop})
+  ;;
+  )
+
+
 (defn print-vals [xs]
   (println (str/join " "
                      (->> xs
-                          (map #(dissoc % :id))
+                          (map #(dissoc % :id :num))
                           (map vals)
                           (map #(apply str %))
                           ))))
@@ -108,8 +145,13 @@
 
 (defn consecutive [xs]
   (->> xs
-       (partition-by identity)
-       (map count))
+       (partition-by :num)
+       ;;(map count)
+       )
+  )
+
+(comment
+  (consecutive (draw 7))
   )
 
 (defn max-consecutive [xs]
