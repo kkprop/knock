@@ -47,6 +47,7 @@
 
   gum (println (apply block/gum *command-line-args*))
   filter (println (apply b/pick *command-line-args*))
+  book (println (b/fuzzy-open (first *command-line-args*)))
 
   uberjar (do
             (println "Making uberjar")

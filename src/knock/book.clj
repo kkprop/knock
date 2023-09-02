@@ -4,6 +4,7 @@
             [clojure.string :as string]
             [babashka.pods :as pods]
             [knock.tui :as tui]
+            [bblgum.core :as b]
             [clojure.string :as str]
             [knock.utils :as utils]))
 
@@ -35,7 +36,9 @@
         (:body (utils/curl-get path))
         (mock slurp path)
         ))))
-
+;;currently is mock
+;;a path is a uri
+;; once this uri is cached, always return the same content
 (defn markdown [path]
   (:out
    (run-cmd "pandoc" "-f html" "-t plain "
@@ -48,7 +51,22 @@
     (tui/filter f)
     ))
 
+
+(utils/config :book-dir)
+
+(defn fuzzy-open [s & {:keys [dir]
+                       :or {dir (if-not (nil? book-dir)
+                                  book-dir
+                                  ".")}}]
+
+  (let [xs (fs/list-dir dir)]
+    (pick
+     (tui/filter (tmp-file (str/join "\n" xs)))))
+  ;;
+  )
+
 (comment
+  (fuzzy-open "木")
 
   (tmp-file
    (.getByte

@@ -2,6 +2,7 @@
  ;;Confluence is a random name for the profile other than your default one
  ;;to avoid interference of your ordinary usage of Chrome
  :chrome-profile "/Users/dc/Library/Application Support/Google/Chrome/Profile 2/Confluence"
+ :book-dir "/Users/dc/Downloads/books/"
 
  :card-suites {:heart "♥️" 
           :spade "♠️"
