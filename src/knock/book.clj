@@ -18,11 +18,22 @@
   (:out
    (run-cmd "einfo" "-p" (str "'" path "'"))))
 
+
+(defn md5-uuid [s]
+  (let [md5 (java.security.MessageDigest/getInstance "MD5")
+        encoder (java.util.Base64/getEncoder)
+        bytes (.digest md5 (.getBytes s))
+        bb (java.nio.ByteBuffer/wrap bytes)
+        ;;hex-string (apply str (map #(format "%02x" %) bytes))
+        ]
+    (java.util.UUID. (.getLong bb) (.getLong bb))))
+
 (defn tmp-file [s]
-  (let [f (str "/tmp/" (uuid) ".tmp")]
+  (let [f (str "/tmp/" (md5-uuid s) ".tmp")]
     (spit f s)
     f)
   )
+
 
 ;;anything to html
 ;; url
