@@ -1310,6 +1310,14 @@
   )
 
 
+;; 
+(defn mapcat-key [m k]
+  (if (sequential? (k m))
+    (->> (k m)
+         (map #(assoc m k %)))
+    [m]))
+
+
 (comment
 
   (-> "abcAB.*?!"

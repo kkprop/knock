@@ -1,3 +1,4 @@
+
 (ns knock.poker
   (:require [knock.utils :as utils :refer :all]
             [clojure.string :as str]
@@ -142,23 +143,29 @@
     (map - next front)
     )
   )
+;; 
+(defn mapcat-key [m k]
+  (if (sequential? (k m))
+    (->> (k m)
+         (map #(assoc m k %)))
+    [m]))
 
-(defn consecutive [xs]
+(defn consecutive [xs & {:keys [k]
+                         :or {k :num}}]
   (->> xs
-       (partition-by :num)
-       ;;(map count)
-       )
-  )
+       (mapcat #(mapcat-key % k))
+       (sort-by k)
+       (partition-by k)))
 
 (comment
-  (consecutive (draw 7))
+  (map :num
+       (consecutive
+         (mock draw 7)
+         )
+       )
+  ;;
   )
 
-(defn max-consecutive [xs]
-  (apply max
-         (consecutive [6 0 0 0 2 0])
-         )
-  )
 
 (defn straight [& xs]
   (let [oxs (->
@@ -166,9 +173,7 @@
              distinct
              sort
              offset)
-        max-consecutive (->> (consecutive oxs) (apply max))
         ]
-    (< 3 max-consecutive)
   ))
 
 (defn flush [& xs]
