@@ -16,9 +16,8 @@
    [clojure.edn :as edn]
    [clojure.walk :as walk]))
 
-
-
 (def os-name (System/getProperty "os.name"))
+(declare force-str)
 
 (defn uuid []
   (java.util.UUID/randomUUID)
@@ -32,8 +31,9 @@
         _ (println s)] s))
 
 (defn run-cmd [& cmd]
-  (sh "sh" "-c" (str/join " " cmd))
-  )
+  (sh "sh" "-c" (str/join " "
+                          (->> cmd (map force-str)
+                                   ))))
 
 
 (comment
@@ -356,7 +356,6 @@
 (def curl-get (partial curl-any curl/get))
 (def curl-post (partial curl-any curl/post))
 
-(declare force-str)
 
 (def ip-regex #"(?:[0-9]{1,3}\.){3}[0-9]{1,3}")
 (def dash-ip-regex #"(?:[0-9]{1,3}-){3}[0-9]{1,3}")
@@ -1316,6 +1315,29 @@
     (->> (k m)
          (map #(assoc m k %)))
     [m]))
+
+(defn cart
+  ([] '())
+  ([l1] (map list l1))
+  ([l1 l2]
+   (map (fn [x]
+          (map (fn [y]
+                 (list x y))
+               l2))
+        l1)))
+
+(defn cartesian-product [& lists]
+  (reduce cart lists))
+
+
+(defn bb-tasks []
+  (let [tasks (-> (run-cmd :bb :tasks)
+                  :out
+                  str/split-lines)]
+    (->> tasks
+         (map str/trim))
+    )
+  )
 
 
 (comment
