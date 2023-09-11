@@ -8,6 +8,8 @@
             [clojure.string :as str]
             [knock.utils :as utils]))
 
+
+
 (defn pdf [path]
   (:out
    (run-cmd "pdftohtml" "-hidden"  "-stdout" (str "'" path "'"))))
@@ -28,12 +30,25 @@
         ]
     (java.util.UUID. (.getLong bb) (.getLong bb))))
 
-(defn tmp-file [s]
-  (let [f (str "/tmp/" (md5-uuid s) ".tmp")]
-    (spit f s)
-    f)
-  )
-
+;;use (parital you-actual-function) to suppress evaluation when the cache already exist
+(defn tmp-file [s-or-fn & {:keys [dir uuid ext]
+                           :or {dir "/tmp/"
+                                ext ".tmp"}}]
+  (let [f (str dir
+               (if (nil? uuid)
+                 ;;no uid md5 the string
+                 (md5-uuid s-or-fn)
+                 (if (uuid? uuid)
+                   uuid
+                   ;;not a formal uuid. md5 the variable
+                   (md5-uuid uuid)))
+               ext)]
+    (when-not (fs/exists? f)
+      (spit f (if (fn? s-or-fn)
+                (s-or-fn)
+                s-or-fn
+                )))
+    f))
 
 ;;anything to html
 ;; url
@@ -47,6 +62,10 @@
         (:body (utils/curl-get path))
         (mock slurp path)
         ))))
+
+
+
+(config book-cache-dir)
 ;;currently is mock
 ;;a path is a uri
 ;; once this uri is cached, always return the same content
@@ -54,13 +73,24 @@
   (:out
    (run-cmd "pandoc" "-f html" "-t plain "
             (tmp-file (mock ->html path)
-            ;;
+                      :ext ".html"
+                      :uuid path
+                      :dir (if (nil? book-cache-dir)
+                             "/tmp/"
+                             book-cache-dir
+                             )
+            ;;)
                       ))))
 
 (defn pick [path]
-  (let [f (tmp-file (markdown path))]
-    (tui/filter f)
-    ))
+  (let [f (tmp-file (partial markdown path)
+                    :ext ".md"
+                    :uuid path
+                    :dir (if (nil? book-cache-dir)
+                            "/tmp/"
+                            book-cache-dir))]
+
+    (tui/filter f)))
 
 
 (utils/config :book-dir)

@@ -136,26 +136,42 @@
 
 (defn pick-suite [& xs])
 
-(defn offset [xs]
+(defn offset [xs & {:keys [k]
+                    :or {k :num}}]
   (let [front (drop-last xs)
-        next (rest xs)
-        ]
-    (map - next front)
-    )
-  )
-;; 
-(defn mapcat-key [m k]
-  (if (sequential? (k m))
-    (->> (k m)
-         (map #(assoc m k %)))
-    [m]))
+        next (rest xs)]
+    (map (fn [a b]
+           (- (k a)
+              (k b)) ) next front)))
 
 (defn consecutive [xs & {:keys [k]
                          :or {k :num}}]
-  (->> xs
-       (mapcat #(mapcat-key % k))
-       (sort-by k)
-       (partition-by k)))
+  (let [raw (->> xs
+                 (mapcat #(mapcat-key % k))
+                 (sort-by k)
+                 (partition-by k))]
+    raw
+    )
+    ;;
+  )
+;;generate several straight path
+(defn offset-consecutive[xs & {:keys [k]
+                         :or {k :num}}]
+  (let [raw (consecutive xs)
+        ]
+    (map )
+    ;;
+    ))
+
+(defn holdem [xs]
+  (let [by-num (consecutive xs)
+        by-suite (consecutive xs)]
+    ;;
+    )
+  )
+
+;; count to xs
+;; offset consecutive count to xs
 
 (comment
   (map :num
@@ -165,7 +181,6 @@
        )
   ;;
   )
-
 
 (defn straight [& xs]
   (let [oxs (->

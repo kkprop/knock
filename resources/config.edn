@@ -3,6 +3,7 @@
  ;;to avoid interference of your ordinary usage of Chrome
  :chrome-profile "/Users/dc/Library/Application Support/Google/Chrome/Profile 2/Confluence"
  :book-dir "/Users/dc/Downloads/books/"
+ :book-cache-dir "/Users/dc/tmp/"
 
  :card-suites {:heart "♥️" 
           :spade "♠️"
