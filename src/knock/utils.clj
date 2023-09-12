@@ -1320,11 +1320,15 @@
   ([] '())
   ([l1] (map list l1))
   ([l1 l2]
+   (first
    (map (fn [x]
           (map (fn [y]
                  (list x y))
-               l2))
-        l1)))
+               l2)
+            )
+        l1)
+    ))
+)
 
 (defn cartesian-product [& lists]
   (reduce cart lists))
