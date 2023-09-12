@@ -159,7 +159,7 @@
                          :or {k :num}}]
   (let [raw (consecutive xs)
         ]
-    (map )
+    (map  )
     ;;
     ))
 
