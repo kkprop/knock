@@ -460,6 +460,16 @@
     )
   )
 
+(defn pp-str [x]
+  (with-out-str
+    (clojure.pprint/pprint x)))
+
+(defn pp-spit [path x & opts]
+  (apply spit path (println x)
+        opts
+        )
+  )
+
 ;;load conf from resources/conf path
 (defn load-conf [name]
   (load-edn (conf-path-edn name))
@@ -1331,6 +1341,24 @@
 
 (defn cartesian-product [& lists]
   (reduce cart lists))
+
+(defn flat-cartesian-product [coll & xs]
+  (let [x (first xs)]
+    (if (nil? x)
+      coll
+      ;(flat-cartesian-product (flatten (cart coll x))
+      ;                        (rest xs))
+      (let [cur-coll  (partition (+ 1 (if (sequential? (first coll))
+                                           (count (first coll))
+                                           1
+                                           ))
+                                 (flatten (cart coll x)))]
+        (if (nil? (rest xs))
+          cur-coll
+          (->>
+           (apply flat-cartesian-product cur-coll (rest xs)))
+          ;;
+          )))))
 
 
 (defn bb-tasks []
