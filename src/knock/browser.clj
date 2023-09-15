@@ -28,6 +28,8 @@
 
 (utils/config :chrome-profile)
 
+chrome-profile
+
 
 (defn new-driver []
   (let [d

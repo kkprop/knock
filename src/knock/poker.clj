@@ -145,7 +145,7 @@
               (k b)) ) next front)))
 
 (defn consecutive [xs & {:keys [k]
-                         :or {k :num}}]
+                         :or {k identity}}]
   (let [raw (->> xs
                  (mapcat #(mapcat-key % k))
                  (sort-by k)
@@ -155,17 +155,24 @@
     ;;
   )
 ;;generate several straight path
-(defn offset-consecutive[xs & {:keys [k]
-                         :or {k :num}}]
-  (let [raw (consecutive xs)
-        ]
-    (map  )
-    ;;
+(defn offset-consecutive [xs & {:keys [k]
+                                :or {k :num}}]
+  (let [raw (consecutive xs :k k)
+        ;;n-to-obj (->> raw (map (fn [mxs] {(get (first mxs) k) mxs})))
+        paths (apply flat-cartesian-product raw)]
+    ;;(offset nxs)
+    (->> paths
+         (map (fn [xs]
+                {:offset (offset xs :k k)
+                 :xs xs}
+                ))
+         )
+;;
     ))
 
 (defn holdem [xs]
-  (let [by-num (consecutive xs)
-        by-suite (consecutive xs)]
+  (let [by-num (consecutive xs :k :num)
+        by-suite (consecutive xs :k :suite)]
     ;;
     )
   )
@@ -174,23 +181,29 @@
 ;; offset consecutive count to xs
 
 (comment
+  (straight
+   (mock draw 7)
+   (mock draw 10)
+   (mock-clean draw 7))
+  (offset-consecutive (mock draw 7))
+
   (map :num
        (consecutive
-         (mock draw 7)
-         )
-       )
-  ;;
+        (mock draw 7) :k :num))
+
+;;
   )
 
 (defn straight [& xs]
-  (let [oxs (->
-             (apply nums xs)
-             distinct
-             sort
-             offset)
-        ]
-  ))
-
+  (let []
+    (->> (offset-consecutive xs :k :num)
+         (map #(let [m (consecutive (:offset %))
+                        ones (get m 1)]
+                    ;;(< 3 (count ones))
+                 ones
+                    )
+                 )
+         )))
 (defn flush [& xs]
   (map :suite xs)
   )

@@ -35,6 +35,18 @@
                           (->> cmd (map force-str)
                                    ))))
 
+(defn force-keyword [x]
+  (if (keyword? x)
+    x
+    (keyword x)))
+
+(defn force-str [x]
+  (if (string? x)
+    x
+    (if (keyword? x)
+      (name x)
+      (str x))))
+
 
 (comment
   (->>
@@ -108,7 +120,7 @@
 
 ;; get all the command string of shell
 (defmacro make-shell-fn [name]
-  (let [fname (symbol name)
+  (let [fname (symbol (force-str name))
         args (symbol "args")]
     `(defn ~fname [& ~args]
        (str/trim-newline
@@ -117,7 +129,7 @@
 
 
 (make-shell-fn "basename")
-(make-shell-fn "dirname")
+(make-shell-fn :dirname)
 (make-shell-fn "openssl")
 (make-shell-fn "base64")
 (make-shell-fn "curl")
@@ -790,19 +802,6 @@
    ;
    ))
 
-(defn force-keyword [x]
-  (if (keyword? x)
-    x
-    (keyword x)
-    )
-  )
-
-(defn force-str [x]
-  (if (string? x)
-    x
-    (if (keyword? x)
-      (name x)
-      (str x))))
 
 (defn word-capitial->dash [x]
   (let [s (force-str x)
