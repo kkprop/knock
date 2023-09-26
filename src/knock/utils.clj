@@ -274,12 +274,16 @@
        (remove nil?)
        (first)))
 
+
 (defn ms [t]
-  (inst-ms t)
-  )
+  (if (nil? t)
+    t
+    (inst-ms t)))
 
 (defn ts [t]
-  (quot (ms t) 1000))
+  (if (nil? t)
+    t
+    (quot (ms t) 1000)))
 
 (ts
  (fuzzy-parse-time "*  expire date: Jul 24 23:30:12 2023 GMT")
@@ -315,14 +319,14 @@
 
 (def days-to-now (partial days (java.util.Date.)))
 (defn inst-to-now [t]
-  (- (ts t)
-   (cur-ts)
-   ))
+  (if (nil? t)
+    t
+    (- (ts t) (cur-ts))))
 
 (defn not-expire? [t]
-  (< 0 (inst-to-now t))
-  )
-
+  (if (nil? t) false
+      (< 0
+         (inst-to-now t))))
 
 (defn range-date
   ([end-str])
