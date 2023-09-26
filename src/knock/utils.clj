@@ -279,7 +279,7 @@
   )
 
 (defn ts [t]
-  (quot (fuzzy-ms t) 1000))
+  (quot (ms t) 1000))
 
 (ts
  (fuzzy-parse-time "*  expire date: Jul 24 23:30:12 2023 GMT")
