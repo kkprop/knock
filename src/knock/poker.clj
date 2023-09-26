@@ -136,43 +136,78 @@
 
 (defn pick-suite [& xs])
 
-(defn offset [xs & {:keys [k]
-                    :or {k :num}}]
+(defn offset [xs & {:keys [k f]
+                    :or {k :num
+                         f -}}]
   (let [front (drop-last xs)
         next (rest xs)]
     (map (fn [a b]
-           (- (k a)
+           (f (k a)
               (k b)) ) next front)))
 
-(defn consecutive [xs & {:keys [k]
+(defn sort-consecutive [xs & {:keys [k]
                          :or {k identity}}]
   (let [raw (->> xs
                  (mapcat #(mapcat-key % k))
+                 ;;make the initial sort
                  (sort-by k)
                  (partition-by k))]
     raw
     )
     ;;
   )
+
+(defn count-dupe
+  "Returns a lazy sequence removing consecutive duplicates in coll.
+  Returns a transducer when no collection is provided."
+  {:added "1.7"}
+  ([]
+   (fn [rf]
+     (let [pv (volatile! ::none)]
+       (fn
+         ([] (rf))
+         ([result] (rf result))
+         ([result input]
+          (let [prior @pv]
+            (vreset! pv input)
+            (if (= prior input)
+              {result 0}
+              (rf {result 0} input))))))))
+  ([coll] (sequence (count-dupe) coll)))
+
+(comment
+  (count-dupe [1 1 2 2 3])
+  )
+
+(defn max-consecutive-of [n xs & {:keys [k]
+                              :or {k identity}}]
+  (let [raw (->> xs)]
+    raw
+    (dedupe)
+    )
+    ;;
+  )
+
+
 ;;generate several straight path
 (defn offset-consecutive [xs & {:keys [k]
                                 :or {k :num}}]
-  (let [raw (consecutive xs :k k)
+  (let [raw (sort-consecutive xs :k k)
         ;;n-to-obj (->> raw (map (fn [mxs] {(get (first mxs) k) mxs})))
         paths (apply flat-cartesian-product raw)]
     ;;(offset nxs)
     (->> paths
          (map (fn [xs]
-                {:offset (offset xs :k k)
-                 :xs xs}
-                ))
+                {(offset xs :k k) xs}
+                )
+              )
          )
 ;;
     ))
 
 (defn holdem [xs]
-  (let [by-num (consecutive xs :k :num)
-        by-suite (consecutive xs :k :suite)]
+  (let [by-num (sort-consecutive xs :k :num)
+        by-suite (sort-consecutive xs :k :suite)]
     ;;
     )
   )
@@ -180,30 +215,26 @@
 ;; count to xs
 ;; offset consecutive count to xs
 
+(defn straight [& xs]
+  (let []
+    (->> (apply offset-consecutive xs)
+         ;;(map #(map-on-key offset-consecutive %))
+         )))
+
 (comment
   (straight
-   (mock draw 7)
-   (mock draw 10)
-   (mock-clean draw 7))
+    (mock draw 7)
+    )
   (offset-consecutive (mock draw 7))
 
   (map :num
-       (consecutive
+       (sort-consecutive
         (mock draw 7) :k :num))
 
 ;;
   )
 
-(defn straight [& xs]
-  (let []
-    (->> (offset-consecutive xs :k :num)
-         (map #(let [m (consecutive (:offset %))
-                        ones (get m 1)]
-                    ;;(< 3 (count ones))
-                 ones
-                    )
-                 )
-         )))
+
 (defn flush [& xs]
   (map :suite xs)
   )

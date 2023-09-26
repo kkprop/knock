@@ -18,6 +18,7 @@
 
 (def os-name (System/getProperty "os.name"))
 (declare force-str)
+(declare split-by)
 
 (defn uuid []
   (java.util.UUID/randomUUID)
@@ -35,29 +36,20 @@
                           (->> cmd (map force-str)
                                    ))))
 
-(defn force-keyword [x]
+(defn ->keyword [x]
   (if (keyword? x)
     x
     (keyword x)))
 
-(defn force-str [x]
+(defn ->str [x]
   (if (string? x)
     x
     (if (keyword? x)
       (name x)
       (str x))))
 
+(def force-str ->str)
 
-(comment
-  (->>
-   (str/split-lines
-    (:out
-     (run-cmd "ls")))
-   (filter #(str/ends-with? % ".json") )
-   )
-
-;;
-  )
 
 (defn join-path [& cmd]
   (str/join "/" cmd))
@@ -134,9 +126,11 @@
 (make-shell-fn "base64")
 (make-shell-fn "curl")
 (make-shell-fn "grep")
+(make-shell-fn :ls)
 
 (defn re-escape [s]
   (str/escape s {\. "\\."
+
                  \[ "\\["
                  \] "\\]"
                  \{ "\\{"
@@ -144,7 +138,7 @@
                  })
   )
 
-(defn force-re [s]
+(defn ->re [s]
   (if (string? s)
     (re-pattern s)
     s
@@ -154,7 +148,7 @@
                      :or {re #" "}}]
   (str/split
     s
-   (force-re re)))
+   (->re re)))
 
 (defn split-pairs [s re & keys]
   (apply hash-map (interleave keys (str/split s re))))
@@ -266,7 +260,10 @@
 
 (def fmt-date-str (java.text.SimpleDateFormat. "yyyy-MM-dd"))
 
-(def time-fmts (->> ["MMM dd HH:mm:ss yyyy" "yyyy-MM-dd HH:mm:ss"]
+(def time-fmts (->> ["MMM dd HH:mm:ss yyyy"
+                     "yyyy-MM-dd HH:mm:ss"
+                     "yyyy-MM-dd'T'HH:mm:ssXXX" ;2023-10-02T16:56:28+08:00
+                     ]
                     (map #(java.text.SimpleDateFormat. %))))
 
 (defn fuzzy-parse-time [s & {:keys [to-trim]
@@ -277,8 +274,16 @@
        (remove nil?)
        (first)))
 
-(fuzzy-parse-time "2024-06-21 18:40:14 GMT")
-(fuzzy-parse-time "*  expire date: Jul 24 23:30:12 2023 GMT")
+(defn ms [t]
+  (inst-ms t)
+  )
+
+(defn ts [t]
+  (quot (fuzzy-ms t) 1000))
+
+(ts
+ (fuzzy-parse-time "*  expire date: Jul 24 23:30:12 2023 GMT")
+ )
 
 
 (defn cur-ts-13 []
@@ -309,7 +314,14 @@
         ))))
 
 (def days-to-now (partial days (java.util.Date.)))
+(defn inst-to-now [t]
+  (- (ts t)
+   (cur-ts)
+   ))
 
+(defn not-expire? [t]
+  (< 0 (inst-to-now t))
+  )
 
 
 (defn range-date
@@ -477,9 +489,8 @@
     (clojure.pprint/pprint x)))
 
 (defn pp-spit [path x & opts]
-  (apply spit path (println x)
-        opts
-        )
+  (apply spit path (pp-str x)
+        opts)
   )
 
 ;;load conf from resources/conf path
@@ -681,8 +692,11 @@
 (defn fuzzy-pick-map [m & ks]
   (let [hs (apply hash-set ks)]
     (->> (flatten-hashmap m)
-         ;; for 
-         (remove #(empty? (clojure.set/intersection hs (apply hash-set (first %))))))))
+         ;;two sets of key path have common field 
+         (remove #(empty? (clojure.set/intersection hs (apply hash-set (flatten(keys %))))))
+         ;;(map #(apply hash-set (flatten (keys %))))
+         ;;
+         )))
 
 (defn fuzzy-instant [n]
   (if (< n 0xFFFFFFFF)
@@ -696,7 +710,8 @@
   (->> m
        (filter #(get k-fn (first %)))
        (map (fn [[k v]] {k ((get k-fn k) v)}))
-       (apply merge)))
+       (apply merge)
+       ))
 
 
 (defn val-diff [a b vcf k]
@@ -727,6 +742,7 @@
       {:a-only-key a-only
        :b-only-key b-only
        :common-key-diff detail})
+
     ;
     ))
 
@@ -1036,8 +1052,7 @@
 
 (defn full-link-flatten [m]
   (->> m
-       )
-  )
+       ))
 
 
 (comment
@@ -1368,6 +1383,23 @@
          (map str/trim))
     )
   )
+
+
+(defn auto-cache-by-expire-time [key f]
+  (let [cur (mock f)
+        ;;depends on fuzzy-parse-time. add new format to support. when not ok
+        t (fuzzy-parse-time (get cur key))]
+    (if (not-expire? t)
+      cur
+      (do (mock-clean f)
+          (mock f)))))
+
+
+(def sentence "The quick brown fox jumps over a lazy dog")
+(def words (split-by sentence #" "))
+(def a-name (str/join "-" words))
+(def a-json-file (str/join "." [a-name "json"]))
+
 
 
 (comment
