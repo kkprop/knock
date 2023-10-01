@@ -41,13 +41,16 @@
                  (if (uuid? uuid)
                    uuid
                    ;;not a formal uuid. md5 the variable
-                   (md5-uuid uuid)))
+                   (let [real-uuid (md5-uuid uuid)]
+                     (pp-spit (join-path dir "index-uuids.edn") {:orig uuid :uuid real-uuid})
+                     real-uuid
+                     )))
+
                ext)]
     (when-not (fs/exists? f)
       (spit f (if (fn? s-or-fn)
                 (s-or-fn)
-                s-or-fn
-                )))
+                s-or-fn)))
     f))
 
 ;;anything to html
@@ -80,7 +83,8 @@
                              book-cache-dir
                              )
             ;;)
-                      ))))
+                      )
+            )))
 
 (defn pick [path]
   (let [f (tmp-file (partial markdown path)
