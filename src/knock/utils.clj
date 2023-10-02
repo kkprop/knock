@@ -1144,11 +1144,16 @@
 ;; load from default config file
 ;;  i.e. (config :chrome-profile)
 ;;       a varible chrome-profile is defined
-(defmacro config [name & {:keys [config-path]
+(defmacro config [name & {:keys [config-path default]
                           :or {config-path "resources/config.edn"}}]
   (let [var-name (symbol (force-str name))
-        key-word (keyword (force-str name))]
-    `(def ~var-name (~key-word (load-edn "resources/config.edn")))))
+        key-word (keyword (force-str name))
+        m (load-edn config-path)
+        value (key-word m)]
+    `(def ~var-name
+       (if (nil? ~value)
+         ~default
+         ~value))))
 
 
 (defn dash-dash-kv [m & selected-keys]
