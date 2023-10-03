@@ -50,6 +50,9 @@
 
 (def force-str ->str)
 
+(defn num-from [n]
+  (iterate inc n))
+
 
 (defn join-path [& cmd]
   (str/join "/" cmd))
@@ -1409,6 +1412,18 @@
 (def a-name (str/join "-" words))
 (def a-json-file (str/join "." [a-name "json"]))
 
+(defn divisible? [num div]
+  (= 0 (mod num div)))
+
+
+(defn seive [xs]
+  (let [x (first xs)]
+    (cons x
+          (lazy-seq
+            (seive (->> (rest xs)
+                        (remove #(divisible? % x))))))))
+
+(take 10 (seive (iterate inc 2)))
 
 
 (comment
