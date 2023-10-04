@@ -3,7 +3,6 @@
    [clojure.string :as str]
    [cheshire.core :as json]
    [knock.utils :as utils]
-   [ruuter.core :as ruuter]
    [babashka.curl :as curl]
    [org.httpkit.server :as server])
   (:import
