@@ -1416,6 +1416,8 @@
   (= 0 (mod num div)))
 
 
+;(take 10 (seive (iterate inc 2)))
+;seive prime number in streaming way
 (defn seive [xs]
   (let [x (first xs)]
     (cons x
@@ -1423,7 +1425,6 @@
             (seive (->> (rest xs)
                         (remove #(divisible? % x))))))))
 
-(take 10 (seive (iterate inc 2)))
 
 
 (comment
