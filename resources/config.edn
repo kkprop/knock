@@ -9,5 +9,6 @@
           :spade "♠️"
           :club "♣️" 
           :diamond "♦️"}
+ :local-roam-edn "/Users/dc/Documents/Roam/1.edn"
  ;";
  }

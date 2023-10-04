@@ -1424,7 +1424,18 @@
           (lazy-seq
             (seive (->> (rest xs)
                         (remove #(divisible? % x))))))))
-
+;(factorial 3)
+(defn factorial
+  ([n] (factorial 1 1 n))
+  ([product counter n]
+   (if (< n counter)
+     product
+     (factorial (* counter product)
+                  (+ counter 1)
+                  n
+                  )
+     )
+   ))
 
 
 (comment
