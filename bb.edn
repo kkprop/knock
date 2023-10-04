@@ -49,6 +49,7 @@
   gum (println (apply block/gum *command-line-args*))
   filter (println (apply b/pick *command-line-args*))
   book (println (b/fuzzy-open (first *command-line-args*)))
+  local-server (p/shell "clj -M -m lucy.local-server")
 
   uberjar (do
             (println "Making uberjar")
