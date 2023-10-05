@@ -55,8 +55,10 @@
 
 
 (defn local-call [fn-name req]
-  (let [url (str "http://127.0.0.1:16916/" (utils/force-str fn-name))]
-    (curl/get url {:body (json/generate-string req)})))
+  (let [url (str "http://127.0.0.1:16916/" (utils/force-str fn-name))
+        res (curl/get url {:body (json/generate-string req)})]
+    (utils/jstr-to-edn
+     (:body res))))
 
 
 (defn fuzzy-search-routes [xs s]
@@ -151,5 +153,6 @@
   (run hello-world {:port 16916})
   (run handler {:port 16916})
 
+  (local-call :rand-title [])
   ;;
   )

@@ -1,14 +1,14 @@
-{
- ;;Confluence is a random name for the profile other than your default one
+{;;Confluence is a random name for the profile other than your default one
  ;;to avoid interference of your ordinary usage of Chrome
  :chrome-profile "/Users/dc/Library/Application Support/Google/Chrome/Profile 2/Confluence"
  :book-dir "/Users/dc/Downloads/books/"
  :book-cache-dir "/Users/dc/tmp/"
 
- :card-suites {:heart "♥️" 
-          :spade "♠️"
-          :club "♣️" 
-          :diamond "♦️"}
+ :card-suites {:heart "♥️"
+               :spade "♠️"
+               :club "♣️"
+               :diamond "♦️"}
  :local-roam-edn "/Users/dc/Documents/Roam/1.edn"
+ :tpc "/Users/dc/Documents/Roam/tpc.edn"
  ;";
  }

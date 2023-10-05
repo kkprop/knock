@@ -137,6 +137,13 @@
             :in $ ?a ?v
             :where [?e ?a ?v]] db attr value))))
 
+(defn has-attr [db attr]
+  (let [db (if (string? db) (db db) db)]
+    (flatten
+     (d/q '[:find (pull ?e [*])
+            :in $ ?a
+            :where [?e ?a _]] db attr ))))
+
 ;;filter block by value in :attr.
 ;; i.e. a block have :block/children ["LrGj93uYu" "lMAj01xvc"]
 ;;  call backward-attr-value :block/chidren "LrGj93uYu" will return the block
@@ -287,6 +294,9 @@
   (rand-n-entity (db "song.db") 3)
 
   ;;this file is really slow
+  (def dc (db "1.edn"))
+  (utils/config tpc)
+  (has-attr (db tpc) :node/title)
   (def dc (db "1.edn"))
   (def uid "LrGj93uYu")
   (def eid

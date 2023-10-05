@@ -4,12 +4,21 @@
 
 (utils/config :local-roam-edn :default "./1.edn")
 
-(defn rand []
-  (println (count @data/dbs))
-  (rand-block
-   (data/db local-roam-edn)
+(defn rand 
+  ([]
+   (rand-block (data/db local-roam-edn)))
+  ([title]
+   (rand-block (data/db local-roam-edn) title)
    )
  )
+
+(defn rand-title
+  ([]
+   (rand-nth
+    (data/has-attr (db local-roam-edn) :node/title))
+   ;;
+   ))
+
 
 (comment
   (rand )
