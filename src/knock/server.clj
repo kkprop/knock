@@ -54,28 +54,36 @@
       {:status 200 :body "Hello world"})))
 
 
-(defn local-call [fn-name req]
+(defn local-call [fn-name & req]
   (let [url (str "http://127.0.0.1:16916/" (utils/force-str fn-name))
-        res (curl/get url {:body (json/generate-string req)})]
-    (utils/jstr-to-edn
-     (:body res))))
+        body {:body (json/generate-string req)}
+        res (utils/curl-any curl/get url :body body)]
+    res
+    ))
+
 
 
 (defn fuzzy-search-routes [xs s]
-  (->> xs (filter #(str/includes? % s))))
+  (let [fns (->> xs (filter #(str/includes? % s)))]
+    ;;exactly matches just return the only one
+    (if (utils/in? fns s)
+      [s]
+      ;;return the matches
+      fns)
+    ))
 
 
 ;;filter a namespace list which called/like keyword
 ;;also can remove function names in/like the neg-words 
 (defn namespaces-by [keyword & neg-words]
   (->>
-   (all-ns)
-   (map ns-name)
-   (filter #(str/includes? (str %) keyword))
-   (remove #(not-every? false? (map (fn [s] (str/includes? (str %) s)) neg-words)))
-   (map symbol)
-   ;;
-   ))
+    (all-ns)
+    (map ns-name)
+    (filter #(str/includes? (str %) keyword))
+    (remove #(not-every? false? (map (fn [s] (str/includes? (str %) s)) neg-words)))
+    (map symbol)
+    ;;
+    ))
 
 ;;select functions from a namespace called/like keyword 
 (defn fns-by-namespace [keyword & neg-words]
@@ -90,22 +98,23 @@
   ([f params]
    (let [m (meta f)
          xs (first (:arglists m))
-         result (if (map? params)
-                  (f params)
-                  (apply f params))]
+         result
+         (if (nil? params)
+           (f)
+           (if (map? params)
+             (f params)
+             (apply f params)))]
      (if (sequential? result)
        (vec result)
        result)))
 
   ([m-fns fn-name params]
-   (let [names (->> m-fns keys (map str))
+   (let [names (->> m-fns keys (map utils/force-str))
          xs (fuzzy-search-routes names fn-name)
          f (get m-fns (symbol (first xs)))]
      (if (or (= 1 (count xs))
              (and (< 1 (count xs))
-                  (= (first xs) fn-name)
-                  )
-             )
+                  (= (first xs) fn-name)))
        {:result
         (call-fn f params)}
        {:error "api not found/more than one match" :matches xs}))))
@@ -116,9 +125,11 @@
 (defn handler [tokens routes {:keys [uri body headers]
                               :as request}]
   (let [path uri
-        names (->> routes keys (map str))
+        names (->> routes keys (map utils/force-str))
         fname (str/replace-first uri #"/" "")
-        body (parse-body body)
+        ;;default inside :body is a json string, do to-edn again
+        body (utils/jstr-to-edn (:body (parse-body body)))
+        ;_ (println body)
         xs (fuzzy-search-routes names fname)
         f (get routes (symbol (first xs)))
         req-token (get headers "authorization")]
@@ -140,12 +151,12 @@
   )
 
 (comment
+  (fuzzy-search-routes ["rand" "rand-title"] "rand")
 ;;
   (do
     (stop-server)
     ;;run namespace
-    (run-ns {:ip "127.0.0.1" :port 16916} 'rte.core 'lucy.server 'lucy.emoji)
-    )
+    (run-ns {:ip "127.0.0.1" :port 16916} 'rte.core 'lucy.server 'lucy.emoji))
 
   (run {:ip "127.0.0.1" :port 16916})
   (stop-server)
@@ -153,6 +164,9 @@
   (run hello-world {:port 16916})
   (run handler {:port 16916})
 
-  (local-call :rand-title [])
+  (local-call :rand-block-of "《东方之旅》")
+  (local-call :rand)
+
+  (utils/jstr-to-edn "null")
   ;;
   )

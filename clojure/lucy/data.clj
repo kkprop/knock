@@ -215,7 +215,10 @@
          )
     ))
 
-
+(defn block-of [db title]
+  [db title]
+  (let [uid (:block/uid (attr-value db :node/title title))]
+    (backward-attr-value db :block/refs uid)))
 
 (defn rand-block
   ([db]
@@ -223,8 +226,8 @@
            (+ 1
               (rand-int (:max-eid db)))))
   ([db title]
-   (let [uid (:block/uid (attr-value db :node/title title))]
-     (backward-attr-value db :block/refs uid))))
+   (rand-nth
+    (block-of db title))))
 
 (defn ids [db]
   (range 1 (+ 1 (:max-eid db)))

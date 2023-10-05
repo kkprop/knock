@@ -41,7 +41,8 @@
 
   wordnet (do (println (apply w/search-wn  *command-line-args*)))
 
-  local-call (apply s/local-call *command-line-args*)
+  ;;wrap up 
+  ;;local-call (apply s/local-call *command-line-args*)
   jp (println (apply str (map (requiring-resolve 'knock.jp/search-word) *command-line-args*)))
 
   play-poker (apply str (u/cur-time-str) "\n" (poker/play))

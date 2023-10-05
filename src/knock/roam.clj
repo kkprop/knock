@@ -1,8 +1,10 @@
+
 (ns knock.roam
   (:require
    [babashka.curl :as curl]
    [clojure.string :as str]
    [cheshire.core :as json]
+   [knock.server :as server :refer :all]
    [knock.utils :as utils :refer :all]
    ))
 
@@ -257,6 +259,7 @@
 
 
 (comment
+  (server/local-call :rand)
   (macroexpand 
    (gen-json-fn
     (load-json "write.json")

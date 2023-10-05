@@ -6,11 +6,10 @@
 
 (defn rand 
   ([]
-   (rand-block (data/db local-roam-edn)))
-  ([title]
-   (rand-block (data/db local-roam-edn) title)
-   )
- )
+   (rand-block (data/db local-roam-edn))))
+
+(defn rand-block-of [title]
+  (rand-block (data/db local-roam-edn) title))
 
 (defn rand-title
   ([]
