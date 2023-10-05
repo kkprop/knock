@@ -1437,6 +1437,60 @@
      )
    ))
 
+(defn md5-uuid [s]
+  (let [md5 (java.security.MessageDigest/getInstance "MD5")
+        encoder (java.util.Base64/getEncoder)
+        bytes (.digest md5 (.getBytes s))
+        bb (java.nio.ByteBuffer/wrap bytes)
+        ;;hex-string (apply str (map #(format "%02x" %) bytes))
+        ]
+    (java.util.UUID. (.getLong bb) (.getLong bb))))
+
+
+;;use (parital you-actual-function) to suppress evaluation when the cache already exist
+(defn tmp-file [s-or-fn & {:keys [dir uuid ext]
+                           :or {dir "/tmp/"
+                                ext ".tmp"}}]
+  (let [f (str dir
+               (if (nil? uuid)
+                 ;;no uid md5 the string
+                 (md5-uuid s-or-fn)
+                 (if (uuid? uuid)
+                   uuid
+                   ;;not a formal uuid. md5 the variable
+                   (let [real-uuid (md5-uuid uuid)]
+                     (pp-spit (join-path dir "index-uuids.edn") {:orig uuid :uuid real-uuid})
+                     real-uuid)))
+
+               ext)]
+    (when-not (fs/exists? f)
+      (spit f (if (fn? s-or-fn)
+                (s-or-fn)
+                s-or-fn)))
+    f))
+
+
+
+;;appoint fields to-search
+;;appoint field(s) to choose
+;; multiple fields, return the hashmap of selected fields
+;; if only one field, just return the value
+(defn searchablize [xs to-choose & to-search]
+  (let []
+    (->> xs
+         (map (fn [m] {(str/join " " (flatten
+                                      (if (sequential? to-search)
+                                        (vals (select-keys m to-search))
+                                        (vals m))))
+                       (if (sequential? to-choose)
+                         (select-keys m to-choose)
+                         (to-choose m))}))
+         ;;assure the to-search fields formed string is unique
+         (apply merge)
+         )
+    ;
+    ))
+
 
 (comment
 

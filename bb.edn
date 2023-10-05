@@ -6,6 +6,7 @@
         org.clojure/core.cache {:mvn/version "1.0.225"}
         net.cgrand/xforms {:mvn/version "0.19.5"}
         org.clojure/core.specs.alpha {:mvn/version "0.2.62"}
+        dawran6/emoji {:mvn/version "0.1.5"}
         org.babashka/spec.alpha {:git/url "https://github.com/babashka/spec.alpha"
                                  :git/sha "1a841c4cc1d4f6dab7505a98ed2d532dd9d56b78"} refactor-nrepl/refactor-nrepl {:mvn/version "2.5.1"}
         io.github.lispyclouds/bblgum {:git/sha "1d4de3d49b84f64d1b71930fa1161f8d2622a4d9"}
@@ -16,6 +17,7 @@
              [babashka.process :as p :refer [process]]
              [babashka.wait :as wait]
              [knock.utils :as u]
+             [knock.emoji :as e]
              [knock.server :as s]
              [knock.roam :as r]
              [knock.block :as  block]
@@ -50,6 +52,8 @@
   filter (println (apply b/pick *command-line-args*))
   book (println (b/fuzzy-open (first *command-line-args*)))
   local-server (p/shell "clj -M -m lucy.local-server")
+  ;!!! notice this choosen emoji will be copied to your clipboard 
+  emoji (println (e/i-emoji))
 
   uberjar (do
             (println "Making uberjar")

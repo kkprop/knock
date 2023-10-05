@@ -38,5 +38,6 @@
   datascript/datascript {:mvn/version "1.5.3"}
   datascript-transit/datascript-transit {:mvn/version "0.3.0"}
   org.clojure/core.async {:mvn/version "1.6.673"},
+  awran6/emoji {:mvn/version "0.1.5"}
   http-kit/http-kit {:mvn/version "2.6.0-RC1"}},
  :paths ["src" "clojure"]}

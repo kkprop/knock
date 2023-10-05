@@ -21,37 +21,6 @@
    (run-cmd "einfo" "-p" (str "'" path "'"))))
 
 
-(defn md5-uuid [s]
-  (let [md5 (java.security.MessageDigest/getInstance "MD5")
-        encoder (java.util.Base64/getEncoder)
-        bytes (.digest md5 (.getBytes s))
-        bb (java.nio.ByteBuffer/wrap bytes)
-        ;;hex-string (apply str (map #(format "%02x" %) bytes))
-        ]
-    (java.util.UUID. (.getLong bb) (.getLong bb))))
-
-;;use (parital you-actual-function) to suppress evaluation when the cache already exist
-(defn tmp-file [s-or-fn & {:keys [dir uuid ext]
-                           :or {dir "/tmp/"
-                                ext ".tmp"}}]
-  (let [f (str dir
-               (if (nil? uuid)
-                 ;;no uid md5 the string
-                 (md5-uuid s-or-fn)
-                 (if (uuid? uuid)
-                   uuid
-                   ;;not a formal uuid. md5 the variable
-                   (let [real-uuid (md5-uuid uuid)]
-                     (pp-spit (join-path dir "index-uuids.edn") {:orig uuid :uuid real-uuid})
-                     real-uuid
-                     )))
-
-               ext)]
-    (when-not (fs/exists? f)
-      (spit f (if (fn? s-or-fn)
-                (s-or-fn)
-                s-or-fn)))
-    f))
 
 ;;anything to html
 ;; url
@@ -94,7 +63,7 @@
                             "/tmp/"
                             book-cache-dir))]
 
-    (tui/filter f)))
+    (tui/i-filter f)))
 
 
 (utils/config :book-dir)
@@ -106,7 +75,7 @@
 
   (let [xs (fs/list-dir dir)]
     (pick
-     (tui/filter (tmp-file (str/join "\n" xs)))))
+     (tui/i-filter (tmp-file (str/join "\n" xs)))))
   ;;
   )
 
