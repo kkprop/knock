@@ -25,28 +25,31 @@
   )
 
 (defn join-cmd [& cmd]
-  (str/join " " cmd))
+  (str/join " " (->> cmd (map force-str))))
 
 (defn show-cmd [& cmd]
-  (let [s (str/join " " cmd)
+  (let [s (apply join-cmd cmd)
         _ (println s)] s))
 
 (defn run-cmd [& cmd]
-  (sh "sh" "-c" (str/join " "
-                          (->> cmd (map force-str)
-                                   ))))
+  (sh "sh" "-c" (apply join-cmd cmd)))
 
-(defn ->keyword [x]
-  (if (keyword? x)
-    x
-    (keyword x)))
 
 (defn ->str [x]
   (if (string? x)
     x
     (if (keyword? x)
       (name x)
-      (str x))))
+      (str x)
+      )))
+
+(defn ->keyword [x]
+  (if (keyword? x)
+    x
+    ;; (keyword ":abc") should be :abc 
+    (keyword (->str x))))
+
+
 
 (def force-str ->str)
 
@@ -185,8 +188,9 @@
 ;    c))
 
 (defn parse-float [s]
-  (Float/parseFloat s)
-  )
+  (if (string? s)
+    (Float/parseFloat s)
+    s))
 
 (defn force-float [s]
   (if (string? s) (parse-float s) (float s)))
@@ -196,6 +200,10 @@
    (cur-time-str "yyyy-MM-dd hh:mm:ss"))
   ([fmt]
      (.format (java.text.SimpleDateFormat. fmt) (java.util.Date.))))
+
+(defn time-tag []
+  (cur-time-str "yyyy-MM-dd..hh-mm-ss")
+  )
 
 (defn cur-year []
   (parse-int
@@ -499,6 +507,12 @@
   (apply spit path (pp-str x)
         opts)
   )
+(defn spit-xs [path xs & opts]
+  (let [_ (clojure.java.io/make-parents path)]
+    (apply spit path
+           ;;an empty line in the end of the fie
+           (str (str/join "\n" xs) "\n")
+           opts)))
 
 ;;load conf from resources/conf path
 (defn load-conf [name]
@@ -794,6 +808,9 @@
   (let [p (re-pattern (format "(?i).*%s.*" kw))]
     (re-matches p s)))
 
+
+(defn url-encode [v] (java.net.URLEncoder/encode v))
+
 (defn make-url [prefix path & kv]
   (let [kv-pairs (flatten
                   (map #(if (map? %) (flatten (seq %)) %) kv))
@@ -801,18 +818,18 @@
                     (partition 2)
                     (map #(str (name (first %))
                                "="
-                               (if (keyword? (second %))
-                                 (str (name (second %)))
-                                 (str (second %)))))
+                               ;;make sure the space and other characters are encoded as url
+                               (url-encode
+                                (if (keyword? (second %))
+                                  (str (name (second %)))
+                                  (str (second %))))))
 
                     (str/join "&&")
                     (apply str))]
 
     (if (empty? params)
       (str prefix path)
-      (str prefix path "?" params)
-      )
-    ))
+      (str prefix path "?" params))))
 
 ;;Mix :k "v" {:mk "mv" :mmk "mmv"}
 (defn kv-pair [& xs]
@@ -1258,10 +1275,18 @@
   (fuzzy-parse-time
    (curl "-vI" "--resolve" (str domain ":" port ":" ip)
          (str "https://" domain ":" port) "2>&1" "| grep 'expire date' " "| cut -d: -f2- | xargs")))
+(defn precision
+  ([x & {:keys [precision] :or {precision 4}}]
+   (format (str "%." precision "f")
+           (parse-float x)
+           )))
 
-(defn percentage [total numerator & {:keys [percision]
-                                     :or {percision 4}}]
-  (format (str "%." percision "f") (/  numerator (float total))))
+(defn percentage
+  ([total numerator & {:keys [precision] :or {precision 4}}]
+   (precision (/  numerator (float total))))
+;;
+  )
+
 
 
 (defn while-change [cb f & args]
@@ -1491,14 +1516,29 @@
     ;
     ))
 
+(defn unfold [m & ks]
+  (->> ks
+       (mapcat #(->> (% m)
+                     (map(fn [x] (assoc m % x))))
+  )))
+
 
 (comment
+  ;;naive version. TODO: should unfold by itself.
+  (unfold {:uni :☯
+                  :bin [:yin :yang]
+                  :oct [:☰ :☱ :☲ :☳ :☴ :☵ :☶ :☷]} :oct
+    )
+
+  ;;TODO automatic unfold
+  (unfold {:meta {:uni :☯
+                  :bin [:yin :yang]
+                  :oct [:☰ :☱ :☲ :☳ :☴ :☵ :☶ :☷]}} [:meta :oct])
 
   (-> "abcAB.*?!"
       (range-replace-string "_" \A \Z)
       (range-replace-string "_" \a \z)
-      (range-replace-string "_" \0 \9)
-      )
+      (range-replace-string "_" \0 \9))
 
   (curl-cert-expire-date "www.163.com" "111.177.39.150" 443)
 
