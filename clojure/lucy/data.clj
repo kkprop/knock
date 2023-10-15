@@ -136,6 +136,11 @@
      (d/q '[:find (pull ?e [*])
             :in $ ?a ?v
             :where [?e ?a ?v]] db attr value))))
+;;block by :block/uid
+(defn block [db uid]
+  (first
+   (attr-value db :block/uid uid)))
+
 
 (defn has-attr [db attr]
   (let [db (if (string? db) (db db) db)]
@@ -163,10 +168,6 @@
              :where [?e ?a ?str]
              [(clojure.string/includes? ?str ?ss)]] db attr substr))))
 
-;;block by :block/uid
-(defn block [db uid]
-  (first
-   (attr-value db :block/uid uid)))
 
 ;;string fuzzy much
 (defn attr-substr [db attr substr ]
@@ -297,14 +298,18 @@
   (rand-n-entity (db "song.db") 3)
 
   ;;this file is really slow
-  (def dc (db "1.edn"))
+  (utils/config :local-roam-edn)
+  (def dc (db local-roam-edn))
   (utils/config tpc)
   (has-attr (db tpc) :node/title)
-  (def dc (db "1.edn"))
+  ;(def dc (db "1.edn"))
   (def uid "LrGj93uYu")
   (def eid
-    (:db/id (block dc uid)))
-  ;;(def uid "yh9a0tmva")
+    (:db/id
+     (block dc "XHBFD-wP7")
+     ))
+
+  (entity dc eid)
 
   (map (juxt :block/uid :block/page :block/parents)
        (attr-value dc :block/string "__communication__"))

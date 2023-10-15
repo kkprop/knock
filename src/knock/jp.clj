@@ -1,6 +1,7 @@
 (ns knock.jp
-  (:require [knock.browser :refer [go click click-multi driver]]
-            [etaoin.api :as e]))
+  (:require
+   [knock.browser :refer [go click click-multi driver]]
+   [etaoin.api :as e]))
 
 
 (def voice {:class "concept_audio concept_light-status_link"})

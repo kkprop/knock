@@ -15,7 +15,6 @@
    (run-cmd "pdftohtml" "-hidden"  "-stdout" (str "'" path "'"))))
 
 
-
 (defn epub [path]
   (:out
    (run-cmd "einfo" "-p" (str "'" path "'"))))

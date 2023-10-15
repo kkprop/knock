@@ -1,4 +1,3 @@
-
 (ns knock.browser
   (:require
    [etaoin.api :as e]
