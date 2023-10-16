@@ -23,7 +23,7 @@
              [knock.block :as  block]
              [knock.book :as b :refer :all]
              [knock.poker :as poker]
-             [knock.chat :as chat]
+             [knock.chat :as chat :refer :all]
              [knock.wn :as w])
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
               proc (process (str "bb nrepl-server " port) {:inherit true})]
@@ -58,7 +58,7 @@
   ;!!! notice this choosen emoji will be copied to your clipboard 
   emoji (println (e/i-emoji))
 
-  prompt (println (chat/prompt (apply str *command-line-args*)))
+  gpt-prompt (println (u/mock chat/prompt (apply str *command-line-args*)))
 
   uberjar (do
             (println "Making uberjar")
