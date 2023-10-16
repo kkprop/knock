@@ -23,6 +23,7 @@
              [knock.block :as  block]
              [knock.book :as b :refer :all]
              [knock.poker :as poker]
+             [knock.chat :as chat]
              [knock.wn :as w])
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
               proc (process (str "bb nrepl-server " port) {:inherit true})]
@@ -47,7 +48,8 @@
 
   play-poker (apply str (u/cur-time-str) "\n" (poker/play))
 
-  parse (println (b/->html (first *command-line-args*)))
+  ;;deprecated replaced by bb filter
+  ;;parse (println (b/->html (first *command-line-args*)))
 
   gum (println (apply block/gum *command-line-args*))
   filter (println (apply b/pick *command-line-args*))
@@ -55,6 +57,8 @@
   local-server (p/shell "clj -M -m lucy.local-server")
   ;!!! notice this choosen emoji will be copied to your clipboard 
   emoji (println (e/i-emoji))
+
+  prompt (println (chat/prompt (apply str *command-line-args*)))
 
   uberjar (do
             (println "Making uberjar")
