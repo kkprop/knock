@@ -17,6 +17,8 @@
    [clojure.walk :as walk]))
 
 (def os-name (System/getProperty "os.name"))
+
+
 (declare force-str)
 (declare split-by)
 
@@ -381,7 +383,10 @@
 (defn curl-any [method url & {:keys [headers body]
                               :or {headers {"Content-Type" "application/json"}}
                               :as opts}]
-  (let [req (if (nil? body) {:headers headers} (assoc {:headers headers} :body (j body)))
+  (let [req (if (nil? body)
+              {:headers headers}
+              (assoc {:headers headers} :body (j body)))
+        ;;_ (println req)
         res (try (method url req) (catch Exception e (ex-data e)))]
     (assoc res :body
            (try
@@ -714,8 +719,9 @@
   (let [hs (apply hash-set ks)]
     (->> (flatten-hashmap m)
          ;;two sets of key path have common field 
-         (remove #(empty? (clojure.set/intersection hs (apply hash-set (flatten(keys %))))))
+         (remove #(empty? (clojure.set/intersection hs (apply hash-set (flatten (keys %))))))
          ;;(map #(apply hash-set (flatten (keys %))))
+         ;;(map #(map-on-key (fn [xs] (apply slash-keys xs))))
          ;;
          )))
 
@@ -1176,6 +1182,18 @@
          ~value))))
 
 
+;; load from shell environment, accept both keyword and string 
+;;   def the same name variable
+;;    i.e. (env :OPENAI_API_KEY)
+(defmacro env [name]
+  (let [var-name (symbol (force-str name))
+        s (force-str name)
+        ]
+    `(def ~var-name (System/getenv ~s))
+    )
+  )
+
+
 (defn dash-dash-kv [m & selected-keys]
   (let [m (if (nil? selected-keys)
             m
@@ -1227,13 +1245,15 @@
 ;;call mock-clean to clean local file
 (defn mock [f & args]
   (let [{:keys [fm ns-path dir path tmp-path]} (apply mock-context f args)
-        _ (clojure.java.io/make-parents path)]
+        _ (clojure.java.io/make-parents path)
+        ]
     (if (fs/exists? path)
       (try
         (load-edn path)
         ;; when failed try call function again and cache
         (catch Exception e
           (let [res (apply f args)
+                _ (println 'failed 'load-edn path "check the reader of this edn")
                 _ (fs/delete-if-exists path)] (clojure.pprint/pprint res (clojure.java.io/writer path)) res)))
       (let [res (apply f args)
             _ (clean-file tmp-path)]
@@ -1526,11 +1546,10 @@
 (comment
   ;;naive version. TODO: should unfold by itself.
   (unfold {:uni :☯
-                  :bin [:yin :yang]
-                  :oct [:☰ :☱ :☲ :☳ :☴ :☵ :☶ :☷]} :oct
-    )
+           :bin [:yin :yang]
+           :oct [:☰ :☱ :☲ :☳ :☴ :☵ :☶ :☷]} :oct)
 
-  ;;TODO automatic unfold
+;;TODO automatic unfold
   (unfold {:meta {:uni :☯
                   :bin [:yin :yang]
                   :oct [:☰ :☱ :☲ :☳ :☴ :☵ :☶ :☷]}} [:meta :oct])
@@ -1547,5 +1566,9 @@
   (mock slow-repeater "abc" 6)
 
   (mock-clean slow-repeater "abc" 3)
+
+  (env :OPENAI_API_KEY)
+  OPENAI_API_KEY
+
   ;;
   )

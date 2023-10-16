@@ -133,7 +133,7 @@
         xs (fuzzy-search-routes names fname)
         f (get routes (symbol (first xs)))
         req-token (get headers "authorization")]
-    (if (or (nil? tokens) (utils/in? tokens req-token))
+    (if (or (empty? tokens) (utils/in? tokens req-token))
       (if (or (= 1 (count xs))
               (and (< 1 (count xs))
                    (= (first xs) fname)))
