@@ -3,11 +3,11 @@
    [etaoin.api :as e]
    [etaoin.keys :as k]
    [clojure.java.io :as io]
-   [portal.api :as p]
+   ;[portal.api :as p]
    [taoensso.timbre :as timbre]
    [cheshire.core :as json]
    [clojure.edn :as edn]
-   [knock.utils :as utils]
+   [knock.utils :as utils :refer :all]
    [clojure.pprint :as pp]))
 
 ;; disable etaoin detail log
@@ -82,24 +82,21 @@ chrome-profile
     )
   )
 
-(defn app-history [env project app]
-  (let [url (str "https://deploy.agoralab.co/api/v1/deploy/action/history?"
-                 (kv-url
-                  :env env
-                  :project project
-                  :app app
-                  ))]
-     (go url)
-     (e/wait-has-text-everywhere driver "data")
-     (:data (:data (json/parse-string
-                    (e/get-element-text driver {:style "word-wrap: break-word; white-space: pre-wrap;"})
-                    true
-                    )))
-    )
-   )
+(defn locate [url q uniq-text]
+  (go url)
+  (->> (e/query-tree driver q)
+       (map (fn [id] {:id id :text (e/get-element-text-el driver id)}))
+       (filter #(utils/rev-fuzzy-in? [uniq-text] (:text %)))
+       (map #(e/get-element-inner-html-el driver (:id %))))
+  )
 
 
 (comment
+  (locate "https://clojure.org/news/2022/03/20/deref"
+          {:class "sect1"}
+          "Blogs"
+          )
+
   (wiki "Philip H. Dybvig")
   (->>
    (e/query-tree driver :content-root {:tag :article})
@@ -108,14 +105,6 @@ chrome-profile
    (f2
     (f22 ada))
    2 3)
-
-  (def h (take 1000
-               (app-history "default" "media" "vos2")))
-
-  (def vd
-    (utils/map-on-val
-     #(map (fn [m] (select-keys m [:idc :operator])) %)
-     (group-by #(select-keys % [:version]) h)))
 
   ;;calc on what version no needed
   (keys vd)
