@@ -7,8 +7,10 @@
    [taoensso.timbre :as timbre]
    [cheshire.core :as json]
    [clojure.edn :as edn]
+   [clojure.data.xml :as xml]
    [knock.utils :as utils :refer :all]
-   [clojure.pprint :as pp]))
+   [clojure.pprint :as pp]
+   [clojure.string :as str]))
 
 ;; disable etaoin detail log
 (timbre/set-level! :info)
@@ -26,9 +28,6 @@
 (def driver-edn-path "etaoin-driver-conn.edn")
 
 (utils/config :chrome-profile)
-
-chrome-profile
-
 
 (defn new-driver []
   (let [d
@@ -84,18 +83,34 @@ chrome-profile
 
 (defn locate [url q uniq-text]
   (go url)
+  (e/wait-visible driver q)
   (->> (e/query-tree driver q)
        (map (fn [id] {:id id :text (e/get-element-text-el driver id)}))
        (filter #(utils/rev-fuzzy-in? [uniq-text] (:text %)))
-       (map #(e/get-element-inner-html-el driver (:id %))))
+       (map #(assoc % :html (e/get-element-inner-html-el driver (:id %))))
+       ;;
+       )
   )
 
-
 (comment
+
+
+  (flatten-hashmap
+   (->>
+    (:content
+     (xml/parse-str
+      (str "<tbody>"
+           (trim-to
+            (:html (first media))
+            "<tr"))))
+
+    (take 6))
+   ;;
+   )
+
   (locate "https://clojure.org/news/2022/03/20/deref"
           {:class "sect1"}
-          "Blogs"
-          )
+          "Blogs")
 
   (wiki "Philip H. Dybvig")
   (->>
