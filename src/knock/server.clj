@@ -56,7 +56,7 @@
 
 (defn local-call [fn-name & req]
   (let [url (str "http://127.0.0.1:16916/" (utils/force-str fn-name))
-        body {:body (json/generate-string req)}
+        body  (json/generate-string req)
         res (utils/curl-any curl/get url :body body)]
     res
     ))
@@ -97,13 +97,13 @@
 (defn call-fn
   ([f params]
    (let [m (meta f)
-         xs (first (:arglists m))
-         result
-         (if (nil? params)
-           (f)
-           (if (map? params)
-             (f params)
-             (apply f params)))]
+         _ (println params)
+         ;xs (first (:arglists m))
+         result (if (nil? params)
+                  (f)
+                  (if (sequential? params)
+                    (apply f params)
+                    (f params)))]
      (if (sequential? result)
        (vec result)
        result)))
@@ -126,18 +126,27 @@
                               :as request}]
   (let [path uri
         names (->> routes keys (map utils/force-str))
-        fname (str/replace-first uri #"/" "")
+        ;; ignore first ""
+        xs-path (rest (str/split uri #"/"))
+        fname (first xs-path)
+        params (rest xs-path)
         ;;default inside :body is a json string, do to-edn again
-        body (utils/jstr-to-edn (:body (parse-body body)))
-        ;_ (println body)
+        ;body (utils/jstr-to-edn (:body (parse-body body)))
+        ;;body is body
+        body (parse-body body)
         xs (fuzzy-search-routes names fname)
         f (get routes (symbol (first xs)))
+        _ (println 'body body 'params params)
         req-token (get headers "authorization")]
     (if (or (empty? tokens) (utils/in? tokens req-token))
       (if (or (= 1 (count xs))
               (and (< 1 (count xs))
                    (= (first xs) fname)))
-        (make-body {:result (call-fn f body)})
+        (make-body {:result
+                    (if (nil? body)
+                      (call-fn f params)
+                      (call-fn f body))})
+
         (make-body {:error "api not found"
                     :matches xs}))
       (make-body {:result  "token denied"} {:status 403}))))
@@ -165,7 +174,6 @@
   (run handler {:port 16916})
 
   (local-call :rand-block-of "《东方之旅》")
-  (local-call :rand)
 
   (utils/jstr-to-edn "null")
   ;;

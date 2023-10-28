@@ -10,16 +10,15 @@
    [cheshire.core :as json :refer :all]
    [babashka.fs :as fs]
    [babashka.curl :as curl]
-   [medley.core :as m]
    [clojure.zip :as z]
-   [clojure.core.async :as a]
+   [clojure.core.async :as async]
    [clojure.edn :as edn]
    [clojure.walk :as walk]))
 
 (def os-name (System/getProperty "os.name"))
 
 
-(declare force-str)
+(declare force-str force-int)
 (declare split-by)
 
 (defn uuid []
@@ -51,13 +50,21 @@
     ;; (keyword ":abc") should be :abc 
     (keyword (->str x))))
 
-
-
 (def force-str ->str)
 
 (defn num-from [n]
   (iterate inc n))
 
+(defn ->k [n]
+  (quot (force-int n) 1024))
+
+(defn ->m [n]
+  (-> (->k n)
+      (quot 1024)))
+
+(defn ->g [n]
+  (-> (->m n)
+      (quot  1024)))
 
 (defn join-path [& cmd]
   (str/join "/" cmd))
@@ -94,26 +101,35 @@
   (rev-in? coll elm :cmpfn str/includes?))
 
 
+(defn ->ch [stream]
+  (let [c (async/chan)]
+    (async/go
+      (with-open [reader (clojure.java.io/reader stream)]
+        (doseq [ln (line-seq reader)]
+          (async/>! c ln)))
+      (async/close! c))
+    c))
 
 (defn pipeline-demo [n data f]
-  (let [out (a/chan)
-        log (a/chan 10)
-        data (a/to-chan data)
+  (let [out (async/chan)
+        log (async/chan 10)
+        data (async/to-chan data)
         task (fn [value channel]
-               (a/go
-                 (a/>! log value)
-                 (a/>! channel (f value))
-                 (a/close! channel)))]
+               (async/go
+                 (async/>! log value)
+                 (async/>! channel (f value))
+                 (async/close! channel)))]
 
-    (a/go-loop [] (when-some [line (a/<! log)] (println line) (recur)))
-    (a/pipeline-async n out task data)
-    (time (a/<!! (a/into
+    (async/go-loop [] (when-some [line (async/<! log)] (println line) (recur)))
+    (async/pipeline-async n out task data)
+    (time (async/<!! (async/into
                   [] out)))))
 
-
-(defn async-fn [fn xs]
-  
-  )
+(defn async-fn [f c]
+  (async/go-loop [] (when-some [xs (async/<! c)]
+                  (f xs)
+                  (recur)
+                  )))
 
 
 ;; TODO meta
@@ -136,6 +152,9 @@
 (make-shell-fn "grep")
 (make-shell-fn :ls)
 
+
+
+
 (defn re-escape [s]
   (str/escape s {\. "\\."
 
@@ -152,14 +171,43 @@
     s
     ))
 
-(defn split-by [s & {:keys [re]
-                     :or {re #" "}}]
-  (str/split
-    s
-   (->re re)))
+(defn split-by [s & re]
+  (let [c (->re (if (nil? re)
+                  " "
+                  (first re)))]
+    (if (< (count s) 2)
+      s
+      (str/split s c))))
+
 
 (defn split-pairs [s re & keys]
   (apply hash-map (interleave keys (str/split s re))))
+
+;; shell text ouput -> hash-map
+;;   with header line as keys
+;;   each line a hash-map
+(defn text-cols->hashmap
+  ([s]
+   (text-cols->hashmap #"\s\s+"))
+  ([s separator]
+   (let [xs (str/split-lines s)
+         head (first xs)
+         ks (map keyword (str/split head separator))]
+     (->> (rest xs)
+          (map (fn [x]
+                 (zipmap ks (str/split x separator))))
+          ;;
+          ))))
+
+
+
+;;trim a string's the starting chars, until match sub
+(defn trim-to [s sub]
+  (if (str/starts-with? s sub)
+    s
+    (trim-to (apply str (rest s)) sub)
+    ))
+
 
 (defn crt->pem [path]
   (openssl "x509 -inform DER -in" path)
@@ -362,7 +410,8 @@
 (def j json/generate-string)
 (def e clojure.edn/read-string)
 
-(defn jstr-to-edn [s] (json/parse-string s true))
+(defn jstr->edn [s] (json/parse-string s true))
+(def jstr-to-edn jstr->edn)
 
 ;; Provider information loading
 (defn load-json-conf [name] (parse-string (slurp (format "resources/conf/%s.json" name))))
@@ -418,7 +467,14 @@
            (re-seq dash-ip-regex s))
       xs)))
 
-
+(defn ->ip [s] (first (extract-ip s)))
+(defn ->ips [s] (extract-ip s))
+;; a direct ip of this network.
+;;  if running on a server, it happen to be the server's ip
+;;  when running on a machine behind NAT, it will be the ip of its network
+(defn my-ip []
+  (str/trim (:out (run-cmd "curl -4 ip.sb")))
+  )
 
 (defn ip? [s]
   (not (empty? (extract-ip s)))
@@ -593,36 +649,34 @@
     )
   )
 
-(defn output-seq-map [filename smap & selected-k]
+(defn output-seq-map [filename xs & selected-k]
   (let [path (output-path (str filename ".csv"))
-        head (flatten (->> smap (take 1) (map keys)))
+        head (flatten (->> xs (take 1) (map keys)))
         _ (clean-file path)
-        selected (set (->> selected-k ))
-        ]
+        selected (set (->> selected-k))
+        head-defaults (zipmap head (repeat (count head) ""))
+        selected-defaults (zipmap selected (repeat (count selected) ""))]
     (if-not (nil? selected-k)
       (do
         ;; write selected header
         (write-csv-line path selected-k)
         ;; write selected values
-         (->>
-           smap
-           (map #(select-keys % selected-k))
-           (map vals)
-           (map #(write-csv-line path %))
-           )
-        )
+        (->>
+         xs
+         (map #(select-keys % selected-k))
+         ;;in case of missing fields set to empty
+         (map #(merge selected-defaults %))
+         (map vals)
+         (map #(write-csv-line path %))))
+
       (do
         ;; write header
         (write-csv-line path head)
         ;; write values
-        (->> smap
-              (map vals)
-              (map #(write-csv-line path %))
-            )
-          )
-      )
-
-    ))
+        (->> xs
+             (map #(merge head-defaults %))
+             (map vals)
+             (map #(write-csv-line path %)))))))
 
 (defn output-seq [filename m]
   (let [path (output-path filename)
@@ -814,6 +868,25 @@
   (let [p (re-pattern (format "(?i).*%s.*" kw))]
     (re-matches p s)))
 
+;;parse a byte from \x encoded string
+;;  could have a better way on performance
+(defn x-first-byte [s]
+  (let [hex (second (re-find #"\\x(..)" (apply str (take 4 s))))]
+    (if (nil? hex)
+      (if (empty? s) [nil nil] [(byte (first s)) (drop 1 s)])
+      [(Integer/parseInt hex 16) (drop 4 s)])))
+
+;;\x encoded string
+(defn x->utf8 [s]
+  (let [u (loop [s s res []]
+            (let [[c xs] (x-first-byte s)]
+              (if (nil? s)
+                res
+                (recur xs (if (nil? c)
+                            res
+                            (conj res c))))))]
+    (String. (byte-array u))))
+
 
 (defn url-encode [v] (java.net.URLEncoder/encode v))
 
@@ -836,6 +909,16 @@
     (if (empty? params)
       (str prefix path)
       (str prefix path "?" params))))
+
+(defn ->k=v [xs & {:keys [separator prefix]
+                   :or {separator "="
+                        prefix ""}}]
+  (->> xs
+       (map #(str prefix " " (str/join separator (map force-str %))))
+       ;(apply str)
+       ))
+
+;REPL
 
 ;;Mix :k "v" {:mk "mv" :mmk "mmv"}
 (defn kv-pair [& xs]
@@ -1239,15 +1322,11 @@
      :path path
      :tmp-path tmp-path}
     ))
-;;for a slow return function.
-;;  mock will run once save the result to local edn file
-;;  the next call of mock will read local file
-;;call mock-clean to clean local file
-(defn mock [f & args]
+(defn- do-mock [force? f & args]
   (let [{:keys [fm ns-path dir path tmp-path]} (apply mock-context f args)
         _ (clojure.java.io/make-parents path)
         ]
-    (if (fs/exists? path)
+    (if (and (not force?) (fs/exists? path))
       (try
         (load-edn path)
         ;; when failed try call function again and cache
@@ -1263,6 +1342,20 @@
         res)
       ;;
       )))
+
+;;for a slow return function.
+;;  mock will run once save the result to local edn file
+;;  the next call of mock will read local file
+;;call mock-clean to clean local file
+(defn mock [f & args]
+  ;;not force
+  (apply do-mock false f args)
+  )
+
+;;force do query and update mock cache
+(defn mock-update [f & args]
+  (apply do-mock true f args)
+  )
 
 (defn mock-clean [f & args]
   (let [{:keys [fm ns-path dir path]} (apply mock-context f args)]
@@ -1542,6 +1635,41 @@
                      (map(fn [x] (assoc m % x))))
   )))
 
+;; f is the test function
+;; edge is the value of test function expected
+;;    i.e. [true false]
+;;             means this edge is considerated as split point
+;;                   first test function result is true
+;;                   second test function result is true
+;;
+(defn group-by-edge
+  ([xs f edge]
+   (group-by-edge xs f edge [] []))
+  ([xs f edge cur res]
+   (let [[a b & more] xs]
+     (println more)
+     (if (nil? more)
+       (conj res (conj cur b))
+       (if (= [(f a) (f b)] edge)
+         ;;edge matches new cur. conj previous to res
+         (group-by-edge (cons b more) f edge
+                        []
+                        (conj res (conj cur a)))
+         ;; not match, march one element
+         (group-by-edge (cons b more) f edge
+                        (conj cur a)
+                        res)
+         ;;
+         )))))
+
+
+
+(defmacro gen-assoc [f]
+  (let [fname (symbol (str "assoc-" (force-str f)))
+        val (keyword (force-str f))]
+    `(defn ~fname [h]
+       (assoc h ~val (~f h)))))
+
 
 (comment
   ;;naive version. TODO: should unfold by itself.
@@ -1569,6 +1697,8 @@
 
   (env :OPENAI_API_KEY)
   OPENAI_API_KEY
+
+  (->k=v {:PORT 123 :PROTO "tcp"} :prefix "--env")
 
   ;;
   )

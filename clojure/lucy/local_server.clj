@@ -1,6 +1,8 @@
 (ns lucy.local-server
   (:require [knock.server :as server]
             [lucy.api :as api]
+            [clojure.data.xml :as xml]
+            [hiccup2.core :as h]
             [knock.utils :as utils]))
 
 
@@ -18,3 +20,9 @@
   (println (utils/cur-time-str) " server is running ")
   ;;
   @(promise))
+
+
+(comment
+
+
+  )

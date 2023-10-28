@@ -3,7 +3,6 @@
             [babashka.curl :as curl]
             )
   )
-
 (env :OPENAI_API_KEY)
 
 

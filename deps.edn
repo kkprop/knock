@@ -9,7 +9,6 @@
   org.clojure/tools.cli {:mvn/version "1.0.214"},
   etaoin/etaoin {:mvn/version "1.0.38"},
   org.clojure/core.logic {:mvn/version "1.0.1"},
-  rewrite-clj/rewrite-clj {:mvn/version "1.1.46"},
   babashka/babashka.core
   {:git/url "https://github.com/babashka/babashka.core",
    :sha "52a6037bd4b632bffffb04394fb4efd0cdab6b1e"},
