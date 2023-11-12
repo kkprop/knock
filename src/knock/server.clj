@@ -33,25 +33,9 @@
       ;;body
      )))
 
-(defn parse-uri [uri]
-  (URLDecoder/decode uri))
-
 (defn run[route-fn {:keys [port] :or {port 8000} :as opts}]
   (reset! server (server/run-server route-fn opts))
   )
-
-;; keys:
-;;
-(defn hello-world [{:keys [uri body headers]}]
-  (let [path (parse-uri uri)]
-    (cond
-      (= path "/sdk")
-      (make-body {:cur-path path :body (parse-body body)
-                  :headers headers
-                  })
-      :else
-
-      {:status 200 :body "Hello world"})))
 
 
 (defn local-call [fn-name & req]
@@ -120,33 +104,46 @@
        {:error "api not found/more than one match" :matches xs}))))
 
 
+
+(comment
+  (utils/parse-uri "/foo//1/2/3?k=v&k3=%2D%2D")
+  (utils/parse-uri "/foo//1/2/3?k=v&k3=%2D%2D")
+  ;;
+  )
+
+
 ;; examples
 ;; fuzzy-search-routes [["abc" "def"]  "bc"]
-(defn handler [tokens routes {:keys [uri body headers]
+(defn handler [tokens routes {:keys [uri body headers query-string]
                               :as request}]
-  (let [path uri
-        names (->> routes keys (map utils/force-str))
-        ;; ignore first ""
-        xs-path (rest (str/split uri #"/"))
+  (let [names (->> routes keys (map utils/force-str))
+        ;;seperate kv
+        ;;/foo/1/2/3?k=v
+        s (java.net.URLDecoder/decode uri)
+        _ (println s)
+        [xs-path kvs] (utils/parse-uri (str s "?" query-string))
         fname (first xs-path)
-        params (rest xs-path)
         ;;default inside :body is a json string, do to-edn again
         ;body (utils/jstr-to-edn (:body (parse-body body)))
         ;;body is body
         body (parse-body body)
+        params kvs
         xs (fuzzy-search-routes names fname)
         f (get routes (symbol (first xs)))
-        _ (println 'body body 'params params)
-        req-token (get headers "authorization")]
-    (if (or (empty? tokens) (utils/in? tokens req-token))
+        _ (println 'body body 'params params kvs)
+        req-token (get headers "authorization")
+        param-token (:token params)]
+    (if (or (empty? tokens)
+            (or (utils/in? tokens req-token)
+                (utils/in? tokens param-token)))
       (if (or (= 1 (count xs))
               (and (< 1 (count xs))
                    (= (first xs) fname)))
         (make-body {:result
                     (if (nil? body)
-                      (call-fn f params)
+                      ;;this is evil
+                      (call-fn f (rest xs-path))
                       (call-fn f body))})
-
         (make-body {:error "api not found"
                     :matches xs}))
       (make-body {:result  "token denied"} {:status 403}))))
@@ -170,7 +167,6 @@
   (run {:ip "127.0.0.1" :port 16916})
   (stop-server)
 
-  (run hello-world {:port 16916})
   (run handler {:port 16916})
 
   (local-call :rand-block-of "《东方之旅》")

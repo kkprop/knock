@@ -17,6 +17,7 @@
 
 (def os-name (System/getProperty "os.name"))
 
+(defn osx?[] (= os-name "Mac OS X"))
 
 (declare force-str force-int)
 (declare split-by)
@@ -34,6 +35,16 @@
 
 (defn run-cmd [& cmd]
   (sh "sh" "-c" (apply join-cmd cmd)))
+
+(defn to-path-cmd [path & cmd]
+  (sh "sh" "-c" (apply join-cmd "cd " path "&&" cmd)))
+
+(defn eval-with-timeout [seconds f]
+  (let [fut (future (f))
+        ret (deref fut (* 1000 seconds) :timed-out)]
+    (when (= ret :timed-out)
+       (future-cancel fut))
+    ret))
 
 
 (defn ->str [x]
@@ -56,7 +67,10 @@
   (iterate inc n))
 
 (defn ->k [n]
-  (quot (force-int n) 1024))
+  (let [x (force-int n)]
+    (if (nil? x)
+      nil
+      (quot x 1024))))
 
 (defn ->m [n]
   (-> (->k n)
@@ -152,8 +166,16 @@
 (make-shell-fn "grep")
 (make-shell-fn :ls)
 
+(defn file-ext [s]
+  (last (str/split s #"\."))
+  )
 
-
+(defn file-name [s]
+  (let [xs (str/split (basename s) #"\.")]
+    (str/join "."
+              (if (= 1 (count xs))
+                xs
+                (drop-last xs)))))
 
 (defn re-escape [s]
   (str/escape s {\. "\\."
@@ -188,17 +210,17 @@
 ;;   each line a hash-map
 (defn text-cols->hashmap
   ([s]
-   (text-cols->hashmap #"\s\s+"))
+   (text-cols->hashmap s #"\s\s+"))
   ([s separator]
    (let [xs (str/split-lines s)
          head (first xs)
          ks (map keyword (str/split head separator))]
      (->> (rest xs)
-          (map (fn [x]
-                 (zipmap ks (str/split x separator))))
+          (map (fn [x] (zipmap ks (str/split x separator))))
           ;;
-          ))))
-
+          ))
+   )
+  )
 
 
 ;;trim a string's the starting chars, until match sub
@@ -239,11 +261,17 @@
 
 (defn parse-float [s]
   (if (string? s)
-    (Float/parseFloat s)
+    (if (= s "+Inf")
+      ##Inf
+      (Float/parseFloat s))
     s))
 
 (defn force-float [s]
-  (if (string? s) (parse-float s) (float s)))
+  (if (nil? s)
+    0
+    (if (string? s)
+      (parse-float s)
+      (float s))))
 
 (defn cur-time-str
   ([]
@@ -568,6 +596,32 @@
   (apply spit path (pp-str x)
         opts)
   )
+
+
+;;make a function 
+;; if a keyword-fn, no suffix
+;; if a [keyword-fn ".txt"] (keyword-fn m).txt
+(defn suffix-decorate [f]
+  (let [[f suffix] (if (sequential? f) f [f])]
+    (if (nil? suffix)
+      f
+      (comp #(str % suffix) f))))
+
+
+(defn pp-hashmap [xs & ks]
+  (let [val-fn (if (empty? ks)
+                 vals
+                 (fn [m] (map #((suffix-decorate %) m) ks)))
+        header (if (empty? ks)
+                 (keys (first xs))
+                 (map #(if (sequential? %) (first %) %) ks))]
+
+    (println (str/join "\t" header))
+    (->> xs
+         (map #(println (str/join "\t" (val-fn %)))))
+    ;;
+    ))
+
 (defn spit-xs [path xs & opts]
   (let [_ (clojure.java.io/make-parents path)]
     (apply spit path
@@ -655,7 +709,8 @@
         _ (clean-file path)
         selected (set (->> selected-k))
         head-defaults (zipmap head (repeat (count head) ""))
-        selected-defaults (zipmap selected (repeat (count selected) ""))]
+        selected-defaults (zipmap selected-k (repeat (count selected-k) ""))
+        ]
     (if-not (nil? selected-k)
       (do
         ;; write selected header
@@ -665,8 +720,8 @@
          xs
          (map #(select-keys % selected-k))
          ;;in case of missing fields set to empty
-         (map #(merge selected-defaults %))
-         (map vals)
+         ;(map #(merge selected-defaults %))
+         (map (apply juxt selected-k))
          (map #(write-csv-line path %))))
 
       (do
@@ -676,7 +731,8 @@
         (->> xs
              (map #(merge head-defaults %))
              (map vals)
-             (map #(write-csv-line path %)))))))
+             (map #(write-csv-line path %))
+             )))))
 
 (defn output-seq [filename m]
   (let [path (output-path filename)
@@ -887,6 +943,22 @@
                             (conj res c))))))]
     (String. (byte-array u))))
 
+(defn url-kv->hashmap [s]
+  (let [[k v] (str/split s #"=")]
+    {(->keyword k) v}))
+
+(defn parse-uri [s]
+  (let [raw (java.net.URLDecoder/decode s)
+        [path params] (str/split raw #"\?")]
+    [ ;;first part path
+     (remove empty? (str/split path #"/"))
+     ;;second part kv-params
+     (if (nil? params)
+       nil
+       (->> (str/split params #"&")
+            (map url-kv->hashmap)
+            (apply merge)))]
+    ))
 
 (defn url-encode [v] (java.net.URLEncoder/encode v))
 
@@ -1185,6 +1257,14 @@
   (partition-all 2 xss)
 ;;
   )
+
+
+(defn name-a-key [m from to & keep-original?]
+  (if (empty? keep-original?)
+    (dissoc (assoc m to (from m)) from)
+    (assoc m to (from m))))
+(defn f-on-a-key [m k f]
+  (assoc m k (f (k m))))
 
 
 ;;should select pickup 
@@ -1662,6 +1742,21 @@
          ;;
          )))))
 
+;;like group-by but will merge the vals to be a hashmap
+;;  use name-a-key to avoid collision
+(defn merge-by-group-by [f coll]
+  (vals (map-on-val #(apply merge %) (group-by f coll))))
+
+
+(defn hashmap-by [f xs]
+  (let [m (->> xs (group-by f))]
+    (->> (get m false)
+         (map (fn [x]
+                {x (get m true)})))))
+
+(defn ->words [s]
+  (->> (str/split s #" |\n")
+       (remove empty?)))
 
 
 (defmacro gen-assoc [f]
@@ -1669,6 +1764,22 @@
         val (keyword (force-str f))]
     `(defn ~fname [h]
        (assoc h ~val (~f h)))))
+
+(defn current-branch [path]
+  (str/trim-newline
+   (:out (run-cmd "cd " path "&&" "git branch --show-current"))
+   )
+  )
+
+(defn git-push [path]
+  (let [s (current-branch)]
+    (run-cmd "cd " path "&&" "git push origin" (str s ":" s)))
+  )
+
+(defn git-pull [path]
+  (let [s (current-branch)]
+    (run-cmd "cd " path "&&" "git pull origin" (str s ":" s))))
+
 
 
 (comment
