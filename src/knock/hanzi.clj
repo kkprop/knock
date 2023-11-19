@@ -8,14 +8,26 @@
     {:strokes (e/get-element-attr driver "//*[@id='word_bishun']" :src)
      :meaning (e/get-element-inner-html driver "//*[@id='detailmean-wrapper']")}))
 
+(defn gif-show [url]
+  (run-cmd :open url)
+  )
+
+(defn show [{:keys[strokes]
+             :as opts}]
+  (gif-show strokes)
+  opts
+  )
 
 
 (comment
-  (mock cha "慧")
+  (show
+   (mock cha "慧"))
+
   (mock cha "定")
 
   (go "https://hanyu.baidu.com/s?wd=慧&ptype=zici")
   (e/get-source driver)
+  ;;
   )
 
 

@@ -47,11 +47,15 @@
                                    :headless :true)))
              ;;any exception happen means we need a new-driver too.
              ;;  just return :timed-out to trigger a new-driver call
-             (catch Exception e :timed-out)
-             )]
+             (catch Exception e :timed-out))]
     (if (= d :timed-out)
-      (new-driver)
-      d)))
+      (try
+        (new-driver)
+        (catch Exception e
+          (run-cmd "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable")))
+      d)
+    ;;
+    ))
 
 (def driver
   (load-driver)

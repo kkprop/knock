@@ -11,7 +11,12 @@
    [babashka.fs :as fs]
    [babashka.curl :as curl]
    [clojure.zip :as z]
-   [clojure.core.async :as async]
+   [clojure.core.async :as async :refer [go go-loop
+                                         chan to-chan into
+                                         <! >!! >! close!
+                                         <!! alt!
+                                         pipeline-async
+                                         ]]
    [clojure.edn :as edn]
    [clojure.walk :as walk]))
 
@@ -25,6 +30,7 @@
 (defn uuid []
   (java.util.UUID/randomUUID)
   )
+
 
 (defn join-cmd [& cmd]
   (str/join " " (->> cmd (map force-str))))
@@ -59,7 +65,13 @@
   (if (keyword? x)
     x
     ;; (keyword ":abc") should be :abc 
-    (keyword (->str x))))
+    (keyword
+     (let [s (->str x)]
+       (if (str/starts-with? s ":")
+         ;;remove the leading :
+         (subs s 1)
+         s
+         )))))
 
 (def force-str ->str)
 
@@ -114,33 +126,47 @@
 (defn rev-fuzzy-in? [coll elm]
   (rev-in? coll elm :cmpfn str/includes?))
 
+;;run f every t seconds
+;;  return a channel
+;;       call close! on the channel if you would like to stop the timer
+(defn timer [f t-sec]
+  (let [exit-ch (chan)]
+    (go-loop []
+      (f)
+      (alt!
+        (async/timeout (* t-sec 1000)) (recur)
+        exit-ch nil
+        )
+      )
+    exit-ch)
+  )
 
 (defn ->ch [stream]
-  (let [c (async/chan)]
-    (async/go
+  (let [c (chan)]
+    (go
       (with-open [reader (clojure.java.io/reader stream)]
         (doseq [ln (line-seq reader)]
-          (async/>! c ln)))
-      (async/close! c))
+          (>! c ln)))
+      (close! c))
     c))
 
 (defn pipeline-demo [n data f]
-  (let [out (async/chan)
-        log (async/chan 10)
-        data (async/to-chan data)
+  (let [out (chan)
+        log (chan 10)
+        data (to-chan data)
         task (fn [value channel]
-               (async/go
-                 (async/>! log value)
-                 (async/>! channel (f value))
-                 (async/close! channel)))]
+               (go
+                 (>! log value)
+                 (>! channel (f value))
+                 (close! channel)))]
 
-    (async/go-loop [] (when-some [line (async/<! log)] (println line) (recur)))
-    (async/pipeline-async n out task data)
-    (time (async/<!! (async/into
+    (go-loop [] (when-some [line (<! log)] (println line) (recur)))
+    (pipeline-async n out task data)
+    (time (<!! (async/into
                   [] out)))))
 
 (defn async-fn [f c]
-  (async/go-loop [] (when-some [xs (async/<! c)]
+  (go-loop [] (when-some [xs (<! c)]
                   (f xs)
                   (recur)
                   )))
@@ -616,11 +642,17 @@
                  (keys (first xs))
                  (map #(if (sequential? %) (first %) %) ks))]
 
-    (println (str/join "\t" header))
-    (->> xs
-         (map #(println (str/join "\t" (val-fn %)))))
+    (str/join "\n"
+              (cons
+                ;;header
+                (str/join "\t" header)
+                ;;lines
+                (->> xs
+                     (map #(str/join "\t" (val-fn %))))))
     ;;
     ))
+
+
 
 (defn spit-xs [path xs & opts]
   (let [_ (clojure.java.io/make-parents path)]
@@ -893,8 +925,11 @@
             (map #(if-not (keyword? %)
                     (if (empty? %)
                       (keyword (str "nil-" (cur-ts-13)))
-                      (keyword %))
-                          %)) repeat)
+                      (->keyword %)
+                      )
+                          %)
+                 )
+            repeat)
        (rest csv-data)))
 
 (defn load-csv [fname]
@@ -986,9 +1021,10 @@
                    :or {separator "="
                         prefix ""}}]
   (->> xs
-       (map #(str prefix " " (str/join separator (map force-str %))))
+       (map #(str prefix (str/join separator (map force-str %))))
        ;(apply str)
-       ))
+       )
+  )
 
 ;REPL
 
@@ -1333,16 +1369,23 @@
 ;; load from default config file
 ;;  i.e. (config :chrome-profile)
 ;;       a varible chrome-profile is defined
-(defmacro config [name & {:keys [config-path default]
+(defmacro config [name & {:keys [config-path default config-m]
                           :or {config-path "resources/config.edn"}}]
   (let [var-name (symbol (force-str name))
         key-word (keyword (force-str name))
-        m (load-edn config-path)
+        m (if (nil? config-m) (load-edn config-path) config-m)
         value (key-word m)]
     `(def ~var-name
        (if (nil? ~value)
          ~default
          ~value))))
+
+(defmacro configs [names & {:keys [config-path default]
+                            :or {config-path "resources/config.edn"}}]
+  (let [m (load-edn config-path)]
+    `(do ~@(for [x (eval names)]
+             (config x :config-m ~m))
+         )))
 
 
 ;; load from shell environment, accept both keyword and string 
@@ -1780,6 +1823,20 @@
   (let [s (current-branch)]
     (run-cmd "cd " path "&&" "git pull origin" (str s ":" s))))
 
+(defn measure-run [f]
+  (force-float
+   (first (re-find #"(\d+\.\d+)"
+                   (str (with-out-str (time (f))))))))
+
+(defn time-ns [& xs ]
+  (->> xs
+   ;(all-ns)
+   (map (comp symbol force-str))
+   (map #(do (try (remove-ns %) (catch Exception e nil)) %))
+   (map #(identity {:t (measure-run (partial require %)) :ns %}))
+   (sort-by :t)
+   )
+  )
 
 
 (comment
