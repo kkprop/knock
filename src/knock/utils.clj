@@ -123,7 +123,7 @@
   (in? coll elm :cmpfn str/includes?) 
   )
 
-(defn rev-fuzzy-in? [coll elm]
+(defn fuzzy-rev-in? [coll elm]
   (rev-in? coll elm :cmpfn str/includes?))
 
 ;;run f every t seconds
@@ -378,6 +378,7 @@
 (def time-fmts (->> ["MMM dd HH:mm:ss yyyy"
                      "yyyy-MM-dd HH:mm:ss"
                      "yyyy-MM-dd'T'HH:mm:ssXXX" ;2023-10-02T16:56:28+08:00
+                     "yyyy-MM-dd'T'HH:mm:ss"
                      ]
                     (map #(java.text.SimpleDateFormat. %))))
 
@@ -432,7 +433,8 @@
       ;;
         ))))
 
-(def days-to-now (partial days (java.util.Date.)))
+(def days-from-now (partial days (java.util.Date.)))
+(defn days-to-now[from] (days from (java.util.Date.)))
 (defn inst-to-now [t]
   (if (nil? t)
     t
@@ -563,6 +565,9 @@
     )
   )
 
+;;slurp but using line-seq 
+(defn slurp-lines [f]
+  (line-seq (clojure.java.io/reader f)))
 
 
 
@@ -830,6 +835,19 @@
   (apply hash-map
          (flatten
           (apply cherry-pick-keys m ks))))
+
+(declare slash-flatten-map)
+
+(defn cherry-rename [m & ks]
+  (->> ks
+       (map #(identity
+              {% (first (vals (slash-flatten-map (cherry-pick m % ))))}))
+       (apply merge)
+       ;;
+       ))
+
+(defn rename [m k new-k]
+  (dissoc (assoc m new-k (k m)) k))
 
 (defn flatten-hashmap
   ([m]
@@ -1380,12 +1398,20 @@
          ~default
          ~value))))
 
-(defmacro configs [names & {:keys [config-path default]
+;;config multiple from the same file
+(defmacro configs [names & {:keys [config-path]
                             :or {config-path "resources/config.edn"}}]
   (let [m (load-edn config-path)]
-    `(do ~@(for [x (eval names)]
-             (config x :config-m ~m))
-         )))
+    `(do
+      ~@(for [x names]
+          `(config ~x :config-m ~m)
+       )
+    )))
+
+(comment
+  (configs [:es :rte])
+  (config :a :confimg-m (load-edn "resources/config.edn"))
+  )
 
 
 ;; load from shell environment, accept both keyword and string 
@@ -1484,6 +1510,11 @@
   (let [{:keys [fm ns-path dir path]} (apply mock-context f args)]
     (when (fs/exists? path)
       (fs/delete path))))
+
+
+(defn map-mock [f coll]
+  (map #(mock f %) coll)
+  )
 
 
 (defn choose [xs]
@@ -1838,8 +1869,28 @@
    )
   )
 
+(defn sort-by-val [m]
+  (sort-by (fn [[k v]] v) m))
+
+(defn reverse-sort-by-val [xs]
+  (reverse (sort-by-val xs)))
+
+(defn stat-count [m k]
+  (map (comp println (partial str/join " "))
+       (reverse-sort-by-val
+         (map-on-val count (group-by k m))
+   )
+  ))
+
+(defn quote-quote [s]
+  (str/replace s "\"" "\\\"")
+  )
 
 (comment
+
+  (println
+   (quote-quote "ab\""))
+
   ;;naive version. TODO: should unfold by itself.
   (unfold {:uni :☯
            :bin [:yin :yang]

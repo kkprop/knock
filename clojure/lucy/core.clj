@@ -4,6 +4,7 @@
              [potemkin.utils :as u]
              [knock.utils :as utils]
              [datomic.client.api :as d]
+             [lanterna.screen :as s]
              [datomic-schema.schema :as s :refer [defdbfn]]
              [babashka.curl :as curl]))
 
@@ -129,26 +130,8 @@
     (utils/fuzzy-pick m k-fn)
     ))
 
-(defn chat-message []
-  (->> (utils/load-json "2023-05-18.json")
-       (take 2)
-       (map (comp :origindata :_source))
-       (map utils/jstr-to-edn)
-       (map utils/slash-flatten-map)
-       )
-  ;;
-  )
 
 
-(defn chat-group []
-  (->> (utils/load-json "chat_group.json")
-       (take 2)
-       (map (comp :_source))
-       (map #(fuzzy-pick-by-schema group % ))
-       ;;
-       )
-  ;;
-  )
 
 (comment
   ()
