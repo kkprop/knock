@@ -60,6 +60,7 @@
   emoji (println (e/i-emoji))
 
   gpt-prompt (println (u/mock chat/prompt (apply str *command-line-args*)))
+  qq (println (u/quote-quote (apply str *command-line-args*)))
 
   uberjar (do
             (println "Making uberjar")
