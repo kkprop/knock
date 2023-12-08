@@ -275,6 +275,9 @@
          (:out
           (run-cmd "ls" "-f1" path)))))
 
+(defn digit? [s]
+  (every? #(Character/isDigit %) s))
+
 (defn parse-int [s]
   (if (str/blank? s) 0 (Long/parseLong (re-find #"\A-?\d+" s))))
 
@@ -536,11 +539,8 @@
   (not (empty? (extract-ip s)))
   )
 
-(defn dash-ip [ip]
+(defn ->dash [ip]
   (str/replace ip #"\." "-"))
-
-(extract-ip " zen-lalan-10-11-4-229 ")
-(extract-ip " zen-lalan-10.11.4.229 ")
 
 
 (defn dig-domain-ips [domain]
@@ -1464,33 +1464,67 @@
         path (if (empty? args)
                (str dir (:name fm) ".edn")
                (str dir (:name fm) "/" (str/join "-" (map force-str args)) ".edn"))
-        tmp-path (str path "." (cur-time-str "yyyy-MM-dd-hh:mm:ss.SSS"))]
+        t (cur-time-str "yyyy-MM-dd-hh:mm:ss.SSS")
+        tmp-path (str path "." t)]
     {:fm fm
      :ns-path ns-path
      :dir dir
      :path path
-     :tmp-path tmp-path}
-    ))
+     :tmp-path tmp-path}))
+
+(defn x-or-xs-fn [x f]
+  (if (sequential? x)
+    (->> x (map f))
+    (f x)
+    )
+  )
+
+(defn assoc-time [x-or-xs t & {:keys [key]
+                               :or {key :uptime-time}}]
+
+  (x-or-xs-fn x-or-xs
+              (fn [x]
+                (if (map? x)
+                  (if (contains? x key)
+                    x
+                    (assoc x key t))
+                  x))))
+
+(defn assoc-cur-time [x-or-xs & {:keys [key]
+                                 :or {key :update-time}}]
+  (assoc-time x-or-xs (cur-time-str)))
+
+(comment
+  (assoc-time [{} {} {}] (cur-time-str))
+  (assoc-time {} (cur-time-str))
+  (assoc-time {} (cur-time-str) :key :update-time)
+  ;;
+  )
+
 (defn- do-mock [force? f & args]
-  (let [{:keys [fm ns-path dir path tmp-path]} (apply mock-context f args)
+  (let [{:keys [fm ns-path dir path tmp-path t]} (apply mock-context f args)
         _ (clojure.java.io/make-parents path)
-        ]
-    (if (and (not force?) (fs/exists? path))
-      (try
-        (load-edn path)
+        res (if (and (not force?) (fs/exists? path))
+      ;;load mock data from local path
+              (try
+                (load-edn path)
         ;; when failed try call function again and cache
-        (catch Exception e
-          (let [res (apply f args)
-                _ (println 'failed 'load-edn path "check the reader of this edn")
-                _ (fs/delete-if-exists path)] (clojure.pprint/pprint res (clojure.java.io/writer path)) res)))
-      (let [res (apply f args)
-            _ (clean-file tmp-path)]
-        (clojure.pprint/pprint res (clojure.java.io/writer tmp-path))
-        (fs/delete-if-exists path)
-        (fs/create-sym-link (fs/absolutize path) (fs/absolutize tmp-path))
-        res)
+                (catch Exception e
+                  (let [res (apply f args)
+                        _ (println 'failed 'load-edn path "check the reader of this edn")
+                        _ (fs/delete-if-exists path)]
+                    (clojure.pprint/pprint res (clojure.java.io/writer path)))))
+              (let [res (apply f args)
+                    _ (clean-file tmp-path)]
+                (clojure.pprint/pprint res (clojure.java.io/writer tmp-path))
+                (fs/delete-if-exists path)
+                (fs/create-sym-link (fs/absolutize path) (fs/absolutize tmp-path))
+                res)
       ;;
-      )))
+              )]
+    ;(assoc-time res (str (fuzzy-parse-time (str (fs/last-modified-time path)))))
+    res
+    ))
 
 ;;for a slow return function.
 ;;  mock will run once save the result to local edn file
@@ -1515,6 +1549,17 @@
 (defn map-mock [f coll]
   (map #(mock f %) coll)
   )
+
+(defn mock-cur-path [f & args]
+  (let [{:keys [fm ns-path dir path tmp-path]} (apply mock-context f args)]
+    path))
+
+(defn mock-exists? [f & args]
+  (fs/exists?
+    (apply mock-cur-path f args)
+    )
+  )
+
 
 
 (defn choose [xs]
@@ -1885,6 +1930,15 @@
 (defn quote-quote [s]
   (str/replace s "\"" "\\\"")
   )
+
+(defn val->key [[k xs]]
+  (->> xs
+       (map (fn [x] {x k}))))
+
+(defn ->hashmap [m key-key val-key]
+  (->> (seq m)
+       (map (fn [[k v]] {key-key k val-key v}))))
+
 
 (comment
 
