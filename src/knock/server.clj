@@ -132,7 +132,8 @@
         f (get routes (symbol (first xs)))
         _ (println 'body body 'params params kvs)
         req-token (get headers "authorization")
-        param-token (:token params)]
+        param-token (:token params)
+        body (merge body (dissoc params :token))]
     (if (or (empty? tokens)
             (or (utils/in? tokens req-token)
                 (utils/in? tokens param-token)))
@@ -140,7 +141,7 @@
               (and (< 1 (count xs))
                    (= (first xs) fname)))
         (make-body {:result
-                    (if (nil? body)
+                    (if (empty? body)
                       ;;this is evil
                       (call-fn f (rest xs-path))
                       (call-fn f body))})

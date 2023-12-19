@@ -650,14 +650,13 @@
     (str/join "\n"
               (cons
                 ;;header
-                (str/join "\t" header)
+                ;;compliance with text-cols->hashmap
+               (str/join "\t\t" (map force-str header))
                 ;;lines
-                (->> xs
-                     (map #(str/join "\t" (val-fn %))))))
+               (->> xs
+                    (map #(str/join "\t\t" (val-fn %))))))
     ;;
     ))
-
-
 
 (defn spit-xs [path xs & opts]
   (let [_ (clojure.java.io/make-parents path)]
@@ -1028,12 +1027,12 @@
                                   (str (name (second %)))
                                   (str (second %))))))
 
-                    (str/join "&&")
+                    (str/join "&")
                     (apply str))]
 
     (if (empty? params)
-      (str prefix path)
-      (str prefix path "?" params))))
+      (str prefix (force-str path))
+      (str prefix (force-str path) "?" params))))
 
 (defn ->k=v [xs & {:keys [separator prefix]
                    :or {separator "="
@@ -1456,21 +1455,34 @@
 (defn var-meta [f]
   (meta (second (first (filter #(and (var? (second %)) (= f (var-get (second %)))) (ns-map *ns*))))))
 
+(declare md5-uuid)
 
 (defn- mock-context [f & args]
-  (let [fm (var-meta f)
-        ns-path (str/replace (ns-name (:ns fm)) #"\." "/")
-        dir (str "resources/mock/" ns-path "/")
-        path (if (empty? args)
-               (str dir (:name fm) ".edn")
-               (str dir (:name fm) "/" (str/join "-" (map force-str args)) ".edn"))
-        t (cur-time-str "yyyy-MM-dd-hh:mm:ss.SSS")
-        tmp-path (str path "." t)]
-    {:fm fm
-     :ns-path ns-path
-     :dir dir
-     :path path
-     :tmp-path tmp-path}))
+  (try
+    (let [fm (var-meta f)
+          ns-path (str/replace (ns-name (:ns fm)) #"\." "/")
+          dir (str "resources/mock/" ns-path "/")
+          path (if (empty? args)
+                 (str dir (:name fm) ".edn")
+               ;;(str dir (:name fm) "/" (str/join "-" (map force-str args)) ".edn")
+                 (str dir (:name fm) "/"
+                      (if (< 200 (count (str args)))
+                        (md5-uuid (str/join " " (map force-str args)))
+                        (str/join "-" (map force-str args))) ".edn"))
+          t (cur-time-str "yyyy-MM-dd-hh:mm:ss.SSS")
+          tmp-path (str path "." t)]
+      {:fm fm
+       :ns-path ns-path
+       :dir dir
+       :path path
+       :tmp-path tmp-path})
+    (catch Exception e
+      (throw (Exception.
+              (str e "need ref function: "
+                   (:name (var-meta f))
+                   "in current namesapce")))
+                  ;;
+      )))
 
 (defn x-or-xs-fn [x f]
   (if (sequential? x)
@@ -1511,7 +1523,9 @@
         ;; when failed try call function again and cache
                 (catch Exception e
                   (let [res (apply f args)
-                        _ (println 'failed 'load-edn path "check the reader of this edn")
+                        _ (println 'failed 'load-edn path "check the reader of this edn"
+                                   e
+                                   )
                         _ (fs/delete-if-exists path)]
                     (clojure.pprint/pprint res (clojure.java.io/writer path)))))
               (let [res (apply f args)
@@ -1550,13 +1564,13 @@
   (map #(mock f %) coll)
   )
 
-(defn mock-cur-path [f & args]
+(defn mock-path [f & args]
   (let [{:keys [fm ns-path dir path tmp-path]} (apply mock-context f args)]
     path))
 
 (defn mock-exists? [f & args]
   (fs/exists?
-    (apply mock-cur-path f args)
+    (apply mock-path f args)
     )
   )
 
@@ -1783,7 +1797,6 @@
         ]
     (java.util.UUID. (.getLong bb) (.getLong bb))))
 
-
 ;;use (parital you-actual-function) to suppress evaluation when the cache already exist
 (defn tmp-file [s-or-fn & {:keys [dir uuid ext]
                            :or {dir "/tmp/"
@@ -1939,6 +1952,24 @@
   (->> (seq m)
        (map (fn [[k v]] {key-key k val-key v}))))
 
+(defn lines-between [s from-s to-s]
+  (let [from (str/index-of s from-s)
+        to (str/index-of s to-s)]
+    (if (empty? s)
+      nil
+      (-> (str/split-lines
+           (subs s from to))
+          rest
+          drop-last))))
+
+(defn val->str [m]
+  (map-on-val (fn [x]
+                (if (sequential? x)
+                  (str/join "," x)
+                  x))
+              m
+              )
+  )
 
 (comment
 
