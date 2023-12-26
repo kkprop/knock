@@ -1504,10 +1504,8 @@
     (catch Exception e
       (throw (Exception.
               (str e "need ref function: "
-                   f
-                   "\n"
-                   (ns-map *ns*)
-                   ".. in current namesapce")))
+                   (:name (var-meta f))
+                   "in current namesapce")))
                   ;;
       )))
 
