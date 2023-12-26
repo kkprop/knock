@@ -90,7 +90,7 @@
   (e/wait-visible driver q)
   (->> (e/query-tree driver q)
        (map (fn [id] {:id id :text (e/get-element-text-el driver id)}))
-       (filter #(utils/rev-fuzzy-in? [uniq-text] (:text %)))
+       (filter #(utils/fuzzy-rev-in? [uniq-text] (:text %)))
        (map #(assoc % :html (e/get-element-inner-html-el driver (:id %))))
        ;;
        )
