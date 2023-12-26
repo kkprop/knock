@@ -1,7 +1,9 @@
 (ns knock.hanzi
   (:require [knock.utils :refer :all]
             [knock.browser :refer [go click click-multi driver]]
-            [etaoin.api :as e]))
+            [knock.server :as server]
+            [etaoin.api :as e]
+            ))
 
 (defn cha [zi]
   (let [_ (go (format "https://hanyu.baidu.com/s?wd=%s&ptype=zici" zi))]
@@ -19,17 +21,32 @@
   opts
   )
 
+(defn stroke [zi]
+  (:strokes (mock cha zi))
+  )
+
+
+(defn -main []
+  (let []
+    (server/stop-server)
+    (server/run-ns {:ip "127.0.0.1" :port 1219} 'knock.hanzi)
+    (@(promise))))
+
 
 (comment
   (show
    (mock cha "慧"))
 
-  (mock cha "定")
+  (var-meta stroke)
 
+  (cha "定")
+
+  (stroke "定")
   (mock cha "律")
   (go "https://hanyu.baidu.com/s?wd=慧&ptype=zici")
   (e/get-source driver)
-  ;;
+
+    ;;
   )
 
 

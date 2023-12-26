@@ -23,7 +23,9 @@
              [knock.roam :as r]
              [knock.block :as  block]
              [knock.book :as b :refer :all]
-             [knock.poker :as poker]
+             [knock.browser :as b ]
+             [knock.poker :as pokr]
+             [knock.hanzi :as hanzi]
              [knock.chat :as chat :refer :all]
              [knock.wn :as w])
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))

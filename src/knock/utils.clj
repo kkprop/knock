@@ -1449,11 +1449,36 @@
   )
 
 
+(defn fn->>ns []
+  (->>
+   (all-ns)
+   (remove #(fuzzy-rev-in? ["clojure" "babashka" "rewrite-clj" "hiccup2" "etaoin" "org.httpkit" "clj-http" "user" "slingshot" "sci.core" "clj-yaml" "cheshire.core" "selmer"]
+                           (str %)))
+   (map ns-map)
+   (apply merge)
+   ;(map-on-val var-get)
+   ;;
+   ))
+
+(def all-ns-map (atom {}))
+(defn get-all-ns-map []
+  (if (empty? @all-ns-map)
+    (swap! all-ns-map merge (fn->>ns))
+    @all-ns-map
+    )
+  )
+
 
 ;;surely have issue of performance
 ;;from 
 (defn var-meta [f]
-  (meta (second (first (filter #(and (var? (second %)) (= f (var-get (second %)))) (ns-map *ns*))))))
+  (meta (second (first (filter #(and (var? (second %)) (= f (var-get (second %))))
+                               ;(ns-map *ns*)
+                               ;(fn->>ns)
+                               (get-all-ns-map)
+                               )
+                       ))))
+
 
 (declare md5-uuid)
 
@@ -1479,8 +1504,10 @@
     (catch Exception e
       (throw (Exception.
               (str e "need ref function: "
-                   (:name (var-meta f))
-                   "in current namesapce")))
+                   f
+                   "\n"
+                   (ns-map *ns*)
+                   ".. in current namesapce")))
                   ;;
       )))
 
@@ -1971,7 +1998,23 @@
               )
   )
 
+(defn str-or-file->ips [& xs]
+  (let [s (str/join " " xs)
+        ips (->ips s)]
+    (if (empty? ips)
+      (->> xs
+           (map #(if (fs/exists? %)
+                   (slurp %)
+                   ""))
+
+           (str/join " ")
+           ->ips)
+      ips)))
+
 (comment
+
+  (str-or-file->ips "127.0.0.1")
+  (str-or-file->ips "./1.i" "./2.i")
 
   (println
    (quote-quote "ab\""))
