@@ -40,7 +40,8 @@
         _ (println s)] s))
 
 (defn run-cmd [& cmd]
-  (sh "sh" "-c" (apply join-cmd cmd)))
+  (sh "sh" "-c" (apply join-cmd cmd))
+  )
 
 (defn to-path-cmd [path & cmd]
   (sh "sh" "-c" (apply join-cmd "cd " path "&&" cmd)))
@@ -385,7 +386,7 @@
                      ]
                     (map #(java.text.SimpleDateFormat. %))))
 
-(defn fuzzy-parse-time [s & {:keys [to-trim]
+(defn ->inst [s & {:keys [to-trim]
                            :or {to-trim ".*expire date: "}}]
   (->> time-fmts
        (map #(try (.parse % (str/replace-first s (re-pattern to-trim) ""))
@@ -405,7 +406,7 @@
     (quot (ms t) 1000)))
 
 (ts
- (fuzzy-parse-time "*  expire date: Jul 24 23:30:12 2023 GMT")
+ (->inst "*  expire date: Jul 24 23:30:12 2023 GMT")
  )
 
 
@@ -438,15 +439,31 @@
 
 (def days-from-now (partial days (java.util.Date.)))
 (defn days-to-now[from] (days from (java.util.Date.)))
-(defn inst-to-now [t]
+(defn to-now-seconds [t]
   (if (nil? t)
     t
-    (- (ts t) (cur-ts))))
+    (if (inst? t)
+      (- (ts t) (cur-ts))
+      (- (ts (->inst t)) (cur-ts)))))
+
+(defn to-now-hours [t]
+  (/ 
+    (float (to-now-seconds t))
+    3600
+    ))
+
+(defn from-now-seconds [t]
+  (- (to-now-seconds t))
+  )
+
+(defn from-now-hours [t]
+  (- (to-now-hours t))
+  )
 
 (defn not-expire? [t]
   (if (nil? t) false
       (< 0
-         (inst-to-now t))))
+         (to-now-seconds t))))
 
 (defn range-date
   ([end-str])
@@ -638,7 +655,7 @@
       f
       (comp #(str % suffix) f))))
 
-
+;;csv way of hashmap -> str
 (defn pp-hashmap [xs & ks]
   (let [val-fn (if (empty? ks)
                  vals
@@ -657,6 +674,23 @@
                     (map #(str/join "\t\t" (val-fn %))))))
     ;;
     ))
+
+(declare slash-flatten-map)
+
+;;layered way of hashmap -> str
+(defn lp-hashmap [m]
+  (->>
+   (slash-flatten-map m)
+   (map (fn [[k v]]
+          (str
+           (str/join "\n" [(force-str k) (str "\t" (force-str v))])
+           "\n"
+           "\n")))
+
+   (apply str)
+   ;;
+   ))
+
 
 (defn spit-xs [path xs & opts]
   (let [_ (clojure.java.io/make-parents path)]
@@ -1013,6 +1047,7 @@
     ))
 
 (defn url-encode [v] (java.net.URLEncoder/encode v))
+(defn url-decode [v] (java.net.URLDecoder/decode v))
 
 (defn make-url [prefix path & kv]
   (let [kv-pairs (flatten
@@ -1585,10 +1620,6 @@
       (fs/delete path))))
 
 
-(defn map-mock [f coll]
-  (map #(mock f %) coll)
-  )
-
 (defn mock-path [f & args]
   (let [{:keys [fm ns-path dir path tmp-path]} (apply mock-context f args)]
     path))
@@ -1597,6 +1628,30 @@
   (fs/exists?
     (apply mock-path f args)
     )
+  )
+
+(defn recent-files [hours-from-now root pattern]
+  (->>
+   (fs/glob root pattern)
+   (filter (comp #(< % hours-from-now) from-now-hours ->inst str fs/last-modified-time))))
+
+;;n times per hour
+(defn mock-with-rate [n f & args]
+  (let [{:keys [fm ns-path dir path]}
+        (apply mock-context f args)
+        d (dirname path)
+        file (basename path)
+        recent-call-count  (count
+                            (recent-files 1.0 d (str file ".*")))]
+    (if (< n recent-call-count)
+      (throw (Exception. (str (:name fm) " mock call over rate : " n " times per hour")))
+      (apply mock-update f args))))
+
+(comment
+  (mock-with-rate 3 run-cmd "ls")
+
+  (mock-update run-cmd "ls")
+;;
   )
 
 
@@ -1623,7 +1678,7 @@
     ))
 
 (defn curl-cert-expire-date [domain ip port]
-  (fuzzy-parse-time
+  (->inst
    (curl "-vI" "--resolve" (str domain ":" port ":" ip)
          (str "https://" domain ":" port) "2>&1" "| grep 'expire date' " "| cut -d: -f2- | xargs")))
 (defn precision
@@ -1776,7 +1831,7 @@
 (defn auto-cache-by-expire-time [key f]
   (let [cur (mock f)
         ;;depends on fuzzy-parse-time. add new format to support. when not ok
-        t (fuzzy-parse-time (get cur key))]
+        t (->inst (get cur key))]
     (if (not-expire? t)
       cur
       (do (mock-clean f)
