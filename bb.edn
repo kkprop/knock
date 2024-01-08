@@ -24,7 +24,7 @@
              [knock.block :as  block]
              [knock.book :as b :refer :all]
              [knock.browser :as b ]
-             [knock.poker :as pokr]
+             [knock.poker :as poker]
              [knock.hanzi :as hanzi]
              [knock.chat :as chat :refer :all]
              [knock.wn :as w])
