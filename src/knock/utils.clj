@@ -656,7 +656,7 @@
       (comp #(str % suffix) f))))
 
 ;;csv way of hashmap -> str
-(defn pp-hashmap [xs & ks]
+(defn hashmap->str [sep xs & ks]
   (let [val-fn (if (empty? ks)
                  vals
                  (fn [m] (map #((suffix-decorate %) m) ks)))
@@ -668,12 +668,15 @@
               (cons
                 ;;header
                 ;;compliance with text-cols->hashmap
-               (str/join "\t\t" (map force-str header))
+               (str/join sep (map force-str header))
                 ;;lines
                (->> xs
-                    (map #(str/join "\t\t" (val-fn %))))))
+                    (map #(str/join sep (val-fn %))))))
     ;;
     ))
+
+(def pp-hashmap (partial hashmap->str "\t\t"))
+(def csv-hashmap (partial hashmap->str ","))
 
 (declare slash-flatten-map)
 
@@ -824,18 +827,48 @@
 
 (defn int-2-ip [i]
   (->> (Integer/toHexString i)
-       (partition 2)
+       (partition-all 2)
        (map #(apply str "0x" %))
        (map read-string)
        (str/join ".")))
 
+;; n max 255
+(defn ip-offset [s n]
+  (let [xs (->>
+            (Integer/toHexString (ip-2-int s))
+            (partition-all 2)
+            (map #(apply str "0x" %))
+            (map read-string))]
+    (str/join "."
+              (conj (vec (take 3 xs))
+                    (+ n (last xs))))))
+
+;;127.0.0.1/26
+(defn range->ips [ip-range]
+  (let [[start mask] (str/split ip-range #"/")
+        i (ip-2-int start)
+        c (- (clojure.math/pow 2 (- 32 (force-int mask)))
+             ;;remove first and last
+             2
+             )]
+    (->>
+     (range c)
+     (map inc)
+     (map #(ip-offset start %)))))
+
+
 (defn ip+n [n s]
   (->>
-   (str/split s #"/"
-                         (first))
+   (str/split s #"/")
+   (first)
    (ip-2-int)
    (+ n)
-   (int-2-ip)))
+   (int-2-ip)
+   )
+  )
+
+
+
 
 (defn instance-to-ip [s]
   (let [ip (second (re-find #".*-(\d+-\d+-\d+-\d+)" s))]
@@ -1540,7 +1573,7 @@
       (throw (Exception.
               (str e "need ref function: "
                    (:name (var-meta f))
-                   "in current namesapce")))
+                   " in current namesapce")))
                   ;;
       )))
 
