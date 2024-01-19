@@ -193,6 +193,11 @@
 (make-shell-fn "grep")
 (make-shell-fn :ls)
 
+
+(defn base64-encode [s]
+  (str/trim-newline
+   (:out (run-cmd :echo s "| base64"))))
+
 (defn file-ext [s]
   (last (str/split s #"\."))
   )
@@ -307,7 +312,13 @@
   ([]
    (cur-time-str "yyyy-MM-dd hh:mm:ss"))
   ([fmt]
-     (.format (java.text.SimpleDateFormat. fmt) (java.util.Date.))))
+   (.format (java.text.SimpleDateFormat. fmt) (java.util.Date.)))
+  ([fmt zone]
+   (.format
+    (doto (java.text.SimpleDateFormat. fmt)
+      (.setTimeZone
+       (java.util.TimeZone/getTimeZone "GMT")))
+    (java.util.Date.))))
 
 (defn time-tag []
   (cur-time-str "yyyy-MM-dd..hh-mm-ss")
@@ -2097,7 +2108,23 @@
            ->ips)
       ips)))
 
+(defn quote-parenthese [s]
+  (-> s
+      (str/replace "(" "\\(")
+      (str/replace ")" "\\)")))
+
+(defn alias [s x]
+  (let [line (-> (str "alias " (str (force-str s) "=" "'" x "'"))
+                 (quote-parenthese)
+                 )
+        f (if (osx?)
+            (ls "$HOME/.bash_profile")
+            (ls "$HOME/.bashrc"))]
+    (when-not (in? (slurp-lines f) line)
+      (spit-line f line))))
+
 (comment
+  (alias :vj "c https://zh.m.wikisource.org/wiki/%E9%87%91%E5%89%9B%E8%88%AC%E8%8B%A5%E6%B3%A2%E7%BE%85%E8%9C%9C%E7%B6%93_(%E9%B3%A9%E6%91%A9%E7%BE%85%E4%BB%80)")
 
   (str-or-file->ips "127.0.0.1")
   (str-or-file->ips "./1.i" "./2.i")
@@ -2135,3 +2162,4 @@
 
   ;;
   )
+
