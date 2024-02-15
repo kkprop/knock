@@ -23,56 +23,77 @@
     ret))
 
 (defn conn [driver]
-  (utils/select driver :host :port))
+   (utils/select driver :host :port)
+   )
 
 (def driver-edn-path "etaoin-driver-conn.edn")
 
 (utils/config :chrome-profile)
 
+;;load a new etaoin driver load one
 (defn new-driver []
-  (let [d
-        (e/chrome
-          {:profile chrome-profile}
-         )
+  (let [d (e/chrome
+          {:profile chrome-profile})
         c (conn d)]
     (spit driver-edn-path (with-out-str (clojure.pprint/pprint c)))
-    d)
+    d
+    )
   )
 
+;;using existing driver, load a new session
 (defn load-driver []
-  (let [d
-        (try (timeout 1000 (partial
-                            e/chrome
-                            (assoc (utils/load-edn driver-edn-path)
-                                   :headless :true)))
+  (let [d (try (timeout 3000 (partial e/chrome (utils/load-edn driver-edn-path)))
+             ;;3 seconds should be loaded
              ;;any exception happen means we need a new-driver too.
              ;;  just return :timed-out to trigger a new-driver call
              (catch Exception e :timed-out))]
     (if (= d :timed-out)
       (try
+        ;;try load a new chrome window
         (new-driver)
-        (catch Exception e
-          (run-cmd "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable")))
+        (catch Exception e (run-cmd "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable")))
       d)
     ;;
     ))
 
-(def driver
-  (load-driver)
+;;a load function load the instance
+;;cache the instance in the variable
+;; var-name f
+;;
+(def driver-cache (atom {}))
+
+(defn driver []
+  (let []
+    (when (empty? @driver-cache)
+      (reset! driver-cache (load-driver)))
+    (try
+      (e/get-source @driver-cache)
+      (catch Exception e
+        ;(let [res (ex-data e)])
+        ;not valid just load again
+        (println "not ok, load a new-driver")
+        (reset! driver-cache (new-driver))
+        )
+      )
+    @driver-cache
+    ))
+
+(comment
+  (driver)
+  @driver-cache
   )
 
 
 (def click-multi (apply partial e/click-multi [driver]))
 
 (defn go [url]
-  (e/go driver url))
+  (e/go (driver) url))
 
 (defn click [& q]
-  (e/click driver (vec q)))
+  (e/click (driver) (vec q)))
 
 (defn search [url word]
-  (e/go driver (str url word) )
-  )
+  (e/go (driver) (str url word)))
 
 (defn wiki [word]
   (search "https://www.wikiwand.com/en/" word))
@@ -87,17 +108,35 @@
 
 (defn locate [url q uniq-text]
   (go url)
-  (e/wait-visible driver q)
-  (->> (e/query-tree driver q)
-       (map (fn [id] {:id id :text (e/get-element-text-el driver id)}))
+  (e/wait-visible (driver) q)
+  (->> (e/query-tree (driver) q)
+       (map (fn [id] {:id id :text (e/get-element-text-el (driver) id)}))
        (filter #(utils/fuzzy-rev-in? [uniq-text] (:text %)))
-       (map #(assoc % :html (e/get-element-inner-html-el driver (:id %))))
+       (map #(assoc % :html (e/get-element-inner-html-el (driver) (:id %))))
        ;;
-       )
-  )
+       ))
 
 (comment
+  (e/get-source
+   (driver)
+   )
+  (go "https://www.google.com")
+  (e/get-source (driver))
 
+  (defn ->opts [{:keys [host port] :as m}]
+    (assoc m
+           :url "https://www.google.com"))
+
+  (def dd
+    (e/chrome
+     (->opts
+      (conn (driver))))
+    )
+
+  (driver)
+  dd
+
+  (e/go dd "https://www.google.com")
 
   (flatten-hashmap
    (->>
@@ -118,8 +157,8 @@
 
   (wiki "Philip H. Dybvig")
   (->>
-   (e/query-tree driver :content-root {:tag :article})
-   (map #(e/get-element-text-el driver %)))
+   (e/query-tree (driver) :content-root {:tag :article})
+   (map #(e/get-element-text-el (driver) %)))
   (fun
    (f2
     (f22 ada))
@@ -157,8 +196,10 @@
 (gen-partial 'etaoin.api ['driver] ['non])
 
 ;;TODO expose all functions in etaoin which start with a driver
-(->>
- (ns-publics 'etaoin.api)
- (take 2)
- (map #(meta (second %))))
+;; alternative just using (driver)
+(comment
+  (->>
+   (ns-publics 'etaoin.api)
+   (take 2)
+   (map #(meta (second %)))))
 

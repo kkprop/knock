@@ -9,14 +9,12 @@
 
 (defn search-word [word]
   (go (str "https://jisho.org/search/" word))
-  (try 
-     (click voice)
-     (catch Exception e "no voice to click")
-     )
-  (try 
-    (e/get-element-text driver text)
-    (catch Exception e nil)
-    )
+  (try
+    (click voice)
+    (catch Exception e "no voice to click"))
+  (try
+    (e/get-element-text (driver) text)
+    (catch Exception e nil))
   ;;
   )
 
@@ -30,7 +28,7 @@
 
   ;;need to convert
   (search-word "识")
-
+  ;;not the right one need to fix 
   (search-word "ここ")
 ;;
   )
