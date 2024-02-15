@@ -198,6 +198,12 @@
   (str/trim-newline
    (:out (run-cmd :echo s "| base64"))))
 
+(defn base64-decode [s]
+  (str/trim-newline
+   (:out (run-cmd :echo s "| base64 -d"))))
+
+
+
 (defn file-ext [s]
   (last (str/split s #"\."))
   )
@@ -251,8 +257,7 @@
           (map (fn [x] (zipmap ks (str/split x separator))))
           ;;
           ))
-   )
-  )
+   ))
 
 
 ;;trim a string's the starting chars, until match sub
@@ -857,15 +862,17 @@
 ;;127.0.0.1/26
 (defn range->ips [ip-range]
   (let [[start mask] (str/split ip-range #"/")
-        i (ip-2-int start)
-        c (- (clojure.math/pow 2 (- 32 (force-int mask)))
-             ;;remove first and last
-             2
-             )]
+        [a b c d] (str/split start #"\.")
+        dn (force-int d)
+        count (clojure.math/pow 2 (- 32 (force-int mask)))
+                 ]
     (->>
-     (range c)
-     (map inc)
-     (map #(ip-offset start %)))))
+     (range count)
+     (map #(+ dn %))
+     (map #(str/join "." [a b c (force-str %)]))
+     )
+    ;;
+    ))
 
 
 (defn ip+n [n s]
@@ -2160,6 +2167,8 @@
 
   (->k=v {:PORT 123 :PROTO "tcp"} :prefix "--env")
 
+  (alias :main "git checkout main")
+  (alias :master "git checkout master")
   ;;
   )
 
