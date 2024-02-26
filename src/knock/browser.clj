@@ -37,8 +37,7 @@
         c (conn d)]
     (spit driver-edn-path (with-out-str (clojure.pprint/pprint c)))
     d
-    )
-  )
+    ))
 
 ;;using existing driver, load a new session
 (defn load-driver []
@@ -202,4 +201,3 @@
    (ns-publics 'etaoin.api)
    (take 2)
    (map #(meta (second %)))))
-

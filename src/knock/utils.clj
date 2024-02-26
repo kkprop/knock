@@ -171,7 +171,19 @@
                   (f xs)
                   (recur)
                   )))
+;; hope not have to require async fns everytime
+(defmacro go-go [& xs] `(go ~@xs))
+(defmacro go-chan [& xs] `(chan ~@xs))
+(defmacro go>! [& xs] `(>! ~@xs))
+(defmacro go<! [& xs] `(<! ~@xs))
 
+
+(defn >0-and-lt? [n x]
+  (and
+    (> x 0)
+    (< x n)
+    )
+  )
 
 ;; TODO meta
 
@@ -192,6 +204,10 @@
 (make-shell-fn "curl")
 (make-shell-fn "grep")
 (make-shell-fn :ls)
+(make-shell-fn :readlink)
+
+
+(def work-dir (dirname (System/getProperty "babashka.config")))
 
 
 (defn base64-encode [s]
@@ -602,7 +618,11 @@
 (defn slurp-lines [f]
   (line-seq (clojure.java.io/reader f)))
 
-
+(defn str-or-file [x]
+  (if (fs/exists? x)
+     (slurp x)
+     x
+     ))
 
 (defn path-str-clean[s]
   (str/replace s "\n" "_"))
@@ -635,8 +655,7 @@
 
 (defn conf-path-edn
   ([name]
-   (format "resources/conf/%s.edn" (path-str-clean name)))
-  )
+   (format "%s/resources/conf/%s.edn" work-dir (path-str-clean name))))
 
 (defn load-edn [path & {:keys [readers]}]
   (if (nil? readers)
@@ -724,7 +743,8 @@
   )
 
 (defn agora-conf []
-  (load-conf "agora"))
+  (load-conf "agora")
+  )
 
 (defn load-samples [name] ((keyword name) (load-conf "samples")))
 
@@ -1473,7 +1493,7 @@
 ;;  i.e. (config :chrome-profile)
 ;;       a varible chrome-profile is defined
 (defmacro config [name & {:keys [config-path default config-m]
-                          :or {config-path "resources/config.edn"}}]
+                          :or {config-path (join-path work-dir "resources/config.edn")}}]
   (let [var-name (symbol (force-str name))
         key-word (keyword (force-str name))
         m (if (nil? config-m) (load-edn config-path) config-m)
@@ -1485,17 +1505,15 @@
 
 ;;config multiple from the same file
 (defmacro configs [names & {:keys [config-path]
-                            :or {config-path "resources/config.edn"}}]
+                            :or {config-path (join-path work-dir "resources/config.edn")}}]
   (let [m (load-edn config-path)]
     `(do
-      ~@(for [x names]
-          `(config ~x :config-m ~m)
-       )
-    )))
+       ~@(for [x names]
+           `(config ~x :config-m ~m)))))
 
 (comment
   (configs [:es :rte])
-  (config :a :confimg-m (load-edn "resources/config.edn"))
+  (config :a :config-m (load-edn "resources/config.edn"))
   )
 
 
@@ -1568,11 +1586,12 @@
 
 (declare md5-uuid)
 
+
 (defn- mock-context [f & args]
   (try
     (let [fm (var-meta f)
           ns-path (str/replace (ns-name (:ns fm)) #"\." "/")
-          dir (str "resources/mock/" ns-path "/")
+          dir (str work-dir "/resources/mock/" ns-path "/")
           path (if (empty? args)
                  (str dir (:name fm) ".edn")
                ;;(str dir (:name fm) "/" (str/join "-" (map force-str args)) ".edn")
@@ -1664,6 +1683,8 @@
 (defn mock-update [f & args]
   (apply do-mock true f args)
   )
+
+(def mock! mock-update)
 
 (defn mock-clean [f & args]
   (let [{:keys [fm ns-path dir path]} (apply mock-context f args)]
@@ -2075,6 +2096,10 @@
   (str/replace s "\"" "\\\"")
   )
 
+(defn quote-str [s]
+  (str "\"" s "\"")
+  )
+
 (defn val->key [[k xs]]
   (->> xs
        (map (fn [x] {x k}))))
@@ -2115,10 +2140,24 @@
            ->ips)
       ips)))
 
+(defn str-or-file->lines [& xs]
+  (let []
+    (->> xs
+         (mapcat #(if (fs/exists? %)
+                    (slurp-lines %)
+                    [%]
+                    ))
+         )
+    )
+  )
+
 (defn quote-parenthese [s]
   (-> s
       (str/replace "(" "\\(")
       (str/replace ")" "\\)")))
+(defn ->abs-path [x]
+  (readlink "-f" x)
+  )
 
 (defn alias [s x]
   (let [line (-> (str "alias " (str (force-str s) "=" "'" x "'"))
@@ -2131,6 +2170,7 @@
       (spit-line f line))))
 
 (comment
+  (->abs-path "tmp/1.i")
   (alias :vj "c https://zh.m.wikisource.org/wiki/%E9%87%91%E5%89%9B%E8%88%AC%E8%8B%A5%E6%B3%A2%E7%BE%85%E8%9C%9C%E7%B6%93_(%E9%B3%A9%E6%91%A9%E7%BE%85%E4%BB%80)")
 
   (str-or-file->ips "127.0.0.1")

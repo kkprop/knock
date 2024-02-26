@@ -23,7 +23,7 @@
              [knock.roam :as r]
              [knock.block :as  block]
              [knock.book :as b :refer :all]
-             [knock.browser :as br ]
+             [knock.browser :as br]
              [knock.poker :as poker]
              [knock.hanzi :as hanzi]
              [knock.chat :as chat :refer :all]
@@ -61,8 +61,10 @@
   ;!!! notice this choosen emoji will be copied to your clipboard 
   emoji (println (e/i-emoji))
 
+  ;; recommending of doing an alias: bb alias chatgpt "cd /Users/dc/kkprop/knock && bb gpt-prompt clojure"
   gpt-prompt (println (u/mock chat/prompt (apply str *command-line-args*)))
   qq (println (u/quote-quote (apply str *command-line-args*)))
+  alias (println (u/alias (first *command-line-args*) (clojure.string/join " " (rest *command-line-args*))))
 
   uberjar (do
             (println "Making uberjar")

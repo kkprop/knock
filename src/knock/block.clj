@@ -1,5 +1,5 @@
 (ns knock.block
-  (:require [bblgum.core :as b]))
+  (:require [knock.utils :refer :all]))
 
 ;;block is the fundamental component of tree shape data
 :block/string
@@ -15,17 +15,18 @@
   {:block/string s}
   )
 
-(defn gum [& xs]
-  (apply b/gum (keyword (first xs)) (rest xs)))
 
-(defn filter []
-  (b/gum :filter :in (clojure.java.io/input-stream
-                      (->
-                       (b/gum :file)
-                       :result
-                       first
-                       )
-                      )))
+;; a charactor for chinese
+;; a word for other language
+(defn ->units [x]
+  (let [s (str-or-file x)]
+    (count (slurp-lines x))
+    ;;
+    ))
+
 (comment
-
+  (->units
+    (->abs-path "~/xj")
+    )
+  ;;
   )
