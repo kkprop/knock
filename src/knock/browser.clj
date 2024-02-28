@@ -9,6 +9,7 @@
    [clojure.edn :as edn]
    [clojure.data.xml :as xml]
    [knock.utils :as utils :refer :all]
+   [knock.book :as book]
    [clojure.pprint :as pp]
    [clojure.string :as str]))
 
@@ -71,7 +72,7 @@
         ;(let [res (ex-data e)])
         ;not valid just load again
         (println "not ok, load a new-driver")
-        (reset! driver-cache (new-driver))
+        (reset! driver-cache (load-driver))
         )
       )
     @driver-cache
@@ -79,23 +80,44 @@
 
 (comment
   (driver)
-  @driver-cache
-  )
 
+  (e/with-chrome driver
+    (e/go driver "https://clojure.org")
+    )
+  (reset! driver-cache {})
+  (go "https://www.163.com")
+  (go "https://zh.wikisource.org")
+  (e/get-status (driver))
+  (e/delete-session (driver)))
 
-(def click-multi (apply partial e/click-multi [driver]))
 
 (defn go [url]
-  (e/go (driver) url))
+  (e/go (driver) url)
+  )
 
 (defn click [& q]
-  (e/click (driver) (vec q)))
+  (e/click (driver) (vec q))
+  )
 
 (defn search [url word]
   (e/go (driver) (str url word)))
 
 (defn wiki [word]
-  (search "https://www.wikiwand.com/en/" word))
+  (e/with-chrome driver
+    (e/go driver (str "https://www.wikiwand.com/en/" word))
+    )
+  )
+
+
+(defn wiki-source [name]
+  (e/with-chrome-headless driver
+    (e/go driver (str "https://zh.m.wikisource.org/wiki/" name))
+    (book/->markdown
+     (e/get-element-inner-html driver "//*[@class='mw-body-content']"))))
+
+(comment
+  (wiki-source "信心铭")
+  )
 
 (defn kv-url [& args]
   ;app=%s&&project=media&&env=default"

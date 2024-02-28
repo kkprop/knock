@@ -54,8 +54,13 @@
                       )
             )))
 
+(defn ->markdown [x]
+  (let [path (tmp-file (str-or-file x))]
+    (markdown path)
+    ))
+
 (defn pick [path]
-  (let [f (tmp-file (partial markdown path)
+  (let [f (tmp-file (->markdown path)
                     :ext ".md"
                     :uuid path
                     :dir (if (nil? book-cache-dir)

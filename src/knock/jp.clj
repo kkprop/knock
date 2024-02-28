@@ -1,6 +1,6 @@
 (ns knock.jp
   (:require
-   [knock.browser :refer [go click click-multi driver]]
+   [knock.browser :refer [go click driver]]
    [etaoin.api :as e]))
 
 
@@ -8,13 +8,15 @@
 (def text {:class "concept_light-representation"})
 
 (defn search-word [word]
-  (go (str "https://jisho.org/search/" word))
-  (try
-    (click voice)
-    (catch Exception e "no voice to click"))
-  (try
-    (e/get-element-text (driver) text)
-    (catch Exception e nil))
+  (e/with-chrome driver
+    (e/go driver (str "https://jisho.org/search/" word))
+    (try
+      (e/click driver voice)
+      (e/wait driver 3)
+      (catch Exception e "no voice to click"))
+    (try
+      (e/get-element-text driver text)
+      (catch Exception e nil)))
   ;;
   )
 

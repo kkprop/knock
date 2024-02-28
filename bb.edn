@@ -17,7 +17,7 @@
  {:requires ([babashka.fs :as fs]
              [babashka.process :as p :refer [process]]
              [babashka.wait :as wait]
-             [knock.utils :as u]
+             [knock.utils :as u :refer [mock]]
              [knock.emoji :as e]
              [knock.server :as s]
              [knock.roam :as r]
@@ -56,6 +56,7 @@
 
   gum (println (apply block/gum *command-line-args*))
   filter (println (apply b/pick *command-line-args*))
+  filter-wen (b/pick (mock br/wiki-source (first *command-line-args*)))
   book (println (b/fuzzy-open (first *command-line-args*)))
   local-server (p/shell "clj -M -m lucy.local-server")
   ;!!! notice this choosen emoji will be copied to your clipboard 
@@ -65,6 +66,8 @@
   gpt-prompt (println (u/mock chat/prompt (apply str *command-line-args*)))
   qq (println (u/quote-quote (apply str *command-line-args*)))
   alias (println (u/alias (first *command-line-args*) (clojure.string/join " " (rest *command-line-args*))))
+  cha (hanzi/show (hanzi/cha (first *command-line-args*)))
+  wen (println (mock br/wiki-source (first *command-line-args*)))
 
   uberjar (do
             (println "Making uberjar")

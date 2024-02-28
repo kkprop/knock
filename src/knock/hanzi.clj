@@ -1,14 +1,16 @@
 (ns knock.hanzi
   (:require [knock.utils :refer :all]
-            [knock.browser :refer [go click click-multi driver]]
+            [knock.browser :refer [go driver]]
             [knock.server :as server]
             [etaoin.api :as e]
             ))
 
 (defn cha [zi]
-  (let [_ (go (format "https://hanyu.baidu.com/s?wd=%s&ptype=zici" zi))]
-    {:strokes (e/get-element-attr (driver) "//*[@id='word_bishun']" :src)
-     :meaning (e/get-element-inner-html (driver) "//*[@id='detailmean-wrapper']")}))
+  (let []
+    (e/with-chrome-headless driver
+      (e/go driver (format "https://hanyu.baidu.com/s?wd=%s&ptype=zici" zi))
+      {:strokes (e/get-element-attr driver "//*[@id='word_bishun']" :src)
+       :meaning (e/get-element-inner-html driver "//*[@id='detailmean-wrapper']")})))
 
 (defn gif-show [url]
   (run-cmd :open url)
