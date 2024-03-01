@@ -207,7 +207,12 @@
 (make-shell-fn :readlink)
 
 
-(def work-dir (dirname (System/getProperty "babashka.config")))
+(def work-dir
+  (let [path (dirname (System/getProperty "babashka.config"))]
+    (if (empty? path)
+      "./"
+      path
+      )))
 
 
 (defn base64-encode [s]
@@ -591,10 +596,45 @@
 (defn ->dash [ip]
   (str/replace ip #"\." "-"))
 
+(defn ->domain [url]
+  (let [x (second
+           (first
+            (re-seq #".*:\/\/(.*)[\:|\/]"
+                    (if (str/ends-with? url "/")
+                      url
+                      (str url "/")))))]
+    (if (nil? x)
+      x
+      (if (str/includes? x ":")
+        (first (str/split x #":" ))
+        x
+        ))))
+
+;;url or domain
+(defn domain->ip [x]
+  (let [domain (->domain x)
+        domain (if (nil? domain)
+                x
+                domain)]
+    (.getHostAddress (java.net.InetAddress/getByName domain))
+    ))
+
+(comment
+  (domain->ip "https://www.x.com:1663")
+  (->domain "https://www.x.com:1663/")
+  (->domain "https://www.x.com:1663")
+  (->domain "https://www.x.com/")
+  (->domain "https://www.x.com")
+  (->domain "www.x.com"))
 
 (defn dig-domain-ips [domain]
-  (extract-ip
-   (:out (run-cmd "curl" "-s" "-v" (str "https://" domain ":15986 2>&1 | grep Trying"))))
+  (let [x (->domain domain)
+        domain (if (nil? x)
+                 domain
+                 x)]
+
+    (extract-ip
+     (:out (run-cmd "curl" "-s" "-v" (str "https://" domain ":15986 2>&1 | grep Trying")))))
   ;;
   )
 
@@ -818,8 +858,7 @@
         _ (clean-file path)
         selected (set (->> selected-k))
         head-defaults (zipmap head (repeat (count head) ""))
-        selected-defaults (zipmap selected-k (repeat (count selected-k) ""))
-        ]
+        selected-defaults (zipmap selected-k (repeat (count selected-k) ""))]
     (if-not (nil? selected-k)
       (do
         ;; write selected header
@@ -829,7 +868,7 @@
          xs
          (map #(select-keys % selected-k))
          ;;in case of missing fields set to empty
-         ;(map #(merge selected-defaults %))
+         ;;(map #(merge selected-defaults %))
          (map (apply juxt selected-k))
          (map #(write-csv-line path %))))
 
@@ -839,6 +878,7 @@
         ;; write values
         (->> xs
              (map #(merge head-defaults %))
+             ;(map #(println (when (= (type %) 'java.lang.string) (println %))))
              (map vals)
              (map #(write-csv-line path %))
              )))))
@@ -879,12 +919,17 @@
               (conj (vec (take 3 xs))
                     (+ n (last xs))))))
 
+(defn exp [x n]
+  (loop [acc 1 n n]
+    (if (zero? n) acc
+        (recur (* x acc) (dec n)))))
+
 ;;127.0.0.1/26
 (defn range->ips [ip-range]
   (let [[start mask] (str/split ip-range #"/")
         [a b c d] (str/split start #"\.")
         dn (force-int d)
-        count (clojure.math/pow 2 (- 32 (force-int mask)))
+        count (exp 2 (- 32 (force-int mask)))
                  ]
     (->>
      (range count)
@@ -1992,6 +2037,26 @@
          )
     ;
     ))
+
+;;reverse index of hashmaps
+(defn reverse-index [xs to-search & to-choose]
+  (->> xs
+       (mapcat (fn [m]
+                 (let [x-or-xs (get m to-search)
+                       v (if (empty? to-choose)
+                           m
+                           (if (= 1 (count to-choose))
+                             ;;only one field, return the value
+                             (get m (first to-choose))
+                             ;;multiple fields, return selected hashmap
+                             (select-keys m to-choose)))]
+
+                   (if (sequential? x-or-xs)
+                     (map (fn [k] {k v}) x-or-xs)
+                     [{x-or-xs v}]))))
+       ;;assure the to-search fields formed string is unique
+       (apply merge)))
+
 
 (defn unfold [m & ks]
   (->> ks
