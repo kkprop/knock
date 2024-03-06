@@ -71,6 +71,7 @@
               }
         ]
     (try 
+      (println "writing" data)
       (post g "write" data)
       (catch Exception e
         (let [msg (.getMessage e)]
@@ -79,6 +80,7 @@
             (do 
               (create-page g {:title (cur-daily-page-title) :uid (cur-daily-page)})
               (post g "write" data)
+              (println data)
               )
             msg)
           )

@@ -24,7 +24,7 @@
 
 (defn osx?[] (= os-name "Mac OS X"))
 
-(declare force-str force-int)
+(declare force-str force-int cur-time-str)
 (declare split-by)
 
 (defn uuid []
@@ -53,6 +53,13 @@
        (future-cancel fut))
     ret))
 
+(def pp clojure.pprint/pprint)
+
+(defn mpp [& args]
+  (binding [*print-meta* true]
+    (apply clojure.pprint/pprint args)
+    )
+  )
 
 (defn ->str [x]
   (if (string? x)
@@ -92,6 +99,9 @@
 (defn ->g [n]
   (-> (->m n)
       (quot  1024)))
+
+(defn ->log [& xs]
+  (str/join " " (concat [(cur-time-str)] (map force-str xs))))
 
 (defn join-path [& cmd]
   (str/join "/" cmd))
@@ -1631,6 +1641,32 @@
 
 (declare md5-uuid)
 
+(defn x-or-xs-fn [x f]
+  (if (sequential? x)
+    (->> x (map f))
+    (f x)))
+
+(defn assoc-time [x-or-xs t & {:keys [key]
+                               :or {key :uptime-time}}]
+  (x-or-xs-fn x-or-xs
+              (fn [x]
+                (if (map? x)
+                  (if (contains? x key)
+                    x
+                    (assoc x key t))
+                  x))))
+
+(defn assoc-cur-time [x-or-xs & {:keys [key]
+                                 :or {key :update-time}}]
+  (assoc-time x-or-xs (cur-time-str)))
+
+(comment
+  (assoc-time [{} {} {}] (cur-time-str))
+  (assoc-time {} (cur-time-str))
+  (assoc-time {} (cur-time-str) :key :update-time)
+  ;;
+  )
+
 
 (defn- mock-context [f & args]
   (try
@@ -1659,34 +1695,7 @@
                   ;;
       )))
 
-(defn x-or-xs-fn [x f]
-  (if (sequential? x)
-    (->> x (map f))
-    (f x)
-    )
-  )
-
-(defn assoc-time [x-or-xs t & {:keys [key]
-                               :or {key :uptime-time}}]
-
-  (x-or-xs-fn x-or-xs
-              (fn [x]
-                (if (map? x)
-                  (if (contains? x key)
-                    x
-                    (assoc x key t))
-                  x))))
-
-(defn assoc-cur-time [x-or-xs & {:keys [key]
-                                 :or {key :update-time}}]
-  (assoc-time x-or-xs (cur-time-str)))
-
-(comment
-  (assoc-time [{} {} {}] (cur-time-str))
-  (assoc-time {} (cur-time-str))
-  (assoc-time {} (cur-time-str) :key :update-time)
-  ;;
-  )
+(def mock? mock-context)
 
 (defn- do-mock [force? f & args]
   (let [{:keys [fm ns-path dir path tmp-path t]} (apply mock-context f args)
@@ -1699,21 +1708,23 @@
                 (catch Exception e
                   (let [res (apply f args)
                         _ (println 'failed 'load-edn path "check the reader of this edn"
-                                   e
-                                   )
+                                   e)
                         _ (fs/delete-if-exists path)]
-                    (clojure.pprint/pprint res (clojure.java.io/writer path)))))
+                    (binding [*print-meta* true]
+                      (clojure.pprint/pprint (with-meta res {:update-time (cur-time-str) :ts (cur-ts)})
+                                             (clojure.java.io/writer path))))))
               (let [res (apply f args)
                     _ (clean-file tmp-path)]
-                (clojure.pprint/pprint res (clojure.java.io/writer tmp-path))
+                (binding [*print-meta* true]
+                  (clojure.pprint/pprint (with-meta res {:update-time (cur-time-str) :ts (cur-ts)})
+                                         (clojure.java.io/writer tmp-path)))
                 (fs/delete-if-exists path)
                 (fs/create-sym-link (fs/absolutize path) (fs/absolutize tmp-path))
                 res)
       ;;
               )]
     ;(assoc-time res (str (fuzzy-parse-time (str (fs/last-modified-time path)))))
-    res
-    ))
+    res))
 
 ;;for a slow return function.
 ;;  mock will run once save the result to local edn file
@@ -1763,6 +1774,15 @@
     (if (< n recent-call-count)
       (throw (Exception. (str (:name fm) " mock call over rate : " n " times per hour")))
       (apply mock-update f args))))
+
+
+(defn measure [f & args]
+  (let [start (cur-ts-13)
+        res (apply f args)
+        end (cur-ts-13)
+        cost-ms (- end start)]
+    (with-meta res {:cost-ts-1 (quot cost-ms 1000.0)
+                    })))
 
 (comment
   (mock-with-rate 3 run-cmd "ls")
@@ -2150,12 +2170,18 @@
 (defn reverse-sort-by-val [xs]
   (reverse (sort-by-val xs)))
 
-(defn stat-count [m k]
+(defn stat-count [xs k]
   (map (comp println (partial str/join " "))
        (reverse-sort-by-val
-         (map-on-val count (group-by k m))
+         (map-on-val count (group-by k xs))
    )
   ))
+
+;; like count distinct in mysql
+;; TODO support ks
+(defn ->stat [xs k]
+  (map-on-val count (group-by k xs))
+  )
 
 (defn quote-quote [s]
   (str/replace s "\"" "\\\"")
@@ -2233,6 +2259,16 @@
             (ls "$HOME/.bashrc"))]
     (when-not (in? (slurp-lines f) line)
       (spit-line f line))))
+
+;;for seq of hashmaps
+;;  do distinct by key 
+;;  then choose same key element by choose-fn
+(defn distinct-by
+  ([xs k choose-fn]
+   (vals (map-on-val choose-fn
+                     (group-by k xs))))
+  ([xs k]
+   (distinct-by xs k first)))
 
 (comment
   (->abs-path "tmp/1.i")
