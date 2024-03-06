@@ -1711,13 +1711,19 @@
                                    e)
                         _ (fs/delete-if-exists path)]
                     (binding [*print-meta* true]
-                      (clojure.pprint/pprint (with-meta res {:update-time (cur-time-str) :ts (cur-ts)})
-                                             (clojure.java.io/writer path))))))
+                      (clojure.pprint/pprint
+                       (if (instance? clojure.lang.IFn res)
+                         (with-meta res {:update-time (cur-time-str) :ts (cur-ts)})
+                         res)
+                       (clojure.java.io/writer path))))))
               (let [res (apply f args)
                     _ (clean-file tmp-path)]
                 (binding [*print-meta* true]
-                  (clojure.pprint/pprint (with-meta res {:update-time (cur-time-str) :ts (cur-ts)})
-                                         (clojure.java.io/writer tmp-path)))
+                  (clojure.pprint/pprint
+                   (if (instance? clojure.lang.IFn res)
+                     (with-meta res {:update-time (cur-time-str) :ts (cur-ts)})
+                     res)
+                   (clojure.java.io/writer tmp-path)))
                 (fs/delete-if-exists path)
                 (fs/create-sym-link (fs/absolutize path) (fs/absolutize tmp-path))
                 res)
