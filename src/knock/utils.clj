@@ -25,7 +25,7 @@
 (defn osx?[] (= os-name "Mac OS X"))
 
 (declare force-str force-int cur-time-str)
-(declare split-by)
+(declare split-by tmp-file)
 
 (defn uuid []
   (java.util.UUID/randomUUID)
@@ -60,6 +60,17 @@
     (apply clojure.pprint/pprint args)
     )
   )
+
+(defn do-println [f & args]
+  (let [s (apply str (join-cmd args))]
+    (println "running with args"
+             (if (< 256 (count s))
+               (str " too long stored here: " (tmp-file s))
+               s))
+    (let [res (apply f args)]
+      (println res)
+      res
+      )))
 
 (defn ->str [x]
   (if (string? x)
@@ -2036,11 +2047,13 @@
                      real-uuid)))
 
                ext)]
-    (when-not (fs/exists? f)
-      (spit f (if (fn? s-or-fn)
-                (s-or-fn)
-                s-or-fn)))
-    f))
+    (if (and (fs/exists? f) (< 2 (fs/size f)))
+      f
+      (doall
+       (spit f (if (fn? s-or-fn)
+                 (s-or-fn)
+                 s-or-fn))
+       (spit f "\n" :append true)))))
 
 
 
