@@ -31,6 +31,7 @@
   (java.util.UUID/randomUUID)
   )
 
+(apply str  "c" ["a" "b"] ["d" "e"])
 
 (defn join-cmd [& cmd]
   (str/join " " (->> cmd (map force-str))))
@@ -2188,6 +2189,12 @@
 
 (defn sort-by-val [m]
   (sort-by (fn [[k v]] v) m))
+
+(defn sorted-by-val [m]
+  (into (sorted-map-by (fn [a b] (compare
+                                   [(get m b) b]
+                                   [(get m a) a]))) m)
+  )
 
 (defn reverse-sort-by-val [xs]
   (reverse (sort-by-val xs)))

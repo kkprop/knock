@@ -1,5 +1,6 @@
 (ns knock.block
-  (:require [knock.utils :refer :all]))
+  (:require [knock.utils :refer :all]
+            [clojure.string :as str]))
 
 ;;block is the fundamental component of tree shape data
 :block/string
@@ -21,7 +22,7 @@
 (defn ->units [x]
   (let [s (str-or-file x)]
     (->>
-     (slurp-lines x)
+     (str/split-lines s)
      (mapcat seq)
      )
     ;;
@@ -42,20 +43,24 @@
    ;;first
    (let [m (->> (range n)
                 (map #(->phrase % n xs))
-                (apply merge))
-         mm (map-on-key #(apply str %) m)
-         ]
-     ;(into (sorted-map-by (fn [a b] (compare (get m b) (get m a)))) m)
-     mm
-     ))
+                (apply merge-with +))
+         mm (map-on-key #(apply str %) m)]
+     (into (sorted-map-by (fn [a b] (compare
+                                     [(get mm b) b]
+                                     [(get mm a) a]))) mm)))
 
   ([xs]
    (->phrase 1 xs)))
 
+(defn ->semantics[]
+  )
+
 (comment
   (pp
-    (->phrase 5
-              (->units
-                (->abs-path "~/shurangama"))))
+   (sorted-by-val
+    (->phrase 1 3
+              (->units "说你又不听，听你又不懂，懂你又不做，做你又做错，错你又不认，认你又不服，不服你又不出声"
+                ;(->abs-path "~/shurangama")
+                       ))))
   ;;
   )
