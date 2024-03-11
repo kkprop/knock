@@ -209,13 +209,13 @@
 ;; TODO meta
 
 ;; get all the command string of shell
-(defmacro make-shell-fn [name]
+(defmacro make-shell-fn [name & default-args]
   (let [fname (symbol (force-str name))
         args (symbol "args")]
     `(defn ~fname [& ~args]
        (str/trim-newline
         (:out
-         (apply (partial run-cmd ~name) ~args))))))
+         (apply (partial run-cmd ~name) ~@default-args ~args))))))
 
 
 (make-shell-fn "basename")
@@ -224,7 +224,7 @@
 (make-shell-fn "base64")
 (make-shell-fn "curl")
 (make-shell-fn "grep")
-(make-shell-fn :ls)
+(make-shell-fn :ls )
 (make-shell-fn :readlink)
 
 
@@ -2049,11 +2049,14 @@
                ext)]
     (if (and (fs/exists? f) (< 2 (fs/size f)))
       f
-      (doall
+      (let []
        (spit f (if (fn? s-or-fn)
                  (s-or-fn)
                  s-or-fn))
-       (spit f "\n" :append true)))))
+       (spit f "\n" :append true)
+       f
+       )
+      )))
 
 
 

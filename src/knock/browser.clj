@@ -116,6 +116,8 @@
      (e/get-element-inner-html driver "//*[@class='mw-body-content']"))))
 
 (comment
+  (driver)
+  (new-driver)
   (wiki-source "信心铭")
   )
 
@@ -141,6 +143,7 @@
   (e/get-source
    (driver)
    )
+  (e/)
   (go "https://www.google.com")
   (e/get-source (driver))
 
