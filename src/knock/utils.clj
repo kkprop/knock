@@ -15,8 +15,10 @@
                                          chan to-chan into
                                          <! >!! >! close!
                                          <!! alt!
-                                         pipeline-async
-                                         ]]
+                                         thread
+                                         thread-call
+                                         pipeline-async]]
+   [clj-yaml.core :as yaml :refer [parse-string]]
    [clojure.edn :as edn]
    [clojure.walk :as walk]))
 
@@ -25,13 +27,11 @@
 (defn osx?[] (= os-name "Mac OS X"))
 
 (declare force-str force-int cur-time-str)
-(declare split-by tmp-file)
+(declare split-by tmp-file mock md5-uuid ->abs-path)
 
 (defn uuid []
   (java.util.UUID/randomUUID)
   )
-
-(apply str  "c" ["a" "b"] ["d" "e"])
 
 (defn join-cmd [& cmd]
   (str/join " " (->> cmd (map force-str))))
@@ -61,6 +61,7 @@
     (apply clojure.pprint/pprint args)
     )
   )
+
 
 (defn do-println [f & args]
   (let [s (apply str (join-cmd args))]
@@ -193,11 +194,40 @@
                   (f xs)
                   (recur)
                   )))
+
 ;; hope not have to require async fns everytime
-(defmacro go-go [& xs] `(go ~@xs))
-(defmacro go-chan [& xs] `(chan ~@xs))
-(defmacro go>! [& xs] `(>! ~@xs))
-(defmacro go<! [& xs] `(<! ~@xs))
+;; go! is actually go, but wont bother to do require
+(defmacro go! [& xs] `(go ~@xs))
+(defmacro thread! [& xs] `(thread ~@xs))
+
+
+;;TODO local server
+(defn go!! [f & xs]
+  (let [id (md5-uuid (str/join (map force-str (cons f xs))))]
+
+    {:id id}
+
+    ))
+
+(comment
+
+  (go!! println 'hi)
+
+  )
+
+;; chan! is actually chan
+(defmacro chan! [& xs] `(chan ~@xs))
+;;see the trace to avoid doing require
+(defmacro ->! [& xs] `(>! ~@xs))
+(defmacro <-! [& xs] `(<! ~@xs))
+(defmacro ->!! [& xs] `(>!! ~@xs))
+(defmacro <-!! [& xs] `(<!! ~@xs))
+
+(defn count! [f & args] (go (count (apply mock f args))))
+
+;; for others perhaps try async/
+;(alias 'async 'clojure.core.async)
+
 
 
 (defn >0-and-lt? [n x]
@@ -227,6 +257,7 @@
 (make-shell-fn "grep")
 (make-shell-fn :ls )
 (make-shell-fn :readlink)
+(make-shell-fn :clear)
 
 
 (def work-dir
@@ -341,6 +372,14 @@
 ;  (let [detail (:members (cr/reflect c))]
 ;
 ;    c))
+
+(defn ->int[s]
+  (re-seq #"\d+" s)
+  )
+
+(defn ->int! [s]
+  (first (->int s)))
+
 
 (defn parse-float [s]
   (if (string? s)
@@ -680,6 +719,22 @@
 (defn slurp-lines [f]
   (line-seq (clojure.java.io/reader f)))
 
+(defn slurp-yaml [f]
+  (yaml/parse-string (slurp f)))
+
+(defn ->yaml [m]
+  (yaml/generate-string m :dumper-options {:flow-style :block}))
+
+;;- replaced to be two space
+;;{} replaced to be 
+(defn ->yaml! [m]
+  (->
+    (yaml/generate-string m :dumper-options {:flow-style :block})
+    (str/replace " {}" "")
+    (str/replace "- " "  "))
+  )
+
+
 (defn str-or-file [x]
   (if (fs/exists? x)
      (slurp x)
@@ -754,13 +809,13 @@
 
 ;;csv way of hashmap -> str
 (defn hashmap->str [sep xs & ks]
-  (let [val-fn (if (empty? ks)
+  (let [xs (if (sequential? xs) xs [xs])
+        val-fn (if (empty? ks)
                  vals
                  (fn [m] (map #((suffix-decorate %) m) ks)))
         header (if (empty? ks)
                  (keys (first xs))
                  (map #(if (sequential? %) (first %) %) ks))]
-
     (str/join "\n"
               (cons
                 ;;header
@@ -774,7 +829,21 @@
 
 (def pp-hashmap (partial hashmap->str "\t\t"))
 (def csv-hashmap (partial hashmap->str ","))
+;;! means println the result
+(def pp-hashmap! (comp println pp-hashmap))
+(def csv-hashmap! (comp println csv-hashmap))
 
+(defn frequencies->str [xs]
+  (pp-hashmap
+    (->> 
+      (frequencies xs)
+      (map (fn [[k v]]
+              {:name k
+               :count v}
+             ))))
+  )
+
+(frequencies->str ["a" "b" "a"])
 (declare slash-flatten-map)
 
 ;;layered way of hashmap -> str
@@ -1651,7 +1720,6 @@
                        ))))
 
 
-(declare md5-uuid)
 
 (defn x-or-xs-fn [x f]
   (if (sequential? x)
@@ -1659,7 +1727,7 @@
     (f x)))
 
 (defn assoc-time [x-or-xs t & {:keys [key]
-                               :or {key :uptime-time}}]
+                               :or {key :update-time}}]
   (x-or-xs-fn x-or-xs
               (fn [x]
                 (if (map? x)
@@ -1780,6 +1848,24 @@
   (->>
    (fs/glob root pattern)
    (filter (comp #(< % hours-from-now) from-now-hours ->inst str fs/last-modified-time))))
+
+;;doing laundry
+;; clean all not linked cache file
+(defn mock-laundry []
+  (let [dir (str work-dir "/resources/mock/")]
+    ;(fs/walk-file-tree dir  )
+    (->> (fs/glob dir "**/*.edn.*")
+         (map str)
+         (map (fn [x]
+                (let [d (dirname x)
+                      link (second (first (re-seq #"(.*.edn).(.*)" x)))
+                      link-to (->abs-path link)
+                      ]
+                  (when-not (= x link-to)
+                    (println "deleting" x "according to link" link-to)
+                    (fs/delete-if-exists x)
+                    )
+                  ))))))
 
 ;;n times per hour
 (defn mock-with-rate [n f & args]
@@ -2250,15 +2336,19 @@
 (defn str-or-file->ips [& xs]
   (let [s (str/join " " xs)
         ips (->ips s)]
-    (if (empty? ips)
-      (->> xs
-           (map #(if (fs/exists? %)
-                   (slurp %)
-                   ""))
-
-           (str/join " ")
-           ->ips)
-      ips)))
+    (if (empty? xs)
+      ;;try read from in pipe
+      ;;need to fix
+      ;(->ips (slurp *in*))
+      nil
+      (if (empty? ips)
+        (->> xs
+             (map #(if (fs/exists? %)
+                     (slurp %)
+                     ""))
+             (str/join " ")
+             ->ips)
+        ips))))
 
 (defn str-or-file->lines [& xs]
   (let []
@@ -2276,8 +2366,7 @@
       (str/replace "(" "\\(")
       (str/replace ")" "\\)")))
 (defn ->abs-path [x]
-  (readlink "-f" x)
-  )
+  (readlink "-f" (str "'" x "'")))
 
 (defn alias [s x]
   (let [line (-> (str "alias " (str (force-str s) "=" "'" x "'"))
@@ -2332,10 +2421,8 @@
 
   (mock-clean slow-repeater "abc" 3)
 
-  (env :OPENAI_API_KEY)
-  OPENAI_API_KEY
-
   (->k=v {:PORT 123 :PROTO "tcp"} :prefix "--env")
+  
 
   (alias :main "git checkout main")
   (alias :master "git checkout master")

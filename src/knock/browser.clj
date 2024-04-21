@@ -82,8 +82,16 @@
   (driver)
 
   (e/with-chrome driver
-    (e/go driver "https://clojure.org")
-    )
+    (e/go driver "https://clojure.org"))
+
+  (locate "https://www.futunn.com/heatmap-us"
+          (driver)
+          "stock-treemap")
+
+  (println
+   (e/get-element-inner-html
+    (driver) {:class "stock-treemap"}))
+
   (reset! driver-cache {})
   (go "https://www.163.com")
   (go "https://zh.wikisource.org")
@@ -143,7 +151,6 @@
   (e/get-source
    (driver)
    )
-  (e/)
   (go "https://www.google.com")
   (e/get-source (driver))
 

@@ -26,6 +26,7 @@
              [knock.browser :as br]
              [knock.poker :as poker]
              [knock.hanzi :as hanzi]
+             [clojure.string :as str]
              [knock.chat :as chat :refer :all]
              [knock.wn :as w])
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
@@ -68,6 +69,8 @@
   alias (println (u/alias (first *command-line-args*) (clojure.string/join " " (rest *command-line-args*))))
   cha (hanzi/show (hanzi/cha (first *command-line-args*)))
   wen (println (mock br/wiki-source (first *command-line-args*)))
+
+  chop (u/pp (block/->phrase 2 (block/->units (str/join *command-line-args*))))
 
   uberjar (do
             (println "Making uberjar")
