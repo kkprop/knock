@@ -2366,7 +2366,7 @@
       (str/replace "(" "\\(")
       (str/replace ")" "\\)")))
 (defn ->abs-path [x]
-  (readlink "-f" (str "'" x "'")))
+  (readlink "-f" x))
 
 (defn alias [s x]
   (let [line (-> (str "alias " (str (force-str s) "=" "'" x "'"))

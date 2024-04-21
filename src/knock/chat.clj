@@ -1,27 +1,28 @@
 (ns knock.chat
   (:require [knock.utils :refer :all]
             [babashka.curl :as curl]
-            )
-  )
-(env :OPENAI_API_KEY)
+            [babashka.process :as p]
+            [babashka.fs :as fs]))
 
+(config :model-dir :default (->abs-path "~/models"))
 
+(defn models []
+  (map str (fs/glob model-dir "*.gguf")))
 
 (defn prompt [q]
-  (let [res (curl-any curl/post
-                      ;;doc :https://platform.openai.com/docs/api-reference/completions/object
-                      "https://api.openai.com/v1/chat/completions"
-                      :headers {"Content-Type" "application/json"
-                                "Authorization" (str "Bearer " OPENAI_API_KEY)}
-                      :body {:messages [{:role "user"
-                                         :content q}]
-                             :model "gpt-3.5-turbo-0613"})]
-    (:choices/message/content
-     (slash-flatten-map (:body res)))))
+  (run-cmd (str model-dir "/bin/main -m")
+           (first (models))
+           "-c 4096 --temp 0.7 --repeat_penalty 1.1 "
+           ;;suppress log
+           "2>/dev/null"
+           ;;input text
+           "-p" (str  "'" q "'")))
 
 
 (comment
   ;;
-    (mock prompt "what is socrate question method")
+  (:out
+    (prompt "what is socrate question method when doing inquery?")
+    )
 ;
 )
