@@ -71,9 +71,4 @@
   wen (println (mock br/wiki-source (first *command-line-args*)))
 
   chop (u/pp (block/->phrase 2 (block/->units (str/join *command-line-args*))))
-
-  uberjar (do
-            (println "Making uberjar")
-            (clojure "-X:uberjar"))
-  uberjar:clean (do (run 'clean)
-                    (run 'uberjar))}}
+  }}

@@ -3,12 +3,13 @@
    [clojure.data.csv :as csv]
    [clojure.java.io :as io]
    [clojure.data :as data]
-            ;[clojure.reflect :as cr]
+                                        ;[clojure.reflect :as cr]
    [clojure.pprint :as pp]
    [clojure.string :as str]
    [clojure.java.shell :as shell :refer [sh]]
    [cheshire.core :as json :refer :all]
    [babashka.fs :as fs]
+   [babashka.process :as proc]
    [babashka.curl :as curl]
    [clojure.zip :as z]
    [clojure.core.async :as async :refer [go go-loop
@@ -27,7 +28,7 @@
 (defn osx?[] (= os-name "Mac OS X"))
 
 (declare force-str force-int cur-time-str)
-(declare split-by tmp-file mock md5-uuid ->abs-path)
+(declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!)
 
 (defn uuid []
   (java.util.UUID/randomUUID)
@@ -227,6 +228,71 @@
 
 ;; for others perhaps try async/
 ;(alias 'async 'clojure.core.async)
+
+(def count-down "bb -e '(doseq [x (range (apply + (->> *command-line-args* (map #(Long/parseLong %)))))] (println x) (Thread/sleep 1000))' 3")
+;;async run return the hashmap including
+;; :proc process information
+;; :out the stream
+;; see the full with (run! count-down)
+(defn run! [& args]
+  (let [log (tmp-file (str/join " " args))
+        m (assoc
+           (proc/process "sh -c" (apply join-cmd args) {:exit-fn (fn [proc] (println proc "exited"))})
+           :cmd args
+           :log log
+           :res (promise))
+        {:keys [out proc cmd]} m]
+    ;;collecting log
+    (async-fn #(spit-line log %) (->ch out))
+    m
+    ))
+
+
+(def count-down! (partial run! count-down))
+
+;;every second show run! process background current log 
+(defn stat-log! [{:keys [out proc cmd log res]
+                  :as m}]
+  ;;deliver when finished
+  (thread!
+   (while (.isAlive proc)
+     (println "cur:" (:out (run-cmd "tail -n 1 " log)))
+     (Thread/sleep 1000)
+     (deliver res m)
+     )
+   ))
+
+(defn cur-line [f]
+  (:out (run-cmd "tail -n 1 " f)))
+
+(defn some-alive? [xs]
+  (some #(.isAlive (:proc %)) xs))
+
+;;concurrent run and collect result
+(defn cc-run [xs]
+  (let []
+    (thread!
+     (while (some-alive? xs)
+       (println (str/join "" (repeat 42 "-")))
+       (Thread/sleep 1000)
+       (pp-hashmap! (->> xs (map #(assoc % :cur-log (cur-line (:log %))))) :log :cur-log))
+     ;;completed
+     (doseq [x xs] (deliver (:res x) x)))
+    ;;block and wait
+    (doseq [x xs]
+      @(:res x))
+    ;;do the something to finalize maybe
+
+    ))
+
+(comment
+  (let [xs (->> (range 3) (map #(run! count-down %)))]
+    (cc-run xs)
+    )
+
+  (run! count-down 1)
+  ;;
+  )
 
 
 

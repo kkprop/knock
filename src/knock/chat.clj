@@ -18,6 +18,16 @@
            ;;input text
            "-p" (str  "'" q "'")))
 
+(defn prompt![p]
+  (run-cmd (str model-dir "/bin/main -m")
+           (first (models))
+           "-c 4096 --temp 0.7 --repeat_penalty 1.1 "
+           ;;suppress log
+           "2>/dev/null"
+           ;;input text
+           "-ins" ))
+
+
 
 (comment
   ;;

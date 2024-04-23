@@ -55,7 +55,16 @@
 (defn ->semantics[]
   )
 
+(defn language [s]
+  (->> s
+       (map int)
+       )
+  )
+
 (comment
+
+  (language "看")
+
   (pp
    (sorted-by-val
     (->phrase 1 3
