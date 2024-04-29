@@ -45,6 +45,11 @@
   (sh "sh" "-c" (apply join-cmd cmd))
   )
 
+(defn run-shell [& cmd]
+  (proc/shell (apply join-cmd cmd) )
+  )
+(run-shell "ls" "-lh")
+
 (defn to-path-cmd [path & cmd]
   (sh "sh" "-c" (apply join-cmd "cd " path "&&" cmd)))
 
@@ -237,7 +242,7 @@
 (defn run! [& args]
   (let [log (tmp-file (str/join " " args))
         m (assoc
-           (proc/process "sh -c" (apply join-cmd args) {:exit-fn (fn [proc] (println proc "exited"))})
+           (proc/process "sh -c" (apply join-cmd args))
            :cmd args
            :log log
            :res (promise))
@@ -265,8 +270,12 @@
 (defn cur-line [f]
   (:out (run-cmd "tail -n 1 " f)))
 
+(defn alive? [p]
+  (.isAlive (:proc p)))
+
 (defn some-alive? [xs]
-  (some #(.isAlive (:proc %)) xs))
+  (some #(.isAlive (:proc %)) xs)
+  )
 
 ;;concurrent run and collect result
 (defn cc-run [xs]

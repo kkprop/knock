@@ -27,7 +27,7 @@
              [knock.poker :as poker]
              [knock.hanzi :as hanzi]
              [clojure.string :as str]
-             [knock.chat :as chat :refer :all]
+             [knock.chat :as chat]
              [knock.wn :as w])
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
               proc (process (str "bb nrepl-server " port) {:inherit true})]
@@ -71,4 +71,6 @@
   wen (println (mock br/wiki-source (first *command-line-args*)))
 
   chop (u/pp (block/->phrase 2 (block/->units (str/join *command-line-args*))))
+  run-model (chat/run-model)
+
   }}

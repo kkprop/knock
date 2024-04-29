@@ -30,3 +30,19 @@
     x
     )
   )
+
+(defn choose
+  ([xs]
+   (choose xs 0)
+   )
+  ;;default seconds
+  ([xs timeout]
+   (->
+    (b/gum :choose xs :timeout (str timeout "s"))
+    :result
+    first
+    )
+   )
+  )
+
+
