@@ -6,6 +6,7 @@
             [babashka.fs :as fs]))
 
 (config :model-dir :default (->abs-path "~/models"))
+(def input-file "/tmp/input-for-models.pid")
 
 (defn models []
   (map str (fs/glob model-dir "*.gguf"))
@@ -34,38 +35,32 @@
   )
 
 
-(defn pid-path [s]
-  (str "/tmp/" s ".pid"))
-
-(defn pid-running? [s]
-  (fs/exists? (pid-path s) )
-  )
-
-(defn pid-file [s]
-  (let [path (pid-path s)]
-    ;;exist means exit. ignore multiple times create
-    (when-not (pid-running? s)
-      (fs/create-file path))
-    (fs/delete-on-exit path)
-    ;;indeed work
-    ;(Thread/sleep 1000)
+(defn run-model []
+  (let [_ (touch input-file)]
+    (with-open [i (clojure.java.io/input-stream input-file)]
+      (let [xs (->> (models)
+                    (remove pid-running?))
+            m (choose (models) 10)]
+        (println m)
+        (proc/shell {:in i} (->model-cmd m))
+        (thread!
+         (async-fn (fn [x]
+                     (println x)) (->ch *in*)))
+        @(promise))
+      )
     ))
 
+(defn capture-stdin []
 
-(defn run-model []
-  (let [xs (->> (models)
-                (remove pid-running?)
-                )
-        m (choose (models) 1)]
-    (->ch "/tmp/input-for-models.pid")
-    (proc/process {:in :inherit :out :inherit
-                   :continue true } (->model-cmd m))
-    (thread!
-      (async-fn (fn [x]
-                  ))
-      )
-    @(promise)
-    )
+  ;;hijack *in*
+  (thread!
+   (async-fn (fn [x]
+               (println "got" x)
+               (println "count:" (count x))) (->ch *in*)))
+
+  (binding [*in* (clojure.java.io/input-stream input-file)]
+    @(promise))
+
   )
 
 

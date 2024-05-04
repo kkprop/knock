@@ -28,7 +28,9 @@
 (defn osx?[] (= os-name "Mac OS X"))
 
 (declare force-str force-int cur-time-str)
-(declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!)
+(declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
+         file-name ext-name
+         )
 
 (defn uuid []
   (java.util.UUID/randomUUID)
@@ -44,11 +46,6 @@
 (defn run-cmd [& cmd]
   (sh "sh" "-c" (apply join-cmd cmd))
   )
-
-(defn run-shell [& cmd]
-  (proc/shell (apply join-cmd cmd) )
-  )
-(run-shell "ls" "-lh")
 
 (defn to-path-cmd [path & cmd]
   (sh "sh" "-c" (apply join-cmd "cd " path "&&" cmd)))
@@ -180,6 +177,10 @@
       (close! c))
     c))
 
+(defn tail-f [path]
+  (->ch (:out (proc/process "tail -n0 -F " path)))
+  )
+
 (defn pipeline-demo [n data f]
   (let [out (chan)
         log (chan 10)
@@ -235,6 +236,15 @@
 ;(alias 'async 'clojure.core.async)
 
 (def count-down "bb -e '(doseq [x (range (apply + (->> *command-line-args* (map #(Long/parseLong %)))))] (println x) (Thread/sleep 1000))' 3")
+
+(defn count-print [n]
+  (->> (range n)
+       (map (fn [x]
+              (println x)
+              (Thread/sleep 1000)))
+       count))
+
+
 ;;async run return the hashmap including
 ;; :proc process information
 ;; :out the stream
@@ -249,9 +259,62 @@
         {:keys [out proc cmd]} m]
     ;;collecting log
     (async-fn #(spit-line log %) (->ch out))
-    m
+    m))
+
+
+(defn call-context [f & args]
+  {:id (str (:name (var-meta f)) "-" (md5-uuid (str/join " " args)))})
+
+(def tasks (atom {}))
+
+;;if not running start the function
+;;if running, return the context and progress of running 
+(defn call [f & args]
+  (let [{:keys [id]} (apply call-context f args)
+        t (get @tasks id)]
+    (if (nil? t)
+      (let [t (apply call! f args)]
+        (swap! tasks merge {id t})
+        (-> t
+            (dissoc :res)
+            (assoc :status "running"))
+        )
+      ;;
+      (let [{:keys [res id]} t]
+        (if (realized? res)
+          (do
+            ;;remove the task record for not blocking next call
+            (swap! tasks dissoc id)
+            (assoc t :res @res))
+          (-> t
+              (dissoc :res)
+              (assoc :status "running")))))))
+
+;;start the function 
+(defn- call! [f & args]
+  (let [{:keys [id]} (apply call-context f args)
+        log (join-path "/tmp" (str id ".tmp"))
+        res (promise)]
+    (thread!
+     (binding [*out* (java.io.FileWriter. log)]
+       (let [x (apply f args)]
+         (deliver res x)
+         x)))
+
+    {;; a log file in the /tmp/
+     :log log
+     :id id
+     ;;async return using @ to dref the result 
+     :res res}
+;;
     ))
 
+(comment
+  (def x
+    (call count-print 10)
+    )
+  ;;
+  )
 
 (def count-down! (partial run! count-down))
 
@@ -317,11 +380,11 @@
 ;; get all the command string of shell
 (defmacro make-shell-fn [name & default-args]
   (let [fname (symbol (force-str name))
-        args (symbol "args")]
+        args  (symbol "args")]
     `(defn ~fname [& ~args]
        (str/trim-newline
-        (:out
-         (apply (partial run-cmd ~name) ~@default-args ~args))))))
+         (:out
+          (apply (partial run-cmd ~name) ~@default-args ~args))))))
 
 
 (make-shell-fn "basename")
@@ -333,6 +396,7 @@
 (make-shell-fn :ls )
 (make-shell-fn :readlink)
 (make-shell-fn :clear)
+(make-shell-fn :touch)
 
 
 (def work-dir
@@ -443,10 +507,24 @@
 
 (defn force-int [s]
   (if (string? s) (parse-int s) s))
-;(defn show-members[c]
-;  (let [detail (:members (cr/reflect c))]
-;
-;    c))
+
+(defmacro bb-version-deps-fn [version]
+  (let [ok? (< -1 (compare (System/getProperty "babashka.version") version))]
+    (when ok? 
+      `(defn show-members[c]
+         (let [detail (:members (clojure.reflect/reflect c))]
+           (clojure.pprint/print-table [:name :type :flags] (sort-by :name detail))
+        c))
+      )
+    )
+  )
+
+(bb-version-deps-fn "1.3.187")
+(comment
+
+  (show-members (java.io.File. "foo"))
+
+  )
 
 (defn ->int[s]
   (re-seq #"\d+" s)
@@ -2184,6 +2262,23 @@
      )
    ))
 
+
+(defn pid-path [s]
+  (str "/tmp/" s ".pid"))
+(defn pid-running? [s]
+  (fs/exists? (pid-path s) )
+  )
+;;a temporary file will be deleted when process exit
+(defn pid-file [s]
+  (let [path (pid-path s)]
+    ;;exist means exit. ignore multiple times create
+    (when-not (pid-running? s)
+      (fs/create-file path))
+    (fs/delete-on-exit path)
+    ;;indeed work, may try with a delay
+                                        ;(Thread/sleep 1000)
+    ))
+
 (defn md5-uuid [s]
   (let [md5 (java.security.MessageDigest/getInstance "MD5")
         encoder (java.util.Base64/getEncoder)
@@ -2220,7 +2315,8 @@
        )
       )))
 
-
+(defn path->id [path]
+  (file-name (basename path)))
 
 ;;appoint fields to-search
 ;;appoint field(s) to choose

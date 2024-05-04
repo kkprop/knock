@@ -72,5 +72,6 @@
 
   chop (u/pp (block/->phrase 2 (block/->units (str/join *command-line-args*))))
   run-model (chat/run-model)
+  st (chat/capture-stdin)
 
   }}
