@@ -36,19 +36,17 @@
 
 
 (defn run-model []
-  (let [_ (touch input-file)]
-    (with-open [i (clojure.java.io/input-stream input-file)]
-      (let [xs (->> (models)
-                    (remove pid-running?))
-            m (choose (models) 10)]
-        (println m)
-        (proc/shell {:in i} (->model-cmd m))
-        (thread!
-         (async-fn (fn [x]
-                     (println x)) (->ch *in*)))
-        @(promise))
-      )
-    ))
+  (let [_ (touch input-file)
+        old *in*]
+    (with-open [rdr (clojure.java.io/reader input-file)]
+      (binding [*in* rdr]
+        (let [xs (->> (models)
+                      (remove pid-running?))
+              m (choose (models) 10)]
+          (println m)
+          (proc/shell {:in rdr} (->model-cmd m))
+          ;(thread! (async-fn (fn [x] (println x)) (->ch *in*)))
+          @(promise))))))
 
 (defn capture-stdin []
   (let [_ (touch input-file)
@@ -57,18 +55,9 @@
       (binding [*in* r]
         ;;hijack *in*
         ;(thread! (async-fn (fn [x] (println "got" x) (println "count:" (count x))) (->ch *in*)))
-        (thread!
-         (async-fn (fn [x]
-                     (println "old input got" x))
-                   (->ch old)))
-
-        (thread!
-         (println "try read line")
-         (loop []
-           (let [x (read-line)]
-             (println "got" x)
-             )
-           ))
+        ;(thread! (async-fn (fn [x] (println "old input got" x)) (->ch old)))
+        ;;ok to keep reading now 
+        (thread! (println "try read line") (while true (when-let [x (read-line)] (println "got" x)) (Thread/sleep 100)))
         @(promise)))))
 
 (comment
