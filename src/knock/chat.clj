@@ -51,18 +51,25 @@
     ))
 
 (defn capture-stdin []
+  (let [_ (touch input-file)
+        old *in*]
+    (with-open [r (clojure.java.io/reader input-file)]
+      (binding [*in* r]
+        ;;hijack *in*
+        ;(thread! (async-fn (fn [x] (println "got" x) (println "count:" (count x))) (->ch *in*)))
+        (thread!
+         (async-fn (fn [x]
+                     (println "old input got" x))
+                   (->ch old)))
 
-  ;;hijack *in*
-  (thread!
-   (async-fn (fn [x]
-               (println "got" x)
-               (println "count:" (count x))) (->ch *in*)))
-
-  (binding [*in* (clojure.java.io/input-stream input-file)]
-    @(promise))
-
-  )
-
+        (thread!
+         (println "try read line")
+         (loop []
+           (let [x (read-line)]
+             (println "got" x)
+             )
+           ))
+        @(promise)))))
 
 (comment
   (pid-file "gguf")

@@ -29,7 +29,7 @@
 
 (declare force-str force-int cur-time-str)
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
-         file-name ext-name
+         file-name ext-name var-meta
          )
 
 (defn uuid []
@@ -267,31 +267,8 @@
 
 (def tasks (atom {}))
 
-;;if not running start the function
-;;if running, return the context and progress of running 
-(defn call [f & args]
-  (let [{:keys [id]} (apply call-context f args)
-        t (get @tasks id)]
-    (if (nil? t)
-      (let [t (apply call! f args)]
-        (swap! tasks merge {id t})
-        (-> t
-            (dissoc :res)
-            (assoc :status "running"))
-        )
-      ;;
-      (let [{:keys [res id]} t]
-        (if (realized? res)
-          (do
-            ;;remove the task record for not blocking next call
-            (swap! tasks dissoc id)
-            (assoc t :res @res))
-          (-> t
-              (dissoc :res)
-              (assoc :status "running")))))))
-
 ;;start the function 
-(defn- call! [f & args]
+(defn- call [f & args]
   (let [{:keys [id]} (apply call-context f args)
         log (join-path "/tmp" (str id ".tmp"))
         res (promise)]
@@ -309,9 +286,33 @@
 ;;
     ))
 
+;;if not running start the function
+;;if running, return the context and progress of running 
+;; when running return the status
+(defn call! [f & args]
+  (let [{:keys [id]} (apply call-context f args)
+        t (get @tasks id)]
+    (if (nil? t)
+      (let [t (apply call f args)]
+        (swap! tasks merge {id t})
+        (-> t
+            (dissoc :res)
+            (assoc :status "running"))
+        )
+      ;;
+      (let [{:keys [res id]} t]
+        (if (realized? res)
+          (do
+            ;;remove the task record for not blocking next call
+            (swap! tasks dissoc id)
+            (assoc t :res @res))
+          (-> t
+              (dissoc :res)
+              (assoc :status "running")))))))
+
 (comment
   (def x
-    (call count-print 10)
+    (call! count-print 10)
     )
   ;;
   )
