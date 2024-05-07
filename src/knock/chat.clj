@@ -2,6 +2,7 @@
   (:require [knock.utils :refer :all]
             [babashka.curl :as curl]
             [knock.tui :refer :all]
+            [clojure.string :as str]
             [babashka.process :as proc]
             [babashka.fs :as fs]))
 
@@ -34,31 +35,29 @@
            )
   )
 
+(defn send-text [id & xs]
+  (run-cmd "tmux send-keys" id "'" (str/join " " xs) "'")
+  )
+
+(defn send-keys [id & xs]
+  (apply run-cmd "tmux send-keys" id xs))
+
 
 (defn run-model []
-  (let [_ (touch input-file)
-        old *in*]
-    (with-open [rdr (clojure.java.io/reader input-file)]
-      (binding []
-        (let [xs (->> (models)
-                      (remove pid-running?))
-              m (choose (models) 10)]
-          ;(println m)
-          (thread!
-           (proc/shell (->model-cmd m)))
-          ;(thread! (async-fn (fn [x] (println "got " x "len:" (count x))) (->ch *in*)))
-          ;(thread! (println "try read line") (while true (when-let [x (read-line)] (println "got" x " len:" (count x))) (Thread/sleep 100)))
-          (thread!
-            (println "try")
-            (Thread/sleep 5000)
-            (proc/shell "expect -c 'send -- \\x03'")
-            (proc/shell "expect -c 'send -- \\x03'")
-            (println "stop here"))
-          (thread! (Thread/sleep 6000)
-                   (proc/shell "expect -c 'send -- \"什么是时间\r\n\"'")
-                   (proc/shell "expect -c 'send -- \"什么是空间\r\n\"'")
-                   )
-          @(promise))))))
+  (let [_ (touch input-file)]
+    (let [xs (->> (models)
+                  (remove pid-running?))
+          m (choose (models) 10)]
+      (thread! (proc/shell (str "tmux new-session -s dc "
+                                    (str "\"" (->model-cmd m) "\""))))
+      (thread!
+        (async-fn (fn [x]
+                    (println "send" x)
+                    (send-text "dc" x)
+                    (send-keys "dc" "Enter")))
+        (tail-f input-file)
+        )
+      @(promise))))
 
 (defn capture-stdin []
   (let [_ (touch input-file)
@@ -67,30 +66,9 @@
       (binding []
         ;;hijack *in*
         ;(thread! (async-fn (fn [x] (println "got" x) (println "count:" (count x))) (->ch *in*)))
-        ;(thread! (async-fn (fn [x] (println "old input got" x)) (->ch old)))
-        ;;ok to keep reading now 
-        ;(thread! (println "try read line") (while true (when-let [x (read-line)] (println "got" x " len:" (count x))) ;(println 'sleeping) (Thread/sleep 100)))
-        ;(thread! (proc/shell "gum" "confirm"))
-        (thread! (choose [:a :b]))
-        (thread! (Thread/sleep 1000) (proc/shell "expect -c 'send -- \"\\x03\"'") (println "send c-c"))
-        (thread! (Thread/sleep 200) (proc/shell "expect -c 'send -- \033\\[B'"))
-        ;(thread! (Thread/sleep 200) (proc/shell "expect -c 'send -- 什么是时间ha? \n'"))
-        ;(thread! (Thread/sleep 200) (proc/shell "expect -c 'send --  \"\n什么是时间? \n\"'"))
+        (thread! (proc/shell "tmux new-session -d -s dc "))
+        (thread! (Thread/sleep 1000) (proc/shell "tmux send-keys -t dc Enter"))
         @(promise)))))
-
-(defn ww []
-  ;;^C
-  (spit input-file (str (char 3)) :append true)
-  ;;^L
-  (spit input-file (str (char 12)) :append true)
-  ;;^M return 
-  (spit input-file (str (char 13)) :append true)
-  (spit input-file (str (char 0x50)) :append true)
-  (spit input-file (str "^[[B") :append true)
-  (proc/shell "expect -c 'send -- \n'" )
-  (spit input-file (str "what is time? \n" \return \/) :append true)
-  ;;
-  )
 
 (comment
   (pid-file "gguf")

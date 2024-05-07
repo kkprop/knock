@@ -265,7 +265,7 @@
 (defn call-context [f & args]
   {:id (str (:name (var-meta f)) "-" (md5-uuid (str/join " " args)))})
 
-(def tasks (atom {}))
+(def call-tasks (atom {}))
 
 ;;start the function 
 (defn- call [f & args]
@@ -291,10 +291,10 @@
 ;; when running return the status
 (defn call! [f & args]
   (let [{:keys [id]} (apply call-context f args)
-        t (get @tasks id)]
+        t (get @call-tasks id)]
     (if (nil? t)
       (let [t (apply call f args)]
-        (swap! tasks merge {id t})
+        (swap! call-tasks merge {id t})
         (-> t
             (dissoc :res)
             (assoc :status "running"))
@@ -304,7 +304,7 @@
         (if (realized? res)
           (do
             ;;remove the task record for not blocking next call
-            (swap! tasks dissoc id)
+            (swap! call-tasks dissoc id)
             (assoc t :res @res))
           (-> t
               (dissoc :res)
@@ -1911,9 +1911,14 @@
                  (str dir (:name fm) ".edn")
                ;;(str dir (:name fm) "/" (str/join "-" (map force-str args)) ".edn")
                  (str dir (:name fm) "/"
-                      (if (< 200 (count (str args)))
+                      (if (or (str/includes? (str args) ":")
+                              (< 200 (count (str args))))
                         (md5-uuid (str/join " " (map force-str args)))
-                        (str/join "-" (map force-str args))) ".edn"))
+                        (str/join "-" (map force-str args))
+                        )
+                      ".edn"
+                      )
+                 )
           t (cur-time-str "yyyy-MM-dd-hh:mm:ss.SSS")
           tmp-path (str path "." t)]
       {:fm fm
@@ -1941,23 +1946,28 @@
         ;; when failed try call function again and cache
                 (catch Exception e
                   (let [res (apply f args)
-                        _ (println 'failed 'load-edn path "check the reader of this edn"
+                        _ (println "failed load-edn" path "check the reader of this edn"
                                    e)
                         _ (fs/delete-if-exists path)]
+                    ;;problem: this one is not a symbol link
                     (binding [*print-meta* true]
-                      (clojure.pprint/pprint
-                       (if (instance? clojure.lang.IFn res)
-                         (with-meta res {:update-time (cur-time-str) :ts (cur-ts)})
-                         res)
-                       (clojure.java.io/writer path))))))
+                      (spit path
+                            (pr-str
+                              (if (instance? clojure.lang.IFn res)
+                                (with-meta res {;:update-time (cur-time-str)
+                                                :ts (cur-ts)})
+                                res)
+                              ))))))
               (let [res (apply f args)
                     _ (clean-file tmp-path)]
                 (binding [*print-meta* true]
-                  (clojure.pprint/pprint
-                   (if (instance? clojure.lang.IFn res)
-                     (with-meta res {:update-time (cur-time-str) :ts (cur-ts)})
-                     res)
-                   (clojure.java.io/writer tmp-path)))
+                  (spit tmp-path
+                        (pr-str
+                          (if (instance? clojure.lang.IFn res)
+                            (with-meta res {;:update-time (cur-time-str)
+                                            :ts (cur-ts)})
+                            res)
+                          )))
                 (fs/delete-if-exists path)
                 (fs/create-sym-link (fs/absolutize path) (fs/absolutize tmp-path))
                 res)
