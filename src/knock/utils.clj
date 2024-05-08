@@ -47,6 +47,14 @@
   (sh "sh" "-c" (apply join-cmd cmd))
   )
 
+(defn run-cmd! [& cmd]
+  (:out (apply run-cmd cmd))
+  )
+
+(defn run-shell [& cmd]
+  (proc/shell (apply join-cmd cmd) )
+  )
+
 (defn to-path-cmd [path & cmd]
   (sh "sh" "-c" (apply join-cmd "cd " path "&&" cmd)))
 
