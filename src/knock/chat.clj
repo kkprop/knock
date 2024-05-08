@@ -68,6 +68,16 @@
   (run-cmd :echo s ">>" input-file)
   )
 
+(defn clipboard-prompt []
+  (loop [prev nil]
+    (let [cur (run-cmd! :pbpaste)]
+      (if (= cur prev)
+        (Thread/sleep 100)
+        (do
+          (println "send")
+          (prompt cur)))
+      (recur cur))))
+
 (defn capture-stdin []
   (let [_ (touch input-file)
         old *in*]
@@ -82,6 +92,7 @@
   (prompt "what is space?")
   (prompt "什么是时间？なに")
   (prompt "如何提升跑步配速？なに")
+
 
   (pid-file "gguf")
 
