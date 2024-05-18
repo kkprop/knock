@@ -40,19 +40,16 @@
                 basename
                 file-name
                 (str/replace "." "-")
-                (str "-gpt")
-                )]
+                (str "-gpt"))]
       (thread! (run-shell "tmux new-session -s" w (str "\"" (->model-cmd m) "\"")))
       (thread!
        (async-fn (fn [x]
                    (println x)
                    ;;check last character > ? 
-                   (when (not= ">\n" (:out (run-cmd "tmux capture-pane -t" w "-p | tail -n 1")))
-                     (send-keys w "c-c")
-                     )
+                   (when-not (str/starts-with? (:out (run-cmd "tmux capture-pane -t" w "-p | tail -n 1")) ">")
+                     (send-keys w "c-c"))
                    (send-text w x)
-                   (send-keys w "Enter")
-                   )
+                   (send-keys w "Enter"))
                  (tail-f input-file)))
       @(promise))))
 
@@ -60,9 +57,12 @@
   (let [xs (str/split-lines (run-cmd! :tmux "list-windows -a"))]
     (->> xs
          (map #(first (str/split % #":")))
-         (filter #(str/ends-with? % "-gpt"))
-         )
-    ))
+         (filter #(str/ends-with? % "-gpt")))))
+
+(defn suffix []
+  (first
+   (slurp-yaml "resources/ask-suffix.yaml"))
+  )
 
 (defn prompt [s]
   (run-cmd :echo s ">>" input-file)
@@ -74,7 +74,7 @@
       (if (= cur prev)
         (Thread/sleep 100)
         (do
-          (println "send")
+          (println (cur-time-str) " sent:" cur)
           (prompt cur)))
       (recur cur))))
 

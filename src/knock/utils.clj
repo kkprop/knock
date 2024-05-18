@@ -27,7 +27,7 @@
 
 (defn osx?[] (= os-name "Mac OS X"))
 
-(declare force-str force-int cur-time-str)
+(declare force-str force-int cur-time-str ->keyword)
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
          file-name ext-name var-meta
          )
@@ -49,6 +49,30 @@
 
 (defn run-cmd! [& cmd]
   (:out (apply run-cmd cmd))
+  )
+
+;; seperator : to split key value -> a hash map
+(defn run-cmd!! [& cmd]
+  (->>
+    (str/split-lines 
+      (:out (apply run-cmd cmd))
+      )
+    (map #(str/split % #":" 2))
+    (remove #(= 1 (count %)))
+    (map (fn [[k v]]
+           (let [kk (-> (re-seq #"\*\s+(.*)" k)
+                        first
+                        second 
+                        )
+                 ]
+             (when-not (nil? kk)
+               {(->keyword (str/replace kk " " "-")) v}
+               )
+             )
+           )
+         )
+    (apply merge)
+    )
   )
 
 (defn run-shell [& cmd]
@@ -214,6 +238,7 @@
 ;; go! is actually go, but wont bother to do require
 (defmacro go! [& xs] `(go ~@xs))
 (defmacro thread! [& xs] `(thread ~@xs))
+(defmacro to-chan! [& xs] `(to-chan ~@xs))
 
 
 ;;TODO local server
@@ -361,13 +386,18 @@
      (doseq [x xs] (deliver (:res x) x)))
     ;;block and wait
     (doseq [x xs]
-      @(:res x))
+      @(:res x)
+      )
     ;;do the something to finalize maybe
 
     ))
 
 (comment
-  (let [xs (->> (range 3) (map #(run! count-down %)))]
+  (def args [count-down])
+
+  (let [xs (->> (range 3) (map #(run!
+                                  count-down
+                                  %)))]
     (cc-run xs)
     )
 
@@ -397,9 +427,9 @@
 
 
 (make-shell-fn "basename")
-(make-shell-fn :dirname)
 (make-shell-fn "openssl")
 (make-shell-fn "base64")
+(make-shell-fn :dirname)
 (make-shell-fn "curl")
 (make-shell-fn "grep")
 (make-shell-fn :ls )
@@ -880,6 +910,13 @@
 ;;slurp but using line-seq 
 (defn slurp-lines [f]
   (line-seq (clojure.java.io/reader f)))
+
+;;slurp but remove comment, start with #
+(defn slurp-lines! [f]
+  (->> (slurp-lines f)
+       (remove #(str/starts-with? % "#" ))
+       )
+  )
 
 (defn slurp-yaml [f]
   (yaml/parse-string (slurp f)))
@@ -2616,6 +2653,12 @@
 
   (alias :main "git checkout main")
   (alias :master "git checkout master")
+
+  (def c
+    (tail-f "/tmp/reboot.edn"))
+
+
+  (async-fn #(println "trying: login" %) c )
   ;;
   )
 
