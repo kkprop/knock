@@ -2662,3 +2662,51 @@
   ;;
   )
 
+
+
+(defn trim-leading [a b s]
+  ;;a string 0 or * to be trimmed
+  ;;b string only one to be trimmed
+  (let [p0 (re-pattern (str b "(.*)"))
+        p1 (re-pattern (str "(" a "*" ")"
+                            b "(.*)"))
+        xs (re-find p1 s)]
+    (when-let [[_ trimmed res] (if (nil? xs)
+                                 (re-find p0 s)
+                                 xs)]
+      {:count (count trimmed)
+       :res res})))
+
+(def trim-md (partial trim-leading "\\s" "- "))
+
+(defn parse-md [lines]
+  (let [xs (remove nil? (map trim-md (reverse lines)))]
+    (loop [xs xs
+           prev {:count nil :res ""}
+           block '()
+           result '()]
+      (if (empty? xs)
+        (cons block result)
+        (let [{:keys [count res] :as cur} (first xs)]
+          (println res block result "..." count (:count prev))
+          (if (nil? res)
+            (cons block result)
+            (cond
+              (nil? (:count prev)) (recur (rest xs) cur
+                                          (cons res block)
+                                          result)
+              (= count (:count prev)) (recur (rest xs) cur
+                                             (cons res block)
+                                             result)
+              (> count (:count prev)) (recur (rest xs) cur
+                                             (list res)
+                                             (cons block result))
+              :else (recur (rest xs) cur
+                           (cons res (list block))
+                           result))
+
+;;
+            ))))))
+
+(defn parse-md-file [f]
+  (parse-md (slurp-lines f)))

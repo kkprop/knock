@@ -50,8 +50,13 @@
                      (send-keys w "c-c"))
                    (send-text w x)
                    (send-keys w "Enter"))
-                 (tail-f input-file)))
+                 (tail-f input-file)
+                 ))
       @(promise))))
+
+(comment
+  (parse-md-file "resources/ask-suffix.yaml")
+  )
 
 (defn all-gpt-tmux []
   (let [xs (str/split-lines (run-cmd! :tmux "list-windows -a"))]
@@ -59,10 +64,7 @@
          (map #(first (str/split % #":")))
          (filter #(str/ends-with? % "-gpt")))))
 
-(defn suffix []
-  (first
-   (slurp-yaml "resources/ask-suffix.yaml"))
-  )
+
 
 (defn prompt [s]
   (run-cmd :echo s ">>" input-file)
