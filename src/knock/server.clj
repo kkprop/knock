@@ -150,7 +150,8 @@
                       (call-fn f body))})
         (make-body {:error "api not found"
                     :matches xs}))
-      (make-body {:result  "token denied"} {:status 403}))))
+      (make-body {:result  "token denied"} {:status 403}))
+    ))
 
 (defn run-ns [{:keys [ip port
                       tokens] :or {ip "127.0.0.1"} :as opts} & namespaces]

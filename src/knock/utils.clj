@@ -24,7 +24,6 @@
    [clojure.walk :as walk]))
 
 (def os-name (System/getProperty "os.name"))
-
 (defn osx?[] (= os-name "Mac OS X"))
 
 (declare force-str force-int cur-time-str ->keyword)
@@ -454,6 +453,30 @@
   (str/trim-newline
    (:out (run-cmd :echo s "| base64 -d"))))
 
+
+(defn enc [password s]
+  (let [path (tmp-file s)
+        out (str/trim (run-cmd! "openssl enc -aes128 -pbkdf2 -a -e -k" password "-in" path))
+        ]
+    (fs/delete-if-exists path)
+    out
+    )
+  )
+
+(defn dec [password s]
+  (let [path (tmp-file s)
+        out (run-cmd! :openssl  "enc -aes128 -pbkdf2 -a -d -k" password "-in" path)
+        ]
+    (fs/delete-if-exists path)
+    (apply str (drop-last out))
+    )
+  )
+
+(comment
+  (dec "PASSWORD"
+    (enc "PASSWORD" "abc\n")
+    )
+  )
 
 
 (defn file-ext [s]
