@@ -88,6 +88,15 @@
        (future-cancel fut))
     ret))
 
+(defn timeout-eval [seconds f & args]
+  (let [fut (future (apply f args))
+        ret (deref fut (* 1000 seconds) :timeout)
+        ]
+    (when (= ret :timeout)
+      (future-cancel fut))
+    ret)
+    )
+
 (def pp clojure.pprint/pprint)
 
 (defn mpp [& args]
