@@ -355,6 +355,8 @@
   (def x
     (call! count-print 10)
     )
+
+  (def x (proc/shell count-down 100))
   ;;
   )
 
@@ -561,6 +563,20 @@
   (openssl "x509 -in" path "-text | grep 'CA Issuers - URI' |awk -FURI: '{print $2}' | xargs curl -s | openssl x509 -inform DER")
   )
 
+(defn dns [path]
+  (let [raw (split-by
+              (run-cmd! :openssl "x509 -noout -text -in " path "|grep DNS")
+              ",")
+        xs  (->> raw (mapcat #(re-seq #".*DNS:(.*)" %))
+                (map second)
+                )
+        ]
+    (if (some true? (map #(str/starts-with? % "*" ) xs))
+      (->> xs (filter #(str/starts-with? % "*")) first)
+      (first xs)
+      )
+    )
+  )
 
 
 ;;pure sequentially list a directory
