@@ -28,7 +28,7 @@
 
 (declare force-str force-int cur-time-str ->keyword)
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
-         file-name ext-name var-meta
+         file-name ext-name var-meta async-fn tail-f
          )
 
 (defn uuid []
@@ -77,6 +77,8 @@
 (defn run-shell [& cmd]
   (proc/shell (apply join-cmd cmd) )
   )
+
+(defn ->stdout! [f] (async-fn #(println %) (tail-f f)))
 
 (defn to-path-cmd [path & cmd]
   (sh "sh" "-c" (apply join-cmd "cd " path "&&" cmd)))
@@ -300,7 +302,33 @@
         {:keys [out proc cmd]} m]
     ;;collecting log
     (async-fn #(spit-line log %) (->ch out))
-    m))
+    m
+    ))
+
+;;run after the promise realized means preparation done
+(defn run-after! [p & args]
+  (let [log                    (tmp-file (str/join " " args))
+        m                      {:cmd args
+                                :log log
+                                :res (promise)
+                                ;;a promise when process started
+                                ;; deliver an m with :proc point to running process
+                                :started (promise)
+                                }
+        ]
+    (thread!
+      ;;wait for the preparation promise from outside
+      @p
+      (let [{:keys [out cmd proc]
+             :as cur-proc} (proc/process "sh -c" (apply join-cmd args))]
+        ;;collecting stdout to log
+        (async-fn #(spit-line log %) (->ch out))
+        (deliver (:started m) (-> m (dissoc :started) (assoc :proc proc) ) )
+        )
+      )
+    m
+    )
+  )
 
 
 (defn call-context [f & args]
@@ -412,6 +440,16 @@
     )
 
   (run! count-down 1)
+
+  (def p (promise))
+
+  (thread! (Thread/sleep 3)
+           (deliver p nil)
+           )
+
+  (def t (run-after! p count-down 1))
+
+  @(:started t)
   ;;
   )
 
@@ -827,6 +865,14 @@
 (defn jstr->edn [s] (json/parse-string s true))
 (def jstr-to-edn jstr->edn)
 
+;;ignore failed
+(defn jstr->edn! [s]
+  (try
+    (jstr->edn s)
+    (catch Exception e
+      nil)
+    )
+  )
 ;; Provider information loading
 (defn load-json-conf [name] (parse-string (slurp (format "resources/conf/%s.json" name))))
 
@@ -2392,6 +2438,13 @@
         ]
     (java.util.UUID. (.getLong bb) (.getLong bb))))
 
+;;do spit, but return the file path
+(defn spit! [f content & options]
+  (let [_ (apply spit f content options)]
+    f
+    )
+  )
+
 ;;use (parital you-actual-function) to suppress evaluation when the cache already exist
 (defn tmp-file [s-or-fn & {:keys [dir uuid ext]
                            :or {dir "/tmp/"
@@ -2411,9 +2464,11 @@
     (if (and (fs/exists? f) (< 2 (fs/size f)))
       f
       (let []
-       (spit f (if (fn? s-or-fn)
+       (spit f
+             (if (fn? s-or-fn)
                  (s-or-fn)
-                 s-or-fn))
+                 s-or-fn)
+             )
        (spit f "\n" :append true)
        f
        )
