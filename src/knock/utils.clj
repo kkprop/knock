@@ -235,14 +235,13 @@
 
     (go-loop [] (when-some [line (<! log)] (println line) (recur)))
     (pipeline-async n out task data)
-    (time (<!! (async/into
-                  [] out)))))
+    (time (<!! (async/into [] out)))))
 
 (defn async-fn [f c]
   (go-loop [] (when-some [xs (<! c)]
                   (f xs)
-                  (recur)
-                  )))
+                  (recur))))
+
 
 ;; hope not have to require async fns everytime
 ;; go! is actually go, but wont bother to do require
@@ -259,7 +258,19 @@
 
     ))
 
+
+
 (comment
+
+  (def c (to-chan! [1 2 nil 3]))
+
+  (pipeline-demo 3 #(println %) )
+
+  (async-fn #(println %) c)
+  @(chan-worker!! #(doall (println %))
+                  (to-chan (range 3)))
+
+
 
   (go!! println 'hi)
 
@@ -378,6 +389,44 @@
           (-> t
               (dissoc :res)
               (assoc :status "running")))))))
+
+;;call f on each element of coll
+(defn worker! [f coll]
+  (let [p (promise)
+        c (to-chan coll)
+        ]
+    (go-loop []
+      (if-some [x (<!! c)]
+        (do (f x) (recur))
+        (deliver p nil)
+        )
+      )
+    p
+    ))
+
+;;wait util all worker completed
+(defn pipeline!! [n f coll]
+  (let [c-count (count coll)
+        per (quot c-count n)
+        xs (partition-all per coll)
+        ps (map #(worker! f %) xs)
+        ]
+    (doseq [x ps]
+      @x
+      )
+    )
+  )
+
+(comment
+  (partition-all 3 (range 10))
+
+  ;;3 worker. each print wi
+  (pipeline!! 3 #(do (println %)
+                     (Thread/sleep 100)
+                     ) (range 10)
+              )
+
+  )
 
 (comment
   (def x
@@ -873,6 +922,48 @@
       nil)
     )
   )
+
+
+(defn object? [x]
+  (instance? clojure.lang.IFn x))
+
+;; string of json, edn, parsed to be edn 
+(defn ->edn [s]
+  (let [x (jstr->edn! s)]
+    (if (nil? x)
+      (e s)
+      x
+      )
+    )
+  )
+
+(defn ->hash-map [k-xs v-xs]
+  (->> v-xs
+       (map #(zipmap k-xs %))
+       ))
+
+(defn name-xs [k xs]
+  (->> xs
+       (map #(zipmap
+               (if (sequential? k)
+                 k
+                 ;;compliance with zipmap
+                 [k]
+                 )
+               %))))
+
+(comment 
+  (->hash-map ["a" "b" "c"] [[1 2 3] [4 5 6]])
+
+  (name-xs :ip ["127.0.0.1" "192.168.1.1"] )
+  (name-xs [:ip :count] [["127.0.0.1" 1] ["192.168.1.1" 2]] )
+
+  (->edn "{:a :b}c")
+  (->edn "{\"a\": 1}")
+
+  )
+
+
 ;; Provider information loading
 (defn load-json-conf [name] (parse-string (slurp (format "resources/conf/%s.json" name))))
 
@@ -1380,7 +1471,11 @@
        ))
 
 (defn rename [m k new-k]
-  (dissoc (assoc m new-k (k m)) k))
+  (if (nil? (k m))
+    ;;already nil. do nothing
+    m
+    (dissoc (assoc m new-k (k m)) k))
+  )
 
 (defn flatten-hashmap
   ([m]
@@ -2033,8 +2128,12 @@
                                  :or {key :update-time}}]
   (assoc-time x-or-xs (cur-time-str)))
 
+
 (comment
-  (assoc-time [{} {} {}] (cur-time-str))
+  (jstr->edn "{}")
+
+  (assoc-time (repeat 3 {}) (cur-time-str))
+  (assoc-cur-time (repeat 3 {}))
   (assoc-time {} (cur-time-str))
   (assoc-time {} (cur-time-str) :key :update-time)
   ;;
@@ -2640,9 +2739,11 @@
   (->> xs
        (map (fn [x] {x k}))))
 
-(defn ->hashmap [m key-key val-key]
-  (->> (seq m)
-       (map (fn [[k v]] {key-key k val-key v}))))
+;; seems not used.
+;;(defn ->hashmap [m key-key val-key]
+;;  (->> (seq m)
+;;       (map (fn [[k v]] {key-key k val-key v}))
+;;       ))
 
 (defn lines-between [s from-s to-s]
   (let [from (str/index-of s from-s)
