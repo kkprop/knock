@@ -394,8 +394,10 @@
 (defn worker! [f coll]
   (let [p (promise)
         ]
+    ;(println "start worker to consume" (count coll))
     (thread!
-      (doseq [x coll] (f x))
+      (doseq [x coll]
+        (f x))
       (deliver p 'done)
       )
     p
@@ -406,7 +408,7 @@
   (let [c-count (count coll)
         per     (quot c-count n)
         xs      (partition-all per coll)
-        ps      (map #(worker! f %) xs)
+        ps      (pmap #(worker! f %) xs)
         ]
     (doseq [x ps]
       @x
@@ -418,10 +420,10 @@
   (partition-all 3 (range 10))
 
   ;;3 worker. each print wi
-  (pipeline!! 3 #(do (println %)
+  (pipeline!! 3 #(do (Thread/sleep 100)
+                     (println %)
                      (Thread/sleep 100)
-                     ) (range 10)
-              )
+                     ) (range 10))
 
   )
 
