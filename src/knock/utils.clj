@@ -393,13 +393,10 @@
 ;;call f on each element of coll
 (defn worker! [f coll]
   (let [p (promise)
-        c (to-chan coll)
         ]
-    (go-loop []
-      (if-some [x (<!! c)]
-        (do (f x) (recur))
-        (deliver p nil)
-        )
+    (thread!
+      (doseq [x coll] (f x))
+      (deliver p 'done)
       )
     p
     ))
@@ -407,9 +404,9 @@
 ;;wait util all worker completed
 (defn pipeline!! [n f coll]
   (let [c-count (count coll)
-        per (quot c-count n)
-        xs (partition-all per coll)
-        ps (map #(worker! f %) xs)
+        per     (quot c-count n)
+        xs      (partition-all per coll)
+        ps      (map #(worker! f %) xs)
         ]
     (doseq [x ps]
       @x
