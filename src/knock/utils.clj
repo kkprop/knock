@@ -407,7 +407,12 @@
 (defn pipeline!! [n f coll]
   (let [c-count (count coll)
         per     (quot c-count n)
-        xs      (partition-all per coll)
+        _ (println "per worker" per)
+        xs      (if (= 0 per)
+                  [coll]
+                  (partition-all per coll)
+                  )
+        _ (println xs)
         ps      (pmap #(worker! f %) xs)
         ]
     (doseq [x ps]
@@ -423,7 +428,7 @@
   (pipeline!! 6 #(do (Thread/sleep 100)
                      (println %)
                      (Thread/sleep 100)
-                     ) (range 10))
+                     ) (range 3))
 
   )
 
