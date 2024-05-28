@@ -420,7 +420,7 @@
   (partition-all 3 (range 10))
 
   ;;3 worker. each print wi
-  (pipeline!! 3 #(do (Thread/sleep 100)
+  (pipeline!! 6 #(do (Thread/sleep 100)
                      (println %)
                      (Thread/sleep 100)
                      ) (range 10))
@@ -943,13 +943,14 @@
 
 (defn name-xs [k xs]
   (->> xs
-       (map #(zipmap
-               (if (sequential? k)
-                 k
+       (map #(if (sequential? k)
+               (zipmap k %)
                  ;;compliance with zipmap
-                 [k]
+               (zipmap [k] [%])
                  )
-               %))))
+               )
+       )
+  )
 
 (comment 
   (->hash-map ["a" "b" "c"] [[1 2 3] [4 5 6]])
@@ -1501,7 +1502,6 @@
          nv
          (cons nv (flatten-hashmap (rest m) xk))))
      {xk m})))
-
 (defn fuzzy-pick-map [m & ks]
   (let [hs (apply hash-set ks)]
     (->> (flatten-hashmap m)
