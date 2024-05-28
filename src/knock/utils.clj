@@ -394,7 +394,7 @@
 (defn worker! [f coll]
   (let [p (promise)
         ]
-    ;(println "start worker to consume" (count coll))
+                                        ;(println "start worker to consume" (count coll))
     (thread!
       (doseq [x coll]
         (f x))
@@ -403,15 +403,18 @@
     p
     ))
 
+(defn partition!! [n coll]
+  (if (= 0 n)
+    (->> coll (map (fn [x] [x])))
+    (partition-all n coll)
+    )
+  )
+
 ;;wait util all worker completed
 (defn pipeline!! [n f coll]
   (let [c-count (count coll)
         per     (quot c-count n)
-        _ (println "per worker" per)
-        xs      (if (= 0 per)
-                  [coll]
-                  (partition-all per coll)
-                  )
+        xs (partition!! per coll)
         _ (println xs)
         ps      (pmap #(worker! f %) xs)
         ]
