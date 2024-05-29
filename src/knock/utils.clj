@@ -392,9 +392,8 @@
 
 ;;call f on each element of coll
 (defn worker! [f coll]
-  (let [p (promise)
-        ]
-                                        ;(println "start worker to consume" (count coll))
+  (let [p (promise)]
+    ;;(println "start worker to consume" (count coll))
     (thread!
       (doseq [x coll]
         (f x))
@@ -418,6 +417,11 @@
         _ (println xs)
         ps      (pmap #(worker! f %) xs)
         ]
+    (thread!
+
+      (filter realized? ps)
+
+      )
     (doseq [x ps]
       @x
       )
@@ -811,6 +815,10 @@
 
 (def fmt-date-str (java.text.SimpleDateFormat. "yyyy-MM-dd"))
 
+(defn ->date-format [s]
+  (java.text.SimpleDateFormat. s)
+  )
+
 (def time-fmts (->> ["MMM dd HH:mm:ss yyyy"
                      "yyyy-MM-dd HH:mm:ss"
                      "yyyy-MM-dd'T'HH:mm:ssXXX" ;2023-10-02T16:56:28+08:00
@@ -938,7 +946,12 @@
 (defn ->edn [s]
   (let [x (jstr->edn! s)]
     (if (nil? x)
-      (e s)
+      (try 
+        (e s)
+        (catch Exception e
+          nil
+          )
+        )
       x
       )
     )
@@ -957,6 +970,36 @@
                (zipmap [k] [%])
                  )
                )
+       )
+  )
+
+;;slurp but using line-seq 
+(defn slurp-lines [f]
+  (line-seq (clojure.java.io/reader f)))
+
+;;slurp but remove comment, start with #
+(defn slurp-lines! [f]
+  (->> (slurp-lines f)
+       (remove #(str/starts-with? % "#" ))
+       )
+  )
+
+
+;;edn or json
+(defn slurp-ej-line [f]
+  (->> (slurp-lines f)
+       (map ->edn)
+       ;;ignore only string 
+       (remove symbol?)
+       (remove nil?)
+       )
+  )
+
+(defn slurp-ej-line! [f]
+  (->> (slurp-lines! f)
+       (map ->edn)
+       (remove symbol?)
+       (remove nil?)
        )
   )
 
@@ -1098,17 +1141,6 @@
                (str s "\n"))]
     (spit f line :append true)
     )
-  )
-
-;;slurp but using line-seq 
-(defn slurp-lines [f]
-  (line-seq (clojure.java.io/reader f)))
-
-;;slurp but remove comment, start with #
-(defn slurp-lines! [f]
-  (->> (slurp-lines f)
-       (remove #(str/starts-with? % "#" ))
-       )
   )
 
 (defn slurp-yaml [f]
