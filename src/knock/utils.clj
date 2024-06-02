@@ -414,7 +414,7 @@
   (let [c-count (count coll)
         per     (quot c-count n)
         xs (partition!! per coll)
-        _ (println xs)
+        ;_ (println xs)
         ps      (pmap #(worker! f %) xs)
         ]
     (thread!
@@ -691,7 +691,11 @@
   (if (str/blank? s) 0 (Long/parseLong (re-find #"\A-?\d+" s))))
 
 (defn force-int [s]
-  (if (string? s) (parse-int s) s))
+  (if (string? s) (parse-int s) s)
+  )
+
+(def int! force-int)
+
 
 (defmacro bb-version-deps-fn [version]
   (let [ok? (< -1 (compare (System/getProperty "babashka.version") version))]
@@ -1136,7 +1140,8 @@
 
 
 (defn spit-line [f s]
-  (let [line (if (str/ends-with? s "\n")
+  (let [s (if (string? s ) s (str s))
+        line (if (str/ends-with? s "\n")
                s
                (str s "\n"))]
     (spit f line :append true)
@@ -1291,6 +1296,15 @@
            ;;an empty line in the end of the fie
            (str (str/join "\n" xs) "\n")
            opts)))
+
+(defn spit-xs! [path xs & opts]
+  (let [res (apply spit-xs path xs opts)
+        ]
+    (when-not (nil? res)
+      (println "writing failed " path " count xs: " (count xs)))
+    path
+    )
+  )
 
 ;;load conf from resources/conf path
 (defn load-conf [name]
