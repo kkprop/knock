@@ -64,9 +64,15 @@
                         second 
                         )
                  ]
-             (when-not (nil? kk)
+             (if-not (nil? kk)
                {(->keyword (str/replace kk " " "-")) v}
+               (if (and (not(empty?  k))
+                        (not(empty?  v)))
+                 {(->keyword k) v}
+                 nil
+                 )
                )
+
              )
            )
          )
@@ -414,7 +420,7 @@
   (let [c-count (count coll)
         per     (quot c-count n)
         xs (partition!! per coll)
-        ;_ (println xs)
+        _ (println (count xs))
         ps      (pmap #(worker! f %) xs)
         ]
     (thread!
@@ -513,6 +519,9 @@
   ;;
   )
 
+(defn range! [n]
+  (range 1 (+ 1 n))
+  )
 
 
 (defn >0-and-lt? [n x]
@@ -924,6 +933,45 @@
       (map #(.format fmt-date-str %))
       ))))
 
+(defn days-left [expire-date]
+  (days-from-now
+    (if (string? expire-date)
+      (->inst expire-date :to-trim " " )
+      expire-date
+      )))
+
+;;define an assoc version of function
+(defmacro ++ [f & args]
+  (let [name+    (symbol (str f "++"))
+        ;;TODO when find the way of got meta of new added function
+                                        ;{:keys[arglists]} (var-meta f)
+        args     (apply vector args)
+        name-key (->keyword(str f))
+        ]
+    `(defn ~name+ [{:keys ~args
+                    :as   m}
+                   ]
+       (assoc m ~name-key (apply ~f ~args))
+       )
+    )
+  )
+
+;;merge ++
+(defmacro m++ [f & args]
+  (let [name+    (symbol (str f "++"))
+        ;;TODO when find the way of got meta of new added function
+                                        ;{:keys[arglists]} (var-meta f)
+        args     (apply vector args)
+        name-key (->keyword(str f))
+        ]
+    `(defn ~name+ [{:keys ~args
+                    :as   m}]
+       (merge m (apply ~f ~args))
+       )
+    )
+  )
+
+(++ days-left expire-date)
 
 
 
@@ -1127,7 +1175,7 @@
                  x)]
 
     (extract-ip
-     (:out (run-cmd "curl" "-s" "-v" (str "https://" domain ":15986 2>&1 | grep Trying")))))
+     (:out (run-cmd "timeout 3 curl" "-s" "-v" (str "https://" domain ":15986 2>&1 | grep Trying")))))
   ;;
   )
 
@@ -1150,6 +1198,10 @@
 
 (defn slurp-yaml [f]
   (yaml/parse-string (slurp f)))
+
+;;multiple yaml
+(defn slurp-yaml! [f]
+  )
 
 (defn ->yaml [m]
   (yaml/generate-string m :dumper-options {:flow-style :block}))
@@ -2378,14 +2430,17 @@
    (curl "-vI" "--resolve" (str domain ":" port ":" ip)
          (str "https://" domain ":" port) "2>&1" "| grep 'expire date' " "| cut -d: -f2- | xargs")))
 (defn precision
-  ([x & {:keys [precision] :or {precision 4}}]
-   (format (str "%." precision "f")
+  ([x & {:keys [keep-digit] :or {keep-digit 2}}]
+   (format (str "%." keep-digit "f")
            (parse-float x)
            )))
 
 (defn percentage
-  ([total numerator & {:keys [precision] :or {precision 4}}]
-   (precision (/  numerator (float total))))
+  ([total numerator & {:keys [keep-digit] :or {keep-digit 2}}]
+   (precision
+     (* 100 
+        (/  numerator (float total))) :keep-digit keep-digit)
+   )
 ;;
   )
 
