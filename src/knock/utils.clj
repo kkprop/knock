@@ -1137,9 +1137,17 @@
 (defn ->dash [ip]
   (str/replace ip #"\." "-"))
 
+(defn remove-last-char [char domain]
+  (if (= (last domain) char)
+    (apply str (drop-last domain))
+    domain)
+  )
+
+(def remove-last-dot (partial remove-last-char \.))
+
 (defn ->domain [url]
-  (let [x (second
-           (first
+(let [x (second
+          (first
             (re-seq #".*:\/\/(.*)[\:|\/]"
                     (if (str/ends-with? url "/")
                       url
