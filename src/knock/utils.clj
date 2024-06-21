@@ -183,8 +183,13 @@
 
 ;;"true if coll contains elm"
 (defn in? [coll elm & {:keys [cmpfn]
-             :or {cmpfn =}}]
-  (some #(cmpfn % elm) coll)
+                       :or   {cmpfn =}}
+           ]
+  (let [res (some #(cmpfn % elm) coll)]
+    (if (nil? res)
+      false
+      true
+      ))
   )
 ;; true if one of things in coll are included in elm
 (defn rev-in? [coll elm & {:keys [cmpfn]
@@ -401,10 +406,10 @@
   (let [p (promise)]
     ;;(println "start worker to consume" (count coll))
     (thread!
-      (doseq [x coll]
-        (f x))
-      (deliver p 'done)
-      )
+      (let [xs (->> coll
+                    (map f)
+                    (apply list))]
+        (deliver p xs)))
     p
     ))
 
@@ -420,7 +425,7 @@
   (let [c-count (count coll)
         per     (quot c-count n)
         xs (partition!! per coll)
-        _ (println (count xs))
+        ;_ (println (count xs))
         ps      (pmap #(worker! f %) xs)
         ]
     (thread!
@@ -428,9 +433,8 @@
       (filter realized? ps)
 
       )
-    (doseq [x ps]
-      @x
-      )
+    ;;TODO fix not in flatten way
+    (pmap (fn [x] @x) ps)
     )
   )
 
@@ -847,7 +851,6 @@
        (remove nil?)
        (first)))
 
-
 (defn ms [t]
   (if (nil? t)
     t
@@ -858,16 +861,24 @@
     t
     (quot (ms t) 1000)))
 
-(ts
- (->inst "*  expire date: Jul 24 23:30:12 2023 GMT")
- )
+(defn +days [t n]
+  (from-timestamp (+ (ts t) (* n 86400))))
 
+(defn -days [t n]
+  (from-timestamp
+    (- (ts t) (* n 86400))))
 
 (defn cur-ts-13 []
   (inst-ms (java.util.Date.)))
 
 (defn cur-ts []
   (quot (cur-ts-13) 1000))
+
+(comment
+  (ts
+    (->inst "*  expire date: Jul 24 23:30:12 2023 GMT")
+   )
+  )
 
 
 (def n 0)
@@ -1059,6 +1070,7 @@
   (->hash-map ["a" "b" "c"] [[1 2 3] [4 5 6]])
 
   (name-xs :ip ["127.0.0.1" "192.168.1.1"] )
+  ;;?support ["127.0.0.1" 1 "192.183.1.1" 2]  
   (name-xs [:ip :count] [["127.0.0.1" 1] ["192.168.1.1" 2]] )
 
   (->edn "{:a :b}c")

@@ -1,4 +1,9 @@
 (ns knock.browser
+  "
+  [[new-driver]]  
+  [[conn]]
+  [[load-driver]]
+  "
   (:require
    [etaoin.api :as e]
    [etaoin.keys :as k]
@@ -9,9 +14,9 @@
    [clojure.edn :as edn]
    [clojure.data.xml :as xml]
    [knock.utils :as utils :refer :all]
-   [knock.book :as book]
    [clojure.pprint :as pp]
    [clojure.string :as str]))
+
 
 ;; disable etaoin detail log
 (timbre/set-level! :info)
@@ -65,13 +70,14 @@
 (defn driver []
   (let []
     (when (empty? @driver-cache)
-      (reset! driver-cache (load-driver)))
+      (reset! driver-cache (load-driver))
+      )
     (try
       (e/get-source @driver-cache)
       (catch Exception e
         ;(let [res (ex-data e)])
         ;not valid just load again
-        (println "not ok, load a new-driver")
+        (println e "not ok, load a new-driver")
         (reset! driver-cache (load-driver))
         )
       )
@@ -117,12 +123,6 @@
   )
 
 
-(defn wiki-source [name]
-  (e/with-chrome-headless driver
-    (e/go driver (str "https://zh.m.wikisource.org/wiki/" name))
-    (book/->markdown
-     (e/get-element-inner-html driver "//*[@class='mw-body-content']"))))
-
 (comment
   (driver)
   (new-driver)
@@ -137,7 +137,7 @@
     )
   )
 
-(defn locate [url q uniq-text]
+(defn locate!! [url q uniq-text]
   (go url)
   (e/wait-visible (driver) q)
   (->> (e/query-tree (driver) q)
@@ -147,7 +147,60 @@
        ;;
        ))
 
+
+
+(defn locate! [q uniq-text]
+  (let [d (driver)]
+    (->> (e/query-tree d q)
+         (map (fn [id] {:id id :text (e/get-element-text-el d id)}))
+         (filter #(utils/fuzzy-rev-in? [uniq-text] (:text %)))
+         (map #(assoc % :html (e/get-element-inner-html-el d (:id %))))
+         (map #(assoc % :tag (e/get-element-tag-el d (:id %))))
+         ;;
+         )))
+
+(defn has-text? [uniq-text {:keys [text]}]
+  (utils/fuzzy-rev-in? [uniq-text] text)
+  )
+
+(defn el-children [driver el q uniq-text]
+  (let []
+    (->>
+      (e/children driver el q)
+      (map (fn [id] {:id id :text (e/get-element-text-el driver id)}))
+      (filter (partial has-text uniq-text)
+      )
+    )
+  )) 
+
+(defn el-children! [el q uniq-text]
+  (el-children (driver) el q uniq-text)
+  )
+
+(defn locate-in! [q uniq-text]
+  (let [d (driver)]
+    (->> (e/query-tree d q)
+         (map (fn [id] {:id id :text (e/get-element-text-el d id)}))
+         (filter #(in? [uniq-text] (:text %)))
+         (map #(assoc % :html (e/get-element-inner-html-el d (:id %))))
+         (map #(assoc % :tag (e/get-element-tag-el d (:id %))))
+         ;;
+         )))
+
+(defn ->el [x]
+  (:id (first x))
+  )
+
+(defn click-el! [id]
+  (e/click-el (driver) id)
+  )
+
 (comment
+
+  (driver)
+
+
+
   (e/get-source
    (driver)
    )
@@ -229,6 +282,14 @@
 ;;TODO expose all functions in etaoin which start with a driver
 ;; alternative just using (driver)
 (comment
+
+  
+
+  (locate "https://confluence.agoralab.co/pages/viewpage.action?pageId=1500840964"
+          (driver)
+          {:class "relative-table confluenceTable tablesorter tablesorter-default stickyTableHeaders"}
+          )
+  
   (->>
    (ns-publics 'etaoin.api)
    (take 2)
