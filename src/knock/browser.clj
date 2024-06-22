@@ -284,12 +284,6 @@
 (comment
 
   
-
-  (locate "https://confluence.agoralab.co/pages/viewpage.action?pageId=1500840964"
-          (driver)
-          {:class "relative-table confluenceTable tablesorter tablesorter-default stickyTableHeaders"}
-          )
-  
   (->>
    (ns-publics 'etaoin.api)
    (take 2)
