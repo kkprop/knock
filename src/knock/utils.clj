@@ -26,7 +26,7 @@
 (def os-name (System/getProperty "os.name"))
 (defn osx?[] (= os-name "Mac OS X"))
 
-(declare force-str force-int cur-time-str ->keyword)
+(declare force-str force-int cur-time-str ->keyword ->uuid)
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
          file-name ext-name var-meta async-fn tail-f
          )
@@ -353,6 +353,7 @@
   )
 
 
+
 (defn call-context [f & args]
   {:id (str (:name (var-meta f)) "-" (md5-uuid (str/join " " args)))})
 
@@ -555,7 +556,6 @@
 (make-shell-fn "grep")
 (make-shell-fn :ls )
 (make-shell-fn :readlink)
-(make-shell-fn :clear)
 (make-shell-fn :touch)
 
 
@@ -599,6 +599,33 @@
     (enc "PASSWORD" "abc\n")
     )
   )
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; tmux related operation
+;;    should have make TUI automation easier 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn tmux [s]
+  (let [id (->uuid s)]
+    (if
+     (str/includes? "tmux list-sessions" uuid)
+      (run-shell "tmux new-session -s " id)
+      (run-shell "tmux attach -t " id))
+    id))
+
+
+(defn send-text [id & xs]
+  (run-cmd "tmux send-keys -t" id "'" (str/join " " xs) "'"))
+
+(defn send-keys [id & xs]
+  (apply run-cmd "tmux send-keys -t" id xs))
+
+(defn clear [id]
+  (send-keys id "c-c")
+  (send-keys id "c-l"))
+
+
 
 
 (defn file-ext [s]
@@ -3047,3 +3074,6 @@
 
 (defn parse-md-file [f]
   (parse-md (slurp-lines f)))
+
+
+

@@ -25,11 +25,6 @@
          )
   )
 
-(defn send-text [id & xs]
-  (run-cmd "tmux send-keys -t" id "'" (str/join " " xs) "'"))
-
-(defn send-keys [id & xs]
-  (apply run-cmd "tmux send-keys -t" id xs))
 
 (defn run-model []
   (let [_ (touch input-file)]
