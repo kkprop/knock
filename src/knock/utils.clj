@@ -2665,6 +2665,11 @@
         ]
     (java.util.UUID. (.getLong bb) (.getLong bb))))
 
+(defn ->uuid [x]
+  (if (uuid? x)
+    x
+    (md5-uuid (->str x))))
+
 ;;do spit, but return the file path
 (defn spit! [f content & options]
   (let [_ (apply spit f content options)]

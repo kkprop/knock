@@ -168,7 +168,7 @@
     (->>
       (e/children driver el q)
       (map (fn [id] {:id id :text (e/get-element-text-el driver id)}))
-      (filter (partial has-text uniq-text)
+      (filter (partial has-text? uniq-text)
       )
     )
   )) 

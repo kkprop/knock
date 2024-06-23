@@ -1,6 +1,8 @@
 (ns knock.block
   (:require [knock.utils :refer :all]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [babashka.process :as p]
+            ))
 
 ;;block is the fundamental component of tree shape data
 :block/string
@@ -50,30 +52,70 @@
                                      [(get mm a) a]))) mm)))
 
   ([xs]
-   (->phrase 1 xs)))
+   (if (string? xs)
+     (->phrase 1 (->units xs))
+     (->phrase 1 xs))))
 
-(defn ->semantics[]
-  )
 
-(defn language [s]
-  (->> s
-       (map int)
-       )
-  )
+(defn mosaic [s xs]
+  (let [cur (atom [])]
+    (doseq [[i x] (map-indexed list s)]
+      (if (in? xs i)
+        (swap! cur conj " ")
+        (swap! cur conj x)))
+    (apply str @cur)))
 
 (comment
+  (mosaic "abc" [1 2])
+  (->phrase s)
+  s
+  )
 
-  (language "看")
+
+(defn tripler
+  ([s]
+   (tripler s 0))
+  ([s n]
+   (let [xs (->units s)
+         nxs (range (count xs))]
+     (if (= 0 n)
+       (mosaic s (drop 3 (shuffle nxs)))
+       (mosaic s (drop (* 3 n) (shuffle nxs)))
+       ;;
+       ))))
+
+(defn tmux [s]
+  (let [id (->uuid s)]
+    (run-shell "tmux new-session -s " id)
+    id
+    )
+  )
+
+(defn lazy-read
+  ([s]
+   (let [id (tmux s)]
+
+     (p/shell (tripler s 0))
+
+     @(promise)
+     )))
+
+
+(comment
+  (->uuid s)
+
+
+  (pp
+    (def s "大學之道，在明明德，在親民，在止於至善。知止而後有定，定而後能靜，靜而後能安，安而後能慮，慮而後能得。物有本末，事有終始，知所先後，則近道矣。古之欲明明德於天下者，先治其國；欲治其國者，先齊其家；欲齊其家者，先脩其身；欲脩其身者，先正其心；欲正其心者，先誠其意；欲誠其意者，先致其知，致知在格物。物格而後知至，知至而後意誠，意誠而後心正，心正而後身脩，身脩而後家齊，家齊而後國治，國治而後天下平。自天子以至於庶人，壹是皆以脩身爲本。其本亂而末治者否矣，其所厚者薄，而其所薄者厚，未之有也！此謂知本，此謂知之至也。" 
+             )
+    )
 
   (pp
    (sorted-by-val
     (->phrase 1 3
               (->units "说你又不听，听你又不懂，懂你又不做，做你又做错，错你又不认，认你又不服，不服你又不出声"
                 ;(->abs-path "~/shurangama")
-                       ))
-    )
-   )
-
+                       ))))
   (pp
    (->phrase 2 (->units "蜕变： 不喝酒了改喝茶了， 不抽烟了改熏香了， 不听歌了改听戏了， 专心烧香拜佛和赚钱")))
 
