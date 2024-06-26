@@ -282,8 +282,14 @@
 ;;TODO expose all functions in etaoin which start with a driver
 ;; alternative just using (driver)
 (comment
+  (go "https://waytoagi.feishu.cn/wiki/QPe5w5g7UisbEkkow8XcDmOpn8e")
 
-  
+  (map :text
+       (locate! {:class "text"} ""))
+  (def catalogue (locate! {:class "tree-title-content-title ellipsis"} ""))
+  (map :text catalogue)
+  (click-el! (:id (second catalogue)))
+
   (->>
    (ns-publics 'etaoin.api)
    (take 2)
