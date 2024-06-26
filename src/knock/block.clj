@@ -118,6 +118,8 @@
 
 
 (comment
+
+
   (sequential? (tripler s))
   (repeatedly (apply tripler (tripler s)
                      )
@@ -139,5 +141,53 @@
   (->units "The Limits of my language are the limits of my world")
 
   (run-cmd :clear)
+  ;;
+  )
+
+
+(defn verticalize [xs]
+  ;;full size
+  (let [c (apply max (map count xs))
+        ln (count xs)
+        ]
+    (->> xs
+         (map (fn [line]
+                (let [n (- c (count line))]
+                  (str line (str/join "" (repeat n " ")))
+                  )))
+         (reverse)
+         (apply interleave)
+         (partition-all ln )
+         (map (partial apply list))
+         (map (partial str/join ""))
+         (str/join "\n")
+         (println)
+         )
+    )
+  ;;
+  )
+
+;;to vertical
+(defn ->shu [s]
+  (let [xs (str/split-lines s)]
+    (->>
+     (partition-all 16 xs)
+     (take 1)
+     (map (fn [lines]
+            ()
+            ))
+     )
+    )
+  ;;
+  )
+
+
+
+(comment
+
+  (def s
+    "已去無有去 未去亦無去 ...
+離已去未去 去時亦無去")
+  (def xs  (str/split-lines s))
   ;;
   )
