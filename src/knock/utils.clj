@@ -35,6 +35,14 @@
   (java.util.UUID/randomUUID)
   )
 
+;;println but return the element
+(defn println! [x]
+  (let []
+    (println x)
+    x)
+  )
+
+
 (defn join-cmd [& cmd]
   (str/join " " (->> cmd (map force-str))))
 
@@ -180,6 +188,41 @@
   (let [cols (dot-split filename)
         n (count cols)]
     (str/join "." (take (- n 1) cols))))
+
+(defn is-or-has [x]
+  (if (map? x)
+    (let [xs x]
+      #(->> xs
+            (map (fn [[k v]]
+                   (= (get % k) v)
+                   ))
+            (every? true?)
+            )
+      )
+    (partial = x)
+    )
+  )
+
+
+(defn ->>! [f x colls]
+  (->> colls
+       (f #((is-or-has x) %))
+       )
+  )
+
+(def filter! (partial ->>! filter))
+(def remove! (partial ->>! remove))
+
+
+(comment
+  (every? true?
+          [((is-or-has {:k 1 :b 2}) {:k 1 :b 2 :c 3})
+           ((is-or-has {:k 1}) {:k 1})
+           (empty? (remove! {:k 1} [{:k 1}]))
+           (not (empty? (filter! {:k 1} [{:k 1 :facts "abc"} {:k 2} {:k 3}])))
+           ]
+          )
+  )
 
 ;;"true if coll contains elm"
 (defn in? [coll elm & {:keys [cmpfn]
@@ -585,7 +628,7 @@
     )
   )
 
-(defn dec [password s]
+(defn dec-by [password s]
   (let [path (tmp-file s)
         out (run-cmd! :openssl  "enc -aes128 -pbkdf2 -a -d -k" password "-in" path)
         ]
@@ -690,6 +733,14 @@
     s
     (trim-to (apply str (rest s)) sub)
     ))
+
+(defn trim-between [s from to]
+  (let [[before _ after ] (rest (first (re-seq (re-pattern (format "(.*)(%s.*%s)(.*)" from to)) s )))]
+    ;;remove [from .* to]
+    ;;return before and after
+    (str before after)
+    )
+  )
 
 
 (defn crt->pem [path]
@@ -1130,11 +1181,14 @@
               (assoc {:headers headers} :body (j body)))
         ;;_ (println req)
         res (try (method url req) (catch Exception e (ex-data e)))]
-    (assoc res :body
-           (try
-             (jstr-to-edn (:body res))
-             ;;can't convert to edn, just return
-             (catch Exception e (:body res))))
+    (-> res
+        (assoc :body (try
+                        (jstr-to-edn (:body res))
+                        ;;can't convert to edn, just return
+                        (catch Exception e (:body res))))
+        ;;remove :process which will cause No reader function for tag object
+        (dissoc :process)
+        )
     ;
     ))
 
@@ -1207,7 +1261,14 @@
     (.getHostAddress (java.net.InetAddress/getByName domain))
     ))
 
+(defn domain? [x]
+  (not (nil?
+        (re-seq #".*\.?.*\..*" x)
+        )))
+
 (comment
+  (domain? "域名")
+  (domain? "x.com")
   (domain->ip "https://www.x.com:1663")
   (->domain "https://www.x.com:1663/")
   (->domain "https://www.x.com:1663")
@@ -1557,7 +1618,7 @@
   (let [[start mask] (str/split ip-range #"/")
         [a b c d] (str/split start #"\.")
         dn (force-int d)
-        count (exp 2 (- 32 (force-int mask)))
+        count (exp 2 (- 32 (force-int 27)))
                  ]
     (->>
      (range count)
@@ -1566,6 +1627,10 @@
      )
     ;;
     ))
+
+(comment
+  (range->ips "98.98.205.160/27")
+  )
 
 
 (defn ip+n [n s]
@@ -3042,7 +3107,6 @@
        :res res})))
 
 (def trim-md (partial trim-leading "\\s" "- "))
-
 (defn parse-md [lines]
   (let [xs (remove nil? (map trim-md (reverse lines)))]
     (loop [xs xs
