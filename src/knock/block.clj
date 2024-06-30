@@ -1,6 +1,7 @@
 (ns knock.block
   (:require [knock.utils :refer :all]
             [clojure.string :as str]
+            [babashka.fs :as fs]
             [babashka.process :as p]
             ))
 
@@ -148,37 +149,39 @@
 (defn verticalize [xs]
   ;;full size
   (let [c (apply max (map count xs))
-        ln (count xs)
-        ]
+        ln (count xs)]
     (->> xs
          (map (fn [line]
                 (let [n (- c (count line))]
-                  (str line (str/join "" (repeat n " ")))
-                  )))
+                  (str line (str/join "" (repeat n \u3000))))))
          (reverse)
          (apply interleave)
-         (partition-all ln )
+         (partition-all ln)
          (map (partial apply list))
          (map (partial str/join ""))
-         (str/join "\n")
-         (println)
-         )
-    )
-  ;;
-  )
+         ;(map #(str/replace % "。。" (str "。" \u3000)))
+         (str/join "\n")))
 
+;;
+  )
 ;;to vertical
 (defn ->shu [s]
-  (let [xs (str/split-lines s)]
+  (let [s (if (fs/exists? s) (slurp s) s)
+        ;have to use \u3000 to file. which cause align problem when it is convert to single space
+        ;。。connected caused problem
+
+        xs (map (partial str/join) (mapcat #(partition-all 16 %) (str/split-lines s)))
+        ;;to square
+        ;xs (->> (partition-all 16 (str/join "" (str/split-lines s))) (map (partial str/join)))
+        ]
+
     (->>
      (partition-all 16 xs)
-     (take 1)
-     (map (fn [lines]
-            ()
-            ))
-     )
-    )
-  ;;
+     (map verticalize)
+     (str/join "\n")
+     println))
+
+;;
   )
 
 
@@ -186,8 +189,10 @@
 (comment
 
   (def s
-    "已去無有去 未去亦無去 ...
-離已去未去 去時亦無去")
+    "已去無有去
+未去亦無去
+離已去未去
+去時亦無去")
   (def xs  (str/split-lines s))
   ;;
   )

@@ -67,12 +67,15 @@
   gpt-prompt (println (u/mock chat/prompt (apply str *command-line-args*)))
   qq (println (u/quote-quote (apply str *command-line-args*)))
   alias (println (u/alias (first *command-line-args*) (clojure.string/join " " (rest *command-line-args*))))
-  cha (hanzi/show (hanzi/cha (first *command-line-args*)))
+  cha (hanzi/show (mock hanzi/cha (first *command-line-args*)))
   wen (println (mock br/wiki-source (first *command-line-args*)))
 
   chop (u/pp (block/->phrase 2 (block/->units (str/join *command-line-args*))))
   run-model (chat/run-model)
   co-gpt (chat/clipboard-prompt)
+  shuzhe (println (str/join "\n" [(apply str (repeat 80 "-"))
+                               ""
+                               (block/->shu (first *command-line-args*))]))
   lr (block/lazy-read (first *command-line-args*))
-
+  ;;
   }}
