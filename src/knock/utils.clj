@@ -175,6 +175,16 @@
 (defn ->log [& xs]
   (str/join " " (concat [(cur-time-str)] (map force-str xs))))
 
+;;fill char to fullfill line char count is n
+(defn fill-after [line n c]
+  (let [x (- n (count line))]
+    (apply str line (repeat x c))))
+
+(defn fill-before [line n c]
+  (let [x (- n (count line))]
+    (str (apply str (repeat x c)) line)))
+
+
 (defn join-path [& cmd]
   (str/join "/" cmd))
 

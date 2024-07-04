@@ -146,19 +146,21 @@
   )
 
 
+
 (defn verticalize [xs]
   ;;full size
   (let [c (apply max (map count xs))
+        n 16
         ln (count xs)]
     (->> xs
-         (map (fn [line]
-                (let [n (- c (count line))]
-                  (str line (str/join "" (repeat n \u3000))))))
+         (map #(fill-after % n \u3000))
          (reverse)
          (apply interleave)
          (partition-all ln)
          (map (partial apply list))
          (map (partial str/join ""))
+         (map #(fill-before % n \u3000))
+         ;;fill to n(16), to make it seems starting with right 
          ;(map #(str/replace % "。。" (str "。" \u3000)))
          (str/join "\n")))
 
@@ -167,18 +169,19 @@
 ;;to vertical
 (defn ->shu [s]
   (let [s (if (fs/exists? s) (slurp s) s)
+        n 16
         ;have to use \u3000 to file. which cause align problem when it is convert to single space
         ;。。connected caused problem
 
-        xs (map (partial str/join) (mapcat #(partition-all 16 %) (str/split-lines s)))
+        xs (map (partial str/join) (mapcat #(partition-all n %) (str/split-lines s)))
         ;;to square
         ;xs (->> (partition-all 16 (str/join "" (str/split-lines s))) (map (partial str/join)))
         ]
 
     (->>
-     (partition-all 16 xs)
+     (partition-all n xs)
      (map verticalize)
-     (str/join "\n")
+     (str/join (apply str "\n" (apply str (repeat (* 2 n) "-")) "\n"))
      println))
 
 ;;

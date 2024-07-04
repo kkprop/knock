@@ -92,8 +92,7 @@
     ""))
 
   (tmp-file
-   (mock ->html "https://ctext.org/zhuangzi/enjoyment-in-untroubled-ease/zhs")
-   )
+   (mock ->html "https://ctext.org/zhuangzi/enjoyment-in-untroubled-ease/zhs"))
 
   (def path "resources/babooka.pdf")
 
