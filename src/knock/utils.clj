@@ -42,6 +42,10 @@
     x)
   )
 
+;;make thing a function.
+;;when called return the thing
+(defn ->fn [x]
+  (partial identity x))
 
 (defn join-cmd [& cmd]
   (str/join " " (->> cmd (map force-str))))
@@ -121,6 +125,14 @@
     )
   )
 
+(defn pause
+  ([ms]
+   (Thread/sleep ms))
+  ;;default pause 300 ms
+  ([]
+   (pause 300)
+   )
+  )
 
 (defn do-println [f & args]
   (let [s (apply str (join-cmd args))]
@@ -720,6 +732,35 @@
 (defn split-pairs [s re & keys]
   (apply hash-map (interleave keys (str/split s re))))
 
+
+(defn chop-by [s & chars]
+  (let [c (first chars)]
+    (println s c)
+    (when-not (nil? c)
+      (->> (str/split s (re-pattern (str c)))
+           (map #(if (empty? (rest chars)) 
+                   %
+                   (apply chop-by % (rest chars))
+                   )
+                )
+           )
+      )
+    ))
+
+(defn kv [[k v]]
+  {k v}
+  )
+
+(comment
+  (hash-map :a )
+
+  (map kv 
+       (chop-by "k=v,k1=v1" \, \=)
+       )
+
+  )
+
+
 ;; shell text ouput -> hash-map
 ;;   with header line as keys
 ;;   each line a hash-map
@@ -742,6 +783,12 @@
   (if (str/starts-with? s sub)
     s
     (trim-to (apply str (rest s)) sub)
+    ))
+
+(defn chop-to [s sub]
+  (if (str/ends-with? s sub)
+    s
+    (chop-to (apply str (drop-last s) ) sub)
     ))
 
 (defn trim-between [s from to]
@@ -1089,6 +1136,7 @@
     )
   )
 
+(def html-parse clojure.data.xml/parse-str)
 
 (defn object? [x]
   (instance? clojure.lang.IFn x))

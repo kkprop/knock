@@ -109,6 +109,12 @@
 
 (comment
 
+  (utils/go! 
+    (let [ [name f] (first (fns-by-namespace "bbs.d2") )]
+      (println (f))
+      )
+    )
+
   (utils/parse-uri "/foo//1/2/3?k=v&k3=%2D%2D")
   (utils/parse-uri "/foo//1/2/3?k=v&k3=%2D%2D")
   ;;

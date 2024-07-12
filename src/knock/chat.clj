@@ -36,7 +36,12 @@
                 file-name
                 (str/replace "." "-")
                 (str "-gpt"))]
-      (thread! (run-shell "tmux new-session -s" w (str "\"" (->model-cmd m) "\"")))
+      (thread!
+       (try
+         (run-shell "tmux new-session -s" w (str "\"" (->model-cmd m) "\""))
+         (catch Exception :as e
+                (println  "run: " "tmux kill-session -t " w " \n clean the old tmux session")
+                )))
       (thread!
        (async-fn (fn [x]
                    (println x)
@@ -45,8 +50,7 @@
                      (send-keys w "c-c"))
                    (send-text w x)
                    (send-keys w "Enter"))
-                 (tail-f input-file)
-                 ))
+                 (tail-f input-file)))
       @(promise))))
 
 (comment
