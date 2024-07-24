@@ -29,6 +29,7 @@
 (declare force-str force-int cur-time-str ->keyword ->uuid)
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
          file-name ext-name var-meta async-fn tail-f
+         map-on-key map-on-val
          )
 
 (defn uuid []
@@ -624,6 +625,10 @@
 (make-shell-fn :touch)
 
 
+(defn clipboard []
+  (run-cmd! :pbpaste))
+
+
 (def work-dir
   (let [path (dirname (System/getProperty "babashka.config"))]
     (if (empty? path)
@@ -735,7 +740,6 @@
 
 (defn chop-by [s & chars]
   (let [c (first chars)]
-    (println s c)
     (when-not (nil? c)
       (->> (str/split s (re-pattern (str c)))
            (map #(if (empty? (rest chars)) 
@@ -750,6 +754,15 @@
 (defn kv [[k v]]
   {k v}
   )
+
+(defn chop-by! [s & chars]
+  (when-not (nil? s)
+    (if (= 2 (count chars ))
+      ;(map-on-key ->keyword)
+      (apply merge (map kv (apply chop-by s chars)))
+      ;;still to be defined 
+      (apply chop-by chars)
+      )))
 
 (comment
   (hash-map :a )
@@ -1361,6 +1374,11 @@
     (spit f line :append true)
     )
   )
+
+(defn spit-line! [f s]
+  "spit only when string not exist currently"
+  (when-not (in? (slurp-lines f) s)
+    (spit-line f s)))
 
 (defn slurp-yaml [f]
   (yaml/parse-string (slurp f)))
