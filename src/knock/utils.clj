@@ -624,9 +624,12 @@
 (make-shell-fn :readlink)
 (make-shell-fn :touch)
 
+(defn pbcopy [s]
+  (run-cmd! "echo" (str "'" s  "'") "| pbcopy"))
 
-(defn clipboard []
-  (run-cmd! :pbpaste))
+(defn pbpaste []
+  (str/trim
+   (run-cmd! :pbpaste)))
 
 
 (def work-dir
