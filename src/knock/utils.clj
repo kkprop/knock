@@ -29,7 +29,7 @@
 (declare force-str force-int cur-time-str ->keyword ->uuid)
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
          file-name ext-name var-meta async-fn tail-f
-         map-on-key map-on-val
+         map-on-key map-on-val mock mock!
          )
 
 (defn uuid []
@@ -631,6 +631,44 @@
   (str/trim
    (run-cmd! :pbpaste)))
 
+
+(def bub "Ooo·.·ooO")
+(defn bubble []
+  (let []
+    (pbcopy (str (pbpaste) bub))
+    )
+  )
+
+(defn bubble? []
+  (str/ends-with? (pbpaste) bub)
+  )
+
+(defn cur-bubble []
+  (pbpaste)
+  )
+
+(def bubble-i (atom int))
+
+
+(defn bbubble []
+  (let []
+    (when (bubble?)
+      (do
+        (mock! cur-bubble)
+        (reset! bubble-i 0)))
+    (pbcopy (subs (mock cur-bubble) @bubble-i (+ 5 @bubble-i)))
+    (swap! bubble-i inc)))
+
+(comment
+
+  (bubble?)
+
+  (bubble)
+  (mock cur-bubble)
+
+  (bbubble)
+  ;;
+  )
 
 (def work-dir
   (let [path (dirname (System/getProperty "babashka.config"))]
