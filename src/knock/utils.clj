@@ -633,7 +633,7 @@
 
 
 (def bub "Ooo·.·ooO")
-(defn bubble []
+(defn make-bubble []
   (let []
     (pbcopy (str (pbpaste) bub))
     )
@@ -651,20 +651,38 @@
 
 
 (defn bbubble []
-  (let []
+  (let [step 5]
     (when (bubble?)
       (do
         (mock! cur-bubble)
         (reset! bubble-i 0)))
-    (pbcopy (subs (mock cur-bubble) @bubble-i (+ 5 @bubble-i)))
-    (swap! bubble-i inc)))
+    (let [cur (+ step @bubble-i)
+          s (mock cur-bubble)]
+      (if (< (count s) cur)
+        nil
+        (pbcopy (subs s @bubble-i (+ step @bubble-i)))
+        )
+      )
+    (swap! bubble-i (partial + step))
+    ))
+
+(defn play-bubble []
+  (let []
+    (make-bubble)
+    (bbubble)
+    ;;still have 
+    (while (not (bubble?))
+      (bbubble)
+      (println (pbpaste))
+      (pause 1000)
+      )))
 
 (comment
 
   (bubble?)
 
-  (bubble)
-  (mock cur-bubble)
+  (make-bubble)
+  (mock! cur-bubble)
 
   (bbubble)
   ;;
@@ -709,6 +727,7 @@
   (dec "PASSWORD"
     (enc "PASSWORD" "abc\n")
     )
+  (def uuid (str(->uuid "")))
   )
 
 
@@ -719,8 +738,7 @@
 
 (defn tmux [s]
   (let [id (->uuid s)]
-    (if
-     (str/includes? "tmux list-sessions" uuid)
+    (if (str/includes? (run-cmd! "tmux list-sessions") (str id))
       (run-shell "tmux new-session -s " id)
       (run-shell "tmux attach -t " id))
     id))

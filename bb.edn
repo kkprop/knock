@@ -83,4 +83,7 @@
 
   aws-change-password (aws/change-password (first *command-line-args*))
   ;;
+
+  play-bubble (u/play-bubble)
+
   }}
