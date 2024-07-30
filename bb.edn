@@ -22,6 +22,7 @@
              [knock.server :as s]
              [knock.roam :as r]
              [knock.aws :as aws]
+             [knock.aliyun :as aliyun]
              [knock.block :as  block]
              [knock.book :as b :refer :all]
              [knock.browser :as br]
@@ -75,15 +76,13 @@
   run-model (chat/run-model)
   co-gpt (chat/clipboard-prompt)
   shuzhe (println (str/join "\n" [(apply str (repeat 80 "-"))
-                               ""
-                               (block/->shu (first *command-line-args*))]))
+                                  ""
+                                  (block/->shu (first *command-line-args*))]))
 
   lr (block/lazy-read (first *command-line-args*))
 
-
   aws-change-password (aws/change-password (first *command-line-args*))
+  aliyun-change-password (aliyun/change-password (first *command-line-args*))
   ;;
 
-  play-bubble (u/play-bubble)
-
-  }}
+  play-bubble (u/play-bubble)}}
