@@ -197,6 +197,19 @@
   (let [x (- n (count line))]
     (str (apply str (repeat x c)) line)))
 
+(defn idx [xs]
+  "add index to hashmap sequences"
+  (let [i (atom 0)]
+    (->> xs
+         (map (fn [x]
+                (let [y (assoc x :idx @i)]
+                  (swap! i inc)
+                  y
+                  )
+                )
+              )
+         )))
+
 
 (defn join-path [& cmd]
   (str/join "/" cmd))
@@ -225,7 +238,6 @@
     (partial = x)
     )
   )
-
 
 (defn ->>! [f x colls]
   (->> colls
@@ -869,6 +881,11 @@
     ;;return before and after
     (str before after)
     )
+  )
+
+(defn re-seq! [re s]
+  "first match second part of matched"
+  (second (first (re-seq re s)))
   )
 
 
