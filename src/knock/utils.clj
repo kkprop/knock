@@ -828,12 +828,12 @@
 
 (defn chop-by! [s & chars]
   (when-not (nil? s)
-    (if (= 2 (count chars ))
-      ;(map-on-key ->keyword)
-      (apply merge (map kv (apply chop-by s chars)))
-      ;;still to be defined 
-      (apply chop-by chars)
-      )))
+    (case (count chars)
+          2 (apply merge (map kv (apply chop-by s chars)))
+          1 (apply hash-map (apply chop-by s chars ))
+          :else (apply chop-by s chars)
+          )
+    ))
 
 (comment
   (hash-map :a )
@@ -874,6 +874,18 @@
     s
     (chop-to (apply str (drop-last s) ) sub)
     ))
+
+(defn trimr! [s sub]
+  (.substring
+    s
+    0
+    (- (count s) (count sub))
+    )
+  )
+
+(defn chop-to! [s sub]
+  (trimr! (chop-to s sub) sub)
+  )
 
 (defn trim-between [s from to]
   (let [[before _ after ] (rest (first (re-seq (re-pattern (format "(.*)(%s.*%s)(.*)" from to)) s )))]
@@ -1461,6 +1473,11 @@
 
 ;;multiple yaml
 (defn slurp-yaml! [f]
+  (->> (str/split (slurp f) #"---")
+       (map yaml/parse-string) 
+       ;;there are nil between two yaml. just remove 
+       (remove nil?)
+       )
   )
 
 (defn ->yaml [m]
@@ -3109,8 +3126,25 @@
   )
 
 (defn quote-str [s]
-  (str "\"" s "\"")
+  (if (string? s)
+    (str "\"" s "\"")
+    s
+    )
   )
+
+
+(defn quote-str! [x]
+  (if (string? x)
+    (quote-str x)
+    (clojure.walk/walk (fn [x] (if (string? x)
+                                 (quote-str x)
+                                   (if (map-entry? x)
+                                     [(quote-str (first x)) (quote-str! (second x))]
+                                     x
+                                     )
+                                   )
+                           )
+                       identity x)))
 
 (defn val->key [[k xs]]
   (->> xs
