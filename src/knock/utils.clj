@@ -644,61 +644,6 @@
    (run-cmd! :pbpaste)))
 
 
-(def bub "Ooo·.·ooO")
-(defn make-bubble []
-  (let []
-    (pbcopy (str (pbpaste) bub))
-    )
-  )
-
-(defn bubble? []
-  (str/ends-with? (pbpaste) bub)
-  )
-
-(defn cur-bubble []
-  (pbpaste)
-  )
-
-(def bubble-i (atom int))
-
-
-(defn bbubble []
-  (let [step 5]
-    (when (bubble?)
-      (do
-        (mock! cur-bubble)
-        (reset! bubble-i 0)))
-    (let [cur (+ step @bubble-i)
-          s (mock cur-bubble)]
-      (if (< (count s) cur)
-        nil
-        (pbcopy (subs s @bubble-i (+ step @bubble-i)))
-        )
-      )
-    (swap! bubble-i (partial + step))
-    ))
-
-(defn play-bubble []
-  (let []
-    (make-bubble)
-    (bbubble)
-    ;;still have 
-    (while (not (bubble?))
-      (bbubble)
-      (println (pbpaste))
-      (pause 1000)
-      )))
-
-(comment
-
-  (bubble?)
-
-  (make-bubble)
-  (mock! cur-bubble)
-
-  (bbubble)
-  ;;
-  )
 
 (def work-dir
   (let [path (dirname (System/getProperty "babashka.config"))]
@@ -861,31 +806,81 @@
           ))
    ))
 
+(defn trimr! [s sub]
+  (.substring
+   s
+   0
+   (- (count s) (count sub))))
+
+(defn triml! [s sub]
+  (.substring
+   s
+   (count sub)
+   (count s)))
+
+
 
 ;;trim a string's the starting chars, until match sub
 (defn trim-to [s sub]
   (if (str/starts-with? s sub)
     s
-    (trim-to (apply str (rest s)) sub)
+    (trim-to (apply str (rest s)) sub)))
+
+
+(defn trim-to! [s sub]
+  "trim-to but return left and right"
+  (let [rest (trim-to s sub)]
+    [(trimr! s rest) rest]
     ))
 
-(defn chop-to [s sub]
-  (if (str/ends-with? s sub)
-    s
-    (chop-to (apply str (drop-last s) ) sub)
-    ))
+(defn trim-to* [s sub]
+  "aggressively remove sub too"
+  (if (empty? s) s
+      (if (str/starts-with? s sub)
+        (triml! s sub)
+        (trim-to* (apply str (rest s)) sub))))
 
-(defn trimr! [s sub]
-  (.substring
+(defn trim-to*! [s sub]
+  "trim-to but return left and right"
+  (let [rest (trim-to* s sub)]
+    [(trimr! s rest) rest]))
+
+(defn chop-to* [s sub]
+  "agressively match the most"
+  (if (empty? s)
     s
-    0
-    (- (count s) (count sub))
-    )
+    (if (str/ends-with? s sub)
+      s
+      (chop-to* (apply str (drop-last s)) sub))))
+
+(defn chop-to*! [s sub]
+  "chop-to* but without sub"
+  (trimr! (chop-to* s sub) sub))
+
+(defn chop-to [s & subs]
+  (let []
+    (->> subs
+         (map #(first (trim-to*! s %)))
+         (sort-by count)
+         first)))
+
+(defn chop-to! [s & subs]
+  (let [x (apply chop-to s subs)
+        sub (->> subs (filter #(str/ends-with? x %))
+             ;;brutally ignore subs have the same part cases
+                 first)]
+
+    (trimr! x sub)))
+
+(comment
+  (triml! ".def" ".")
+
+  (trim-to*! "" ".")
+
   )
 
-(defn chop-to! [s sub]
-  (trimr! (chop-to s sub) sub)
-  )
+
+
 
 (defn trim-between [s from to]
   (let [[before _ after ] (rest (first (re-seq (re-pattern (format "(.*)(%s.*%s)(.*)" from to)) s )))]
@@ -898,6 +893,102 @@
 (defn re-seq! [re s]
   "first match second part of matched"
   (second (first (re-seq re s)))
+  )
+
+
+
+;;;;;;;;;;;;;;;;;;
+;; make bubble  ;;
+;; bbubble      ;;
+;; chop bubble  ;;
+;;;;;;;;;;;;;;;;;;
+
+(def bub "Ooo·.·ooO")
+(defn make-bubble []
+  (let []
+    (pbcopy (str (pbpaste) bub))
+    )
+  )
+
+(defn bubble? []
+  (str/ends-with? (pbpaste) bub)
+  )
+
+(defn cur-bubble []
+  (pbpaste)
+  )
+
+(def bubble-i (atom int))
+
+(defn typing-paste
+  ([]
+   (typing-paste 100)
+   )
+  ([interval]
+   (let [s (pbpaste)]
+     (doseq [i (count s)]
+       (print (nth s i))
+       (pause interval)
+       ))
+   )
+  )
+
+(defn bbubble []
+  (let [step 5]
+    (when (bubble?)
+      (do
+        (mock! cur-bubble)
+        (reset! bubble-i 0)))
+    (let [cur (+ step @bubble-i)
+          s (mock cur-bubble)]
+      (if (< (count s) cur)
+        nil
+        (pbcopy (subs s @bubble-i (+ step @bubble-i)))))
+
+    (swap! bubble-i (partial + step))))
+
+(def b-str (atom ""))
+(defn cbubble []
+  "bubble by chop-to"
+  (let []
+    (when (bubble?)
+      (do
+        (mock! cur-bubble)
+        (reset! b-str (mock cur-bubble))))
+    (let []
+      (if (< (count @b-str) (count bub))
+        nil
+        (do
+          (pbcopy (chop-to @b-str "。"))
+          (reset! b-str (trim-to* @b-str "。")))))))
+
+(defn play-bubble []
+  (let []
+    (make-bubble)
+    (cbubble)
+    (typing-paste)
+    ;;still have 
+    (while (not (bubble?))
+      (cbubble)
+      (typing-paste)
+      (pause 1000))))
+
+(comment
+  (println @b-str)
+
+  @b-str
+
+  (pbpaste)
+
+  (println  (mock cur-bubble))
+
+  (bubble?)
+
+  (make-bubble)
+  (mock! cur-bubble)
+
+  (bbubble)
+  ;;
   )
 
 
@@ -3122,29 +3213,49 @@
   )
 
 (defn quote-quote [s]
-  (str/replace s "\"" "\\\"")
-  )
+  (str/replace s "\"" "\\\""))
 
 (defn quote-str [s]
   (if (string? s)
     (str "\"" s "\"")
-    s
-    )
-  )
-
+    s))
 
 (defn quote-str! [x]
+  "iterate inside to quote string"
   (if (string? x)
     (quote-str x)
     (clojure.walk/walk (fn [x] (if (string? x)
                                  (quote-str x)
-                                   (if (map-entry? x)
-                                     [(quote-str (first x)) (quote-str! (second x))]
-                                     x
-                                     )
-                                   )
-                           )
+                                 (if (map-entry? x)
+                                   [(quote-str (first x)) (quote-str! (second x))]
+                                   x)))
+
                        identity x)))
+
+(defn strip [s & chars]
+  (let [c (first chars)]
+    (println c)
+    (if-not (nil? c)
+      (apply strip (str/replace s (re-pattern (str chars)) " ") (rest chars))
+      s)
+    )
+  )
+
+(defn strip! [s & chars]
+  (->>
+    (str/split (apply strip s chars) #"\s")
+    (remove empty?)
+    (str/join "\n")
+  ))
+
+(comment
+  (println (strip!
+              (slurp (->abs-path "~/1.txt"))
+             \' \, \"))
+  ;
+  )
+
+
 
 (defn val->key [[k xs]]
   (->> xs
