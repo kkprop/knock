@@ -48,6 +48,13 @@
 (defn ->fn [x]
   (partial identity x))
 
+(defn ->list [xs]
+  (if (sequential? xs)
+    xs
+    (list xs)
+    )
+  )
+
 (defn join-cmd [& cmd]
   (str/join " " (->> cmd (map force-str))))
 
@@ -922,16 +929,15 @@
 
 (defn typing-paste
   ([]
-   (typing-paste 100)
-   )
+   (typing-paste 300))
   ([interval]
    (let [s (pbpaste)]
-     (doseq [i (count s)]
+     (doseq [i (range (count s))]
        (print (nth s i))
-       (pause interval)
-       ))
-   )
-  )
+       (flush)
+       (pause interval))
+     ;(println s)
+     )))
 
 (defn bbubble []
   (let [step 5]
@@ -961,17 +967,6 @@
         (do
           (pbcopy (chop-to @b-str "。"))
           (reset! b-str (trim-to* @b-str "。")))))))
-
-(defn play-bubble []
-  (let []
-    (make-bubble)
-    (cbubble)
-    (typing-paste)
-    ;;still have 
-    (while (not (bubble?))
-      (cbubble)
-      (typing-paste)
-      (pause 1000))))
 
 (comment
   (println @b-str)
@@ -3249,9 +3244,10 @@
   ))
 
 (comment
-  (println (strip!
-              (slurp (->abs-path "~/1.txt"))
-             \' \, \"))
+  (println (strip
+            (slurp (->abs-path "~/1.txt"))
+            \' \, \"))
+  (re-seq #"[\d\w]+-[\d\w]+"  (slurp (->abs-path "~/1.txt")))
   ;
   )
 

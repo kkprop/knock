@@ -3,7 +3,7 @@
             [clojure.string :as str]
             [babashka.fs :as fs]
             [babashka.process :as p]
-            ))
+            [knock.simulate :as sim]))
 
 ;;block is the fundamental component of tree shape data
 :block/string
@@ -199,3 +199,24 @@
   (def xs  (str/split-lines s))
   ;;
   )
+
+
+
+(defn paste-roam []
+  (do
+    (sim/send-keys* "Roam Research" [:v :command])
+    (sim/send-keys* "Roam Research" :enter)))
+
+(defn play-bubble []
+  (let []
+    (make-bubble)
+    (cbubble)
+    (paste-roam)
+    (typing-paste)
+    ;;still have 
+    (while (not (bubble?))
+      (cbubble)
+      (typing-paste)
+      (paste-roam)
+      (pause 1000))))
+
