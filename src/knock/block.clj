@@ -221,13 +221,12 @@
      (let [x (if (str/includes? (pbpaste) "。") "。" ".")]
        (make-bubble)
        (cbubble x)
-       (typing-paste interval)
+       ;(typing-paste interval)
        (paste-roam)
     ;;still have 
        (while (not (bubble?))
          (cbubble x)
-         (typing-paste interval)
-         (println)
+         ;(typing-paste interval)
          (paste-roam)
          (pause 1000))))))
 
