@@ -646,6 +646,11 @@
 (defn pbcopy [s]
   (run-cmd! "echo" (str "'" s  "'") "| pbcopy"))
 
+(defn pbimage [path]
+  "image to clipboard"
+  (run-cmd! (format "osascript -e 'set the clipboard to (read (POSIX file \"%s\") as JPEG picture)'" path))
+  )
+
 (defn pbpaste []
   (str/trim
    (run-cmd! :pbpaste)))
@@ -910,7 +915,7 @@
 ;; chop bubble  ;;
 ;;;;;;;;;;;;;;;;;;
 
-(def bub "Ooo·.·ooO")
+(def bub "Ooo· ·ooO")
 (defn make-bubble []
   (let []
     (pbcopy (str (pbpaste) bub))
@@ -936,8 +941,8 @@
        (print (nth s i))
        (flush)
        (pause interval))
-     ;(println s)
-     )))
+     ))
+  )
 
 (defn bbubble []
   (let [step 5]
@@ -954,19 +959,28 @@
     (swap! bubble-i (partial + step))))
 
 (def b-str (atom ""))
-(defn cbubble []
+(defn cbubble
   "bubble by chop-to"
-  (let []
-    (when (bubble?)
-      (do
-        (mock! cur-bubble)
-        (reset! b-str (mock cur-bubble))))
-    (let []
-      (if (< (count @b-str) (count bub))
-        nil
-        (do
-          (pbcopy (chop-to @b-str "。"))
-          (reset! b-str (trim-to* @b-str "。")))))))
+  ([] (cbubble "."))
+  ([x]
+   (let []
+     (when (bubble?)
+       (do
+         (mock! cur-bubble)
+         (reset! b-str (mock cur-bubble))))
+     (let []
+       (if (< (count @b-str) (count bub))
+         nil
+         (do
+           (pbcopy
+             ;;remove ended /n
+             (str/trim
+               (chop-to @b-str x))
+             )
+           (reset! b-str (trim-to* @b-str x))))
+       )
+     )
+   ))
 
 (comment
   (println @b-str)
@@ -3227,6 +3241,10 @@
 
                        identity x)))
 
+(defn quote-path [path]
+  (str/replace path " " "\\ ")
+  )
+
 (defn strip [s & chars]
   (let [c (first chars)]
     (println c)
@@ -3370,8 +3388,7 @@
 
   (mock-clean slow-repeater "abc" 3)
 
-  (->k=v {:PORT 123 :PROTO "tcp"} :prefix "--env")
-  
+  (->k=v {:PORT 123 :PROTO "tcp"} :prefix "--env") 
 
   (alias :main "git checkout main")
   (alias :master "git checkout master")
@@ -3434,3 +3451,158 @@
 
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; simulation of keyboard and mouse events ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(def modifiers ["command" "shift" "control" "option"])
+
+(defn opt-app [app]
+  (str"-a" (format " \"%s\"" app)))
+
+
+(defn opt-text [s]
+  (str "-c " (format "\"%s\"" s))
+  )
+
+(defn send-keys*
+  ([keys]
+   (send-keys* nil (->list keys))
+   )
+
+  ([app keys]
+   (let [
+         xs (->> (->list keys)
+                 (map ->str)
+                 (remove #(in? modifiers % ))
+                 (apply vector)
+                 )
+         ms (->> (->list keys)
+                 (map ->str)
+                 (filter #(in? modifiers % ))
+                 )
+         s (str/join ":" (remove empty?(conj xs (str/join "," ms)))
+                     )
+         ]
+     (run-cmd :sendkeys (when-not (nil? app) (opt-app app))
+              "-c" (format "\"<c:%s>\"" s)
+              )
+     )))
+
+(defn send-text*
+  ([s] (send-keys* nil s))
+  ([app s]
+   (run-cmd :sendkeys (when-not (nil? app) (opt-text s) ))
+   ))
+
+(defn latest-screenshot []
+  (quote-path
+    (join-path (->abs-path "~/Desktop") 
+               (->> 
+                 (str/split-lines (run-cmd! "ls -atr" (->abs-path "~/Desktop")))
+                 (filter #(or
+                            (str/includes? % "截屏")
+                            (str/includes? % "screenshot")
+                            ))
+                 last
+                 ))))
+
+(comment
+  (println (latest-screenshot))
+  )
+
+(defn screenshot []
+  "depends on sendkeys on osx: brew install socsieng/tap/sendkeys"
+  (let [prev (latest-screenshot)]
+    (send-keys* ["3" "command" "shift"] )
+    (pause 3)
+    (while (= prev (latest-screenshot))
+      (println "waiting")
+      (pause 3)
+      )
+    (latest-screenshot)
+    )
+  )
+
+
+(defn wait-latest-screenshot []
+  (let [prev (latest-screenshot)]
+    (while (= prev (latest-screenshot))
+      (println "waiting")
+      (pause 30)
+      )
+    (latest-screenshot)
+   )
+  )
+
+
+(defn mouse-move-to [x y]
+  (run-cmd! :sendkeys "-c" (format "\"<m:%d,%d>\""  x  y))
+  )
+
+(defn mouse-left-down []
+  (run-cmd! :sendkeys "-c" (format "\"<md:left>\""))
+  )
+
+(defn mouse-left-up []
+  (run-cmd! :sendkeys "-c" (format "\"<mu:left>\""))
+  )
+
+(defn mouse-left-down-rect [x0 y0 x y]
+  (run-cmd! :sendkeys "-c" (format "\"<m:%d,%d><md:left><m:%d,%d:1><mu:left>\""
+                                   x0 y0 x y
+                                   ))
+  )
+
+(defn screenshot-rect
+  ([x y]
+   (screenshot-rect 0 0 x y)
+   )
+  ([x0 y0 x y]
+   (let [prev (latest-screenshot)]
+     (do
+       (send-keys* [:command :shift :4])
+       (mouse-left-down-rect x0 y0 x y)
+       (wait-latest-screenshot)
+       ))
+   )
+  )
+
+
+(defn mouse-click
+  ([]
+   (run-cmd! :sendkeys "-c" "\"<m:left>\""  )
+   )
+  ([x y]
+   (let []
+     (mouse-move-to x y)
+     (mouse-click)
+     )
+   )
+  )
+
+(defn mouse-right-click
+  ([] (run-cmd! :sendkeys "-c" "\"<m:right>\""  ))
+  ([x y]
+   (let []
+     (mouse-move-to x y)
+     (mouse-right-click)
+     )
+   )
+  )
+
+
+
+(comment
+
+  (do 
+    (mouse-move-to 200 100)
+    (mouse-click)
+    (send-keys* [:enter])
+    )
+
+  (send-keys* "Google Chrome" :enter)
+
+  )
