@@ -32,6 +32,8 @@
          map-on-key map-on-val mock mock!
          )
 
+
+
 (defn uuid []
   (java.util.UUID/randomUUID)
   )
@@ -257,6 +259,7 @@
 
 
 (comment
+  (def name "lr-on")
   (every? true?
           [((is-or-has {:k 1 :b 2}) {:k 1 :b 2 :c 3})
            ((is-or-has {:k 1}) {:k 1})
@@ -642,6 +645,16 @@
 (make-shell-fn :ls )
 (make-shell-fn :readlink)
 (make-shell-fn :touch)
+
+
+(defn touch! [path] 
+  (let [dir (dirname path)]
+    (when-not (fs/exists? dir)
+      (fs/create-dirs dir )
+      )
+    (touch path)
+    )
+  )
 
 (defn pbcopy [s]
   (run-cmd! "echo" (str "'" s  "'") "| pbcopy"))
@@ -3606,3 +3619,26 @@
   (send-keys* "Google Chrome" :enter)
 
   )
+
+
+
+(defn button-path [name]
+  (join-path work-dir "resources/buttons" (->str name)))
+
+(defn on? [name]
+  (-> name
+      button-path
+      fs/exists?
+      ))
+
+(defn on! [name]
+  "button on. return current button status"
+  (let []
+    (touch! (button-path name))
+    (on? name)))
+
+(defn off! [name]
+  "button off. return current button status"
+  (let []
+    (fs/delete-if-exists (button-path name))
+    (on? name)))
