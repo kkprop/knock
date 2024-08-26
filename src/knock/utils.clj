@@ -661,7 +661,13 @@
 
 (defn pbimage [path]
   "image to clipboard"
-  (run-cmd! (format "osascript -e 'set the clipboard to (read (POSIX file \"%s\") as JPEG picture)'" path))
+  (run-cmd (format "osascript -e 'set the clipboard to (read (POSIX file \"%s\") as JPEG picture)'"
+                   (if (str/starts-with? path "~" )
+                     (->abs-path path)
+                     path
+                     )
+                   )
+           )
   )
 
 (defn pbpaste []
@@ -849,7 +855,7 @@
 (defn trim-to [s sub]
   (if (str/starts-with? s sub)
     s
-    (trim-to (apply str (rest s)) sub)))
+    (recur (apply str (rest s)) sub)))
 
 
 (defn trim-to! [s sub]
@@ -863,7 +869,7 @@
   (if (empty? s) s
       (if (str/starts-with? s sub)
         (triml! s sub)
-        (trim-to* (apply str (rest s)) sub))))
+        (recur (apply str (rest s)) sub))))
 
 (defn trim-to*! [s sub]
   "trim-to but return left and right"
@@ -876,7 +882,7 @@
     s
     (if (str/ends-with? s sub)
       s
-      (chop-to* (apply str (drop-last s)) sub))))
+      (recur (apply str (drop-last s)) sub))))
 
 (defn chop-to*! [s sub]
   "chop-to* but without sub"
@@ -929,11 +935,18 @@
 ;;;;;;;;;;;;;;;;;;
 
 (def bub "Ooo· ·ooO")
+(defn bubble-trim [s]
+  (let [;;chop only main text
+        cs (chop-to! s "\n\n摘录来自")]
+    (if (= s cs)
+      s
+      (-> cs
+          (trimr! "”")
+          (triml! "”")))))
+
 (defn make-bubble []
   (let []
-    (pbcopy (str (pbpaste) bub))
-    )
-  )
+    (pbcopy (str (pbpaste) bub))))
 
 (defn bubble? []
   (str/ends-with? (pbpaste) bub)
@@ -3346,7 +3359,13 @@
       (str/replace "(" "\\(")
       (str/replace ")" "\\)")))
 (defn ->abs-path [x]
-  (readlink "-f" x))
+  (let [p (readlink "-f" x)]
+    (if (empty? p)
+      (readlink "-f" (quote-path x) )
+      p
+      )
+    )
+  )
 
 (defn alias [s x]
   (let [line (-> (str "alias " (str (force-str s) "=" "'" x "'"))
@@ -3507,8 +3526,19 @@
 (defn send-text*
   ([s] (send-keys* nil s))
   ([app s]
-   (run-cmd :sendkeys (when-not (nil? app) (opt-text s) ))
+   (let [xs (map (partial apply str) (partition!! 23 s))]
+     (->> xs
+          (map (fn [x]
+                 (run-cmd :sendkeys (when-not (nil? app) (opt-text x))))
+               )
+          (apply list)
+          )
+     ;;
+     )
+   ;;
    ))
+
+(def s "abc.cde.edf")
 
 (defn latest-screenshot []
   (quote-path

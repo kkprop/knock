@@ -200,7 +200,7 @@
   ;;
   )
 
-
+(def kb "keep-paste")
 
 (defn paste-roam []
   (let [s (pbpaste)]
@@ -208,19 +208,23 @@
       (let [s (if (str/ends-with? s bub) (chop-to! s bub)
                   s)]
         ;(send-keys* "Roam Research" [:v :command :shift])
-        (send-keys* "Roam Research" :ctrl)
-        (send-text* "Roam Research" s)
-        (send-keys* "Roam Research" :enter)
-        )
-      )))
+        (when (on? kb)
+          (send-keys* "Roam Research" :ctrl)
+          (send-text* "Roam Research" s)
+          (send-keys* "Roam Research" :enter))
+        ))))
 
 (defn play-bubble
   ([] (play-bubble 1000))
   ([interval]
    (let [interval (if (nil? interval) 200 interval )]
-     (let [x (if (str/includes? (pbpaste) "。") "。" ".")]
+     (let [s (bubble-trim (pbpaste))
+           x (if (str/includes? s "。") "。" ".")
+           _ (pbcopy s)
+           ]
        (make-bubble)
        (cbubble x)
+       (on! kb)
        ;(typing-paste interval)
        (paste-roam)
     ;;still have 
@@ -228,5 +232,8 @@
          (cbubble x)
          ;(typing-paste interval)
          (paste-roam)
-         (pause 1000))))))
+         (pause 1000))
+       ;;make over to not affect next operation
+       (off! kb)
+       ))))
 
