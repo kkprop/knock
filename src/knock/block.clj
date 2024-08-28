@@ -237,7 +237,7 @@
          (paste-roam)
          (pause 200)
          (while (need-pause?)
-           (pause 1000))
+           (pause 200))
          ;;lift pause already works once. remove
          (when (on? lp)
            (off! lp)

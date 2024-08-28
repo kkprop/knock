@@ -514,7 +514,7 @@
   (let [c-count (count coll)
         per     (quot c-count n)
         xs (partition!! per coll)
-        ;_ (println (count xs))
+        _ (println (count xs))
         ps      (pmap #(worker! f %) xs)
         ]
     (thread!
@@ -523,7 +523,7 @@
 
       )
     ;;TODO fix not in flatten way
-    (pmap (fn [x] @x) ps)
+    (doall (pmap (fn [x] @x) ps))
     )
   )
 
