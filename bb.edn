@@ -85,8 +85,6 @@
   aliyun-change-password (aliyun/change-password (first *command-line-args*))
   ;;
 
-  play-bubble (if (u/on? block/kb)
-                (u/off! block/kb)
-                (block/play-bubble (when-not (empty? *command-line-args*)
-                                                         (u/force-int (first *command-line-args*)))))
-  stop-bubble (u/off! block/kb)}}
+  play-bubble (block/play-bubble (when-not (empty? *command-line-args*)
+                                     (u/force-int (first *command-line-args*))))
+  lift-pause (u/on! block/lp)}}

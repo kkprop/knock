@@ -200,7 +200,15 @@
   ;;
   )
 
-(def kb "keep-paste")
+(def lp "lift-pause")
+(def mp (atom (mouse-pos)))
+
+(defn need-pause? []
+  (and
+   (not= (mouse-pos) @mp)
+   ;;not lifting pause
+   (not (on? lp))
+   ))
 
 (defn paste-roam []
   (let [s (pbpaste)]
@@ -208,32 +216,36 @@
       (let [s (if (str/ends-with? s bub) (chop-to! s bub)
                   s)]
         ;(send-keys* "Roam Research" [:v :command :shift])
-        (when (on? kb)
           (send-keys* "Roam Research" :ctrl)
           (send-text* "Roam Research" s)
           (send-keys* "Roam Research" :enter))
-        ))))
+        )))
 
 (defn play-bubble
   ([] (play-bubble 1000))
   ([interval]
-   (let [interval (if (nil? interval) 200 interval )]
+   (let [interval (if (nil? interval) 200 interval)]
      (let [s (bubble-trim (pbpaste))
            x (if (str/includes? s "。") "。" ".")
-           _ (pbcopy s)
-           ]
+           _ (pbcopy s)]
        (make-bubble)
        (cbubble x)
-       (on! kb)
-       ;(typing-paste interval)
        (paste-roam)
-    ;;still have 
+       ;;still have 
        (while (not (bubble?))
          (cbubble x)
-         ;(typing-paste interval)
          (paste-roam)
-         (pause 1000))
-       ;;make over to not affect next operation
-       (off! kb)
-       ))))
+         (pause 200)
+         (while (need-pause?)
+           (pause 1000))
+         ;;lift pause already works once. remove
+         (when (on? lp)
+           (off! lp)
+           ;;also update mouse pos
+           (reset! mp (mouse-pos))
+           )
+         ;;
+         )))))
+
+
 

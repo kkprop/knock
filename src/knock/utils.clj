@@ -3,7 +3,7 @@
    [clojure.data.csv :as csv]
    [clojure.java.io :as io]
    [clojure.data :as data]
-                                        ;[clojure.reflect :as cr]
+   ;;[clojure.reflect :as cr]
    [clojure.pprint :as pp]
    [clojure.string :as str]
    [clojure.java.shell :as shell :refer [sh]]
@@ -741,8 +741,6 @@
 (defn clear [id]
   (send-keys id "c-c")
   (send-keys id "c-l"))
-
-
 
 
 (defn file-ext [s]
@@ -3538,6 +3536,8 @@
    ;;
    ))
 
+
+
 (def s "abc.cde.edf")
 
 (defn latest-screenshot []
@@ -3637,7 +3637,6 @@
   )
 
 
-
 (comment
 
   (do 
@@ -3648,8 +3647,20 @@
 
   (send-keys* "Google Chrome" :enter)
 
+  (delete-on-exiting "/tmp/exiting")
   )
 
+
+(defn when-exiting [f & args]
+  (-> (Runtime/getRuntime)
+      (.addShutdownHook
+        (Thread. (fn []
+                   (apply f args)
+                   )))))
+
+(defn delete-on-exiting [path]
+  (when-exiting fs/delete-if-exists path)
+  )
 
 
 (defn button-path [name]
@@ -3667,8 +3678,44 @@
     (touch! (button-path name))
     (on? name)))
 
+(defn off? [name] (not (on? name)))
+
 (defn off! [name]
   "button off. return current button status"
   (let []
     (fs/delete-if-exists (button-path name))
     (on? name)))
+
+
+(defn key-chan []
+  (let [in (java.io.PushbackInputStream. System/in)
+        c (chan)
+        ]
+    (loop []
+      (>!! c (.read in) )
+      (when-not (= -1 (.available in))
+        (recur)))))
+
+(defn key-echo []
+  (async-fn
+    #(println ":" %)
+    (key-chan))
+  )
+
+
+(defn hhmmss [s]
+  "01:02 -> 62" 
+  "02:03:06 -> 7386"
+  (reduce +
+          (map #(apply * %)
+               (partition 2
+                          (interleave 
+                            (map (partial exp 60) (take 3 (range )))
+                            (reverse (map force-int (->int s))))))))
+
+
+
+(defn mouse-pos []
+  (str/trim (run-cmd! :sendkeys "mouse-position")))
+
+;;TODO: a thing. subscribe changing
