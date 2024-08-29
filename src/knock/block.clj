@@ -235,9 +235,9 @@
        (while (not (bubble?))
          (cbubble x)
          (paste-roam)
-         (pause 200)
+         (pause 600)
          (while (need-pause?)
-           (pause 200))
+           (pause 1000))
          ;;lift pause already works once. remove
          (when (on? lp)
            (off! lp)

@@ -32,8 +32,6 @@
          map-on-key map-on-val mock mock!
          )
 
-
-
 (defn uuid []
   (java.util.UUID/randomUUID)
   )
@@ -645,7 +643,6 @@
 (make-shell-fn :ls )
 (make-shell-fn :readlink)
 (make-shell-fn :touch)
-
 
 (defn touch! [path] 
   (let [dir (dirname path)]
@@ -3536,10 +3533,6 @@
    ;;
    ))
 
-
-
-(def s "abc.cde.edf")
-
 (defn latest-screenshot []
   (quote-path
     (join-path (->abs-path "~/Desktop") 
@@ -3712,7 +3705,6 @@
                           (interleave 
                             (map (partial exp 60) (take 3 (range )))
                             (reverse (map force-int (->int s))))))))
-
 
 
 (defn mouse-pos []
