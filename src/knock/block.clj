@@ -21,7 +21,7 @@
 
 
 ;; a charactor for chinese
-;; a word for other language
+;; TODO a word for other language
 (defn ->units [x]
   (let [s (str-or-file x)]
     (->>
@@ -227,6 +227,7 @@
    (let [interval (if (nil? interval) 200 interval)]
      (let [s (bubble-trim (pbpaste))
            x (if (str/includes? s "。") "。" ".")
+           is-en? (= x ".")
            _ (pbcopy s)]
        (make-bubble)
        (cbubble x)
@@ -235,17 +236,22 @@
        (while (not (bubble?))
          (cbubble x)
          (paste-roam)
-         (pause 600)
+         (if is-en?
+           (pause interval)
+           (pause (* 1 interval)))
          (while (need-pause?)
-           (pause 1000))
+           (pause 500))
          ;;lift pause already works once. remove
          (when (on? lp)
            (off! lp)
            ;;also update mouse pos
-           (reset! mp (mouse-pos))
-           )
+           (reset! mp (mouse-pos)))
          ;;
          )))))
 
+(comment
+
+  (->units "a.b.c a d e")
+  )
 
 

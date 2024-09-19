@@ -11,13 +11,20 @@
 
 
 (defn pdf [path]
-  (:out
-   (run-cmd "pdftohtml" "-hidden"  "-stdout" (str "'" path "'"))))
+  ;;brew install pdftohtml
+  (let [res (:out
+             ;;TODO too slow. lazy? 
+             (run-cmd "pdftohtml" "-hidden"  "-stdout" (str "'" path "'")))]
+    (when (empty? res)
+      (println "error, please install pdftohtml"))
+    res))
 
 
 (defn epub [path]
-  (:out
-   (run-cmd "einfo" "-p" (str "'" path "'"))))
+  ;;brew install ebook-tools
+  (let []
+    (:out
+     (run-cmd "einfo" "-p" (str "'" path "'")))))
 
 
 
@@ -26,13 +33,16 @@
 ;; books: pdf epub 
 (defn ->html [path]
   (if (str/ends-with? path ".epub")
-    (mock epub path)
+    (if (empty? (mock epub path))
+      (mock! epub path)
+      (mock epub path))
     (if (str/ends-with? path ".pdf")
-      (mock pdf path)
+      (if (empty? (mock pdf path))
+        (mock! pdf path)
+        (mock pdf path))
       (if (str/starts-with? path "http")
         (:body (utils/curl-get path))
-        (mock slurp path)
-        ))))
+        (mock slurp path)))))
 
 
 
@@ -55,9 +65,10 @@
             )))
 
 (defn ->markdown [x]
-  (let [path (tmp-file (str-or-file x))]
-    (markdown path)
-    ))
+  (let [path (if (fs/exists? x)
+               x
+               (tmp-file (str-or-file x)))]
+    (markdown path)))
 
 (defn pick [path]
   (let [f (tmp-file (->markdown path)
@@ -65,6 +76,7 @@
                     :uuid path
                     :dir (if (nil? book-cache-dir)
                             "/tmp/"
+                            ;;/Users/$user/tmp/
                             book-cache-dir))]
 
     (tui/i-filter f)))
@@ -85,6 +97,8 @@
 
 (comment
   (fuzzy-open "木")
+
+  (def path "/Users/dc/Downloads/books/MONEY Master the Game 7 Simple Steps to Financial Freedom (Tony Robbins) (Z-Library).epub")
 
   (tmp-file
    (.getByte
@@ -107,6 +121,7 @@
   ;;TODO support picture 
   (->html "/Users/dc/Downloads/books/Where The Wild Things Are (Maurice Sendak) (Z-Library).pdf")
   (->html "/Users/dc/Downloads/books/The Ethics, Parts 1-5 by Benedict de Spinoza (Translated by R. H. M. Elwes) (z-lib.org).pdf")
+  (markdown "/Users/dc/Downloads/books/Introduction to Probability Models (Sheldon M. Ross) (Z-Library).pdf")
 
 ;;k
   )

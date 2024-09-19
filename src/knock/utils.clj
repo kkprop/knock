@@ -19,7 +19,7 @@
                                          thread
                                          thread-call
                                          pipeline-async]]
-   [clj-yaml.core :as yaml :refer [parse-string]]
+   [clj-yaml.core :as yaml ]
    [clojure.edn :as edn]
    [clojure.walk :as walk]))
 
@@ -126,6 +126,7 @@
     )
 
 (def pp clojure.pprint/pprint)
+(defn tp [& more] (apply println (cur-time-str) more))
 
 (defn mpp [& args]
   (binding [*print-meta* true]
@@ -672,6 +673,13 @@
    (run-cmd! :pbpaste)))
 
 
+(defn notify [name title]
+  "precondition: open script editor notification in settings"
+  (run-cmd (format "osascript -e 'display notification \"%s\" with title \"%s\"'"
+                   name
+                   title)))
+
+
 
 (def work-dir
   (let [path (dirname (System/getProperty "babashka.config"))]
@@ -738,6 +746,8 @@
 (defn clear [id]
   (send-keys id "c-c")
   (send-keys id "c-l"))
+
+
 
 
 (defn file-ext [s]
@@ -831,6 +841,24 @@
           ;;
           ))
    ))
+
+(defn text-cols->hashmap!
+  ([s]
+   (text-cols->hashmap! s #"\s\s+"))
+  ([s separator]
+   (->> (text-cols->hashmap s separator)
+        (map (fn [m]
+               (map-on-key
+                 #(->keyword (str/join "-"
+                                 (map str/lower-case (str/split (force-str %) #"\s+"))
+                                 ))
+                 m
+                 )
+               )
+             )
+        )
+   )
+  )
 
 (defn trimr! [s sub]
   (.substring
@@ -1346,7 +1374,12 @@
 (def j json/generate-string)
 (def e clojure.edn/read-string)
 
-(defn jstr->edn [s] (json/parse-string s true))
+(defn jstr->edn [s]
+  ;;path or string both fine
+  (let [s (if (fs/exists? s) (slurp s) s)]
+    (json/parse-string s true)
+    )
+  )
 (def jstr-to-edn jstr->edn)
 
 ;;ignore failed
@@ -1438,11 +1471,12 @@
 
 
 ;; Provider information loading
-(defn load-json-conf [name] (parse-string (slurp (format "resources/conf/%s.json" name))))
+(defn load-json-conf [name] (json/parse-string (slurp (format "resources/conf/%s.json" name))))
 
 
 (defn load-json-str[s]
-  (let [xs (map #(parse-string % true)
+  "poise loading json lines not json"
+  (let [xs (map #(json/parse-string % true)
                 ;;force to be vector in order to parse multiple json objects
                 (str/split-lines s))]
     (if (= 1 (count xs))
@@ -1908,7 +1942,7 @@
   (let [[start mask] (str/split ip-range #"/")
         [a b c d] (str/split start #"\.")
         dn (force-int d)
-        count (exp 2 (- 32 (force-int 27)))
+        count (exp 2 (- 32 (force-int mask)))
                  ]
     (->>
      (range count)
@@ -2753,6 +2787,14 @@
     )
   )
 
+(defn mock-change? [f & args]
+  (let [first-call-mock? (not (apply mock-exists? f args))
+        prev (apply mock f args)]
+    (if first-call-mock?
+      true
+      (not (= prev (apply mock! f args)))
+      )))
+
 (defn recent-files [hours-from-now root pattern]
   (->>
    (fs/glob root pattern)
@@ -3338,6 +3380,17 @@
              ->ips)
         ips))))
 
+(defn str-or-file->ips! [path]
+  "ignore ip format like: #127.0.0.1 lines"
+  (let [ips (str-or-file->ips path)
+        lines (slurp-lines path)
+        ]
+    (->> ips
+         (remove #(in? lines (str "#" %) ))
+         )
+    )
+  )
+
 (defn str-or-file->lines [& xs]
   (let []
     (->> xs
@@ -3711,3 +3764,28 @@
   (str/trim (run-cmd! :sendkeys "mouse-position")))
 
 ;;TODO: a thing. subscribe changing
+
+
+(defn filization [m]
+  ;(clojure.walk/prewalk (fn [x] (println x) x))
+  )
+
+(comment
+  (def m [:bin [:yin :yang]
+           :oct [:sky :marsh :fire :thunder
+                 :wind :water :mountain :earth]
+           :hex [:force :displacement
+                 :great-progression :great-invigorating
+                 :small-harvest :attending
+                 :great-accumulating :pervading]
+           ])
+  (filization
+    ()
+    )
+  )
+
+
+
+
+
+
