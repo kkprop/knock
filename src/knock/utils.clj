@@ -55,6 +55,8 @@
     )
   )
 
+(def ->kk clojure.walk/keywordize-keys)
+
 (defn join-cmd [& cmd]
   (str/join " " (->> cmd (map force-str))))
 
@@ -1367,7 +1369,6 @@
     )
   )
 
-(++ days-left expire-date)
 
 
 
@@ -1390,8 +1391,6 @@
       nil)
     )
   )
-
-(def html-parse clojure.data.xml/parse-str)
 
 (defn object? [x]
   (instance? clojure.lang.IFn x))
@@ -3780,9 +3779,27 @@
                  :great-accumulating :pervading]
            ])
   (filization
-    ()
-    )
-  )
+   ())
+
+
+
+(defn ok? [x]
+  (let [not-ok (str "❌" x)
+        ok (str "✅ " x)
+        ]
+    (if (map? x)
+      (if (= 0 (:exit x))
+        ok
+        not-ok
+        )
+      (case x
+        (str/includes? x "error") not-ok
+        ;(str/includes? x "Connection timed out") not-ok
+        ;(str/includes? x "Connection refuse") not-ok
+        ok
+        )
+      )))
+
 
 
 
