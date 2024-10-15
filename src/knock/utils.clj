@@ -2106,23 +2106,28 @@
 
 
 (defn csv-to-hashmap [csv-data]
-  (map zipmap
-       (->> (first csv-data)
-            (map #(if-not (keyword? %)
-                    (if (empty? %)
-                      (keyword (str "nil-" (cur-ts-13)))
-                      (->keyword %)
-                      )
-                          %)
-                 )
-            repeat)
-       (rest csv-data)))
+  (let [header (->> (first csv-data)
+                    (map #(if (keyword? %)
+                            %
+                            (if (empty? %)
+                              (keyword (str "nil-" (cur-ts-13)))
+                              (->keyword %)
+                              )
+                            )
+                         )
+                    )]
+    ;(println (map first (first csv-data)))
+    (map zipmap
+         (repeat header)
+         (rest csv-data))))
 
 (defn load-csv [fname]
   (with-open [reader
               (io/reader fname)]
     (doall
      (csv/read-csv reader))))
+
+
 
 (defn load-csv-to-hashmap [fname]
   (csv-to-hashmap (load-csv fname))
@@ -3415,7 +3420,11 @@
   )
 
 (defn alias [s x]
-  (let [line (-> (str "alias " (str (force-str s) "=" "'" x "'"))
+  (let [qstr (if (str/includes? x "'" )
+               "\""
+               "'"
+               )
+        line (-> (str "alias " (str (force-str s) "=" qstr x qstr))
                  (quote-parenthese)
                  )
         f (if (osx?)
@@ -3779,8 +3788,9 @@
                  :great-accumulating :pervading]
            ])
   (filization
-   ())
+   ()) 
 
+)
 
 
 (defn ok? [x]
