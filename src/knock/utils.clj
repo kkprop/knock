@@ -55,6 +55,13 @@
     )
   )
 
+(defn quote-of-str [x]
+  (if (str/includes? x "'" )
+    "\""
+    "'"
+    )
+  )
+
 (def ->kk clojure.walk/keywordize-keys)
 
 (defn join-cmd [& cmd]
@@ -692,8 +699,13 @@
 
 
 (defn base64-encode [s]
-  (str/trim-newline
-   (:out (run-cmd :echo s "| base64"))))
+  (let [f (tmp-file s)]
+    (str/join ""
+              (str/split-lines
+                (:out (run-cmd :base64 f))
+                ))
+    )
+  )
 
 (defn base64-decode [s]
   (str/trim-newline
@@ -1155,7 +1167,12 @@
 
 (defn cur-year []
   (parse-int
-   (cur-time-str "YYYY")))
+   (cur-time-str "YYYY"))
+  )
+
+(defn cur-date-str []
+  (cur-time-str "YYYY-MM-dd")
+  )
 
 
 (defn str-to-date-by-fmt [s fmt]
@@ -3427,7 +3444,7 @@
         line (-> (str "alias " (str (force-str s) "=" qstr x qstr))
                  (quote-parenthese)
                  )
-        f (if (osx?)
+        f    (if (osx?)
             (ls "$HOME/.bash_profile")
             (ls "$HOME/.bashrc"))]
     (when-not (in? (slurp-lines f) line)
