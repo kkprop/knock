@@ -47,6 +47,15 @@
   (let [d (e/chrome)]
     (save-etaoin-local-address d)))
 
+(defn driver-ok? [{:keys []
+                   :as d}]
+  (try
+    (e/get-source d)
+    true
+    (catch Exception e
+      false)))
+
+
 
 ;;u sing existing driver, load a new session
 (defn load-driver []
@@ -124,56 +133,16 @@
 
 
 (comment
+  )
 
-  (def d1 (e/chrome))
-  (def d2 (e/chrome))
-  (e/get-source d1)
-  (e/get-source d2)
-  (e/chrome (conn d1))
-  (e/go d1 "https://www.baidu.com")
-  (e/go d2 "https://www.google.com")
-
-  (e/chrome (select-keys d2 [:host :port]))
-
-  (e/go (e/chrome d1) "www.baidu.com")
-  (e/go (conn d2) "www.163.com")
-
-  (def session "94b6717eef857f73f33a982615a3b4e3")
-  (def d (driver))
-  (def name "SRM")
-  @name-to-session
-  @driver-sessions
-
-  (name-session
-   (driver)
-   "SRM")
-
-  (driver)
-
-  (e/with-chrome driver
-    (e/go driver "https://clojure.org"))
-
-  (locate "https://www.futunn.com/heatmap-us"
-          (driver)
-          "stock-treemap")
-
-  (println
-   (e/get-element-inner-html
-    (driver) {:class "stock-treemap"}))
-
-
-  (reset! driver-cache {})
-  (go "https://www.163.com")
-  (go "https://zh.wikisource.org")
-  (e/get-status (driver))
-  (e/delete-session (driver)))
 
 (defn go
   ([url]
    (e/go (driver) url))
   ([url name]
-   (let []
-     (when (nil? (get @name-to-session name))
+   (let [sid (get @name-to-session name)
+         d (sid->driver sid)]
+     (when (or (nil? sid) (not (driver-ok? d)))
        (let [d (new-driver)]
          (name-session d name)
          (e/go d url)))
