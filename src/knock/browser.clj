@@ -44,9 +44,9 @@
 
 ;;load a new etaoin driver load one
 (defn new-driver []
-  (let [d (e/chrome)
-        ]
+  (let [d (e/chrome)]
     (save-etaoin-local-address d)))
+
 
 ;;u sing existing driver, load a new session
 (defn load-driver []
@@ -125,8 +125,18 @@
 
 (comment
 
-  (e/go (e/chrome d) "www.baidu.com")
-  (e/go d2 "www.163.com")
+  (def d1 (e/chrome))
+  (def d2 (e/chrome))
+  (e/get-source d1)
+  (e/get-source d2)
+  (e/chrome (conn d1))
+  (e/go d1 "https://www.baidu.com")
+  (e/go d2 "https://www.google.com")
+
+  (e/chrome (select-keys d2 [:host :port]))
+
+  (e/go (e/chrome d1) "www.baidu.com")
+  (e/go (conn d2) "www.163.com")
 
   (def session "94b6717eef857f73f33a982615a3b4e3")
   (def d (driver))
@@ -151,12 +161,12 @@
    (e/get-element-inner-html
     (driver) {:class "stock-treemap"}))
 
+
   (reset! driver-cache {})
   (go "https://www.163.com")
   (go "https://zh.wikisource.org")
   (e/get-status (driver))
   (e/delete-session (driver)))
-
 
 (defn go
   ([url]
@@ -164,9 +174,9 @@
   ([url name]
    (let []
      (when (nil? (get @name-to-session name))
-       (let [d (pp (new-driver))]
+       (let [d (new-driver)]
          (name-session d name)
-         (go url)))
+         (e/go d url)))
      (sid->driver (get @name-to-session name)))))
 
 (defn ->session
