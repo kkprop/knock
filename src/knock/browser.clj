@@ -36,28 +36,38 @@
 
 (utils/config :chrome-profile)
 
-;;load a new etaoin driver load one
-(defn new-driver []
-  (let [d (e/chrome
-          {:profile chrome-profile})
-        c (conn d)]
-    (spit driver-edn-path (with-out-str (clojure.pprint/pprint c)))
+(defn save-etaoin-local-address [d]
+  (let []
+    (spit driver-edn-path (with-out-str (clojure.pprint/pprint (conn d))))
     d
     ))
 
-;;using existing driver, load a new session
+;;load a new etaoin driver load one
+(defn new-driver []
+  (let [d (e/chrome)
+        ]
+    (save-etaoin-local-address d)))
+
+;;u sing existing driver, load a new session
 (defn load-driver []
-  (let [d (try (timeout 3000 (partial e/chrome (utils/load-edn driver-edn-path)))
-             ;;3 seconds should be loaded
-             ;;any exception happen means we need a new-driver too.
-             ;;  just return :timed-out to trigger a new-driver call
-             (catch Exception e :timed-out))]
+  (let [d (try (timeout 3000 (e/chrome
+                                      (if (fs-exists? driver-edn-path)
+                                        (utils/load-edn driver-edn-path)
+                                        nil)))
+               ;;3 seconds should be loaded
+               ;;any exception happen means we need a new-driver too.
+               ;;  just return :timed-out to trigger a new-driver call
+               (catch Exception e :timed-out))]
+                                        ;(println d)
     (if (= d :timed-out)
       (try
         ;;try load a new chrome window
         (new-driver)
         (catch Exception e (run-cmd "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable")))
-      d)
+      (do
+        ;;update etaolin local-address
+        (save-etaoin-local-address d)
+        ))
     ;;
     ))
 
@@ -84,7 +94,50 @@
     @driver-cache
     ))
 
+(def driver-sessions (atom {}))
+(def name-to-session (atom {}))
+
+(defn note-session [{:keys [session]
+                     :as d}]
+  (let []
+    (when (nil? (get @driver-sessions session))
+      (swap! driver-sessions merge {session d}))
+    (get @driver-sessions session)
+    ))
+(defn name-session
+  ([{:keys [session] :as d}]
+   (name-session d session))
+  ([{:keys [session] :as d} name]
+   (let []
+     (note-session d)
+    ;;update name to session index
+     (swap! name-to-session assoc name session)
+     (let [dd (assoc d :name name)]
+       (swap! driver-sessions merge dd)
+       dd
+       ))))
+
+(defn sid->driver [session]
+  (get @driver-sessions session)
+  )
+
+
+
 (comment
+
+  (e/go (e/chrome d) "www.baidu.com")
+  (e/go d2 "www.163.com")
+
+  (def session "94b6717eef857f73f33a982615a3b4e3")
+  (def d (driver))
+  (def name "SRM")
+  @name-to-session
+  @driver-sessions
+
+  (name-session
+   (driver)
+   "SRM")
+
   (driver)
 
   (e/with-chrome driver
@@ -105,13 +158,30 @@
   (e/delete-session (driver)))
 
 
-(defn go [url]
-  (e/go (driver) url)
-  )
+(defn go
+  ([url]
+   (e/go (driver) url))
+  ([url name]
+   (let []
+     (when (nil? (get @name-to-session name))
+       (let [d (pp (new-driver))]
+         (name-session d name)
+         (go url)))
+     (sid->driver (get @name-to-session name)))))
+
+(defn ->session
+  ([url name]
+   (let []
+     (go url name)
+     ;;
+     )))
+
+
 
 (defn click [& q]
   (e/click (driver) (vec q))
   )
+
 
 (defn search [url word]
   (e/go (driver) (str url word)))
@@ -122,11 +192,17 @@
     )
   )
 
+(defn wiki-source [name]
+  (e/with-chrome-headless driver
+    (e/go driver (str "https://zh.m.wikisource.org/wiki/" name))
+     (e/get-element-inner-html driver "//*[@class='mw-body-content']")
+    ))
+
 
 (comment
   (driver)
   (new-driver)
-  (wiki-source "信心铭")
+  (pp (wiki-source "信心铭"))
   )
 
 (defn kv-url [& args]

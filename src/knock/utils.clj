@@ -30,6 +30,7 @@
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
          file-name ext-name var-meta async-fn tail-f
          map-on-key map-on-val mock mock!
+         trimr!
          )
 
 (defn uuid []
@@ -654,6 +655,9 @@
 (make-shell-fn :readlink)
 (make-shell-fn :touch)
 
+;;make it easier. or maybe not.
+(def fs-exists? fs/exists?)
+
 (defn touch! [path] 
   (let [dir (dirname path)]
     (when-not (fs/exists? dir)
@@ -874,11 +878,12 @@
    )
   )
 
+;;TOFIX: if ends not sub. should not chop
 (defn trimr! [s sub]
-  (.substring
-   s
-   0
-   (- (count s) (count sub))))
+  (if (str/ends-with? s sub)
+    (.substring s 0 (- (count s) (count sub)))
+    s
+    ))
 
 (defn triml! [s sub]
   (.substring

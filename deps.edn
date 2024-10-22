@@ -1,5 +1,6 @@
 {:deps
  {selmer/selmer {:mvn/version "1.12.50"},
+  com.datomic/peer     {:mvn/version "1.0.7187"}
   org.clojure/clojure {:mvn/version "1.11.1"},
   org.clojure/tools.logging {:mvn/version "1.1.0"},
   org.clojure/core.specs.alpha {:mvn/version "0.2.62"},
