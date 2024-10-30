@@ -17,7 +17,6 @@
    [clojure.pprint :as pp]
    [clojure.string :as str]))
 
-
 ;; disable etaoin detail log
 (timbre/set-level! :info)
 
@@ -33,8 +32,10 @@
    )
 
 (def driver-edn-path "etaoin-driver-conn.edn")
+;;alive sessions could be preserved. with their names, url
 
 (utils/config :chrome-profile)
+
 
 (defn save-etaoin-local-address [d]
   (let []
@@ -175,7 +176,8 @@
   (e/with-chrome-headless driver
     (e/go driver (str "https://zh.m.wikisource.org/wiki/" name))
      (e/get-element-inner-html driver "//*[@class='mw-body-content']")
-    ))
+    )
+  )
 
 
 (comment

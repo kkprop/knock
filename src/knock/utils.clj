@@ -30,7 +30,7 @@
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
          file-name ext-name var-meta async-fn tail-f
          map-on-key map-on-val mock mock!
-         trimr!
+         trimr! pause cur-ts
          )
 
 (defn uuid []
@@ -134,6 +134,46 @@
       (future-cancel fut))
     ret)
     )
+;;function params to 0
+(defn partial! [f & args]
+  (apply partial f args)
+  )
+
+(defn retry-n-times [n f & args]
+  (if (<= n 0)
+    ;;no more chanc
+    (throw (Exception. (str "retry-n-times still failed" )))
+    (let [res (try
+                (let [res (apply f args)]
+                  res
+                  )
+                (catch Exception e
+                  (println e)
+                  (pause 1000)
+                  :need-another-retry-202
+                  )
+                )]
+      (if (not= res :need-another-retry-202)
+        res
+        (recur (- n 1) f)
+        ))))
+
+(defn half-chance-exception [x]
+  (let [n (rem (cur-ts) 10)]
+    (if (< n 5)
+      (throw
+        (Exception. (str x " " n " need to reach 5 before seizing throw exceptions"))
+        )
+      n)
+    ))
+
+
+(comment
+  ((partial! half-chance-exception 'hi ))
+
+  (retry-n-times 6 half-chance-exception 'hi)
+
+  )
 
 (def pp clojure.pprint/pprint)
 (defn tp [& more] (apply println (cur-time-str) more))
