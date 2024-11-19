@@ -209,6 +209,13 @@
    ;;not lifting pause
    (not (on? lp))
    ))
+(defn reset-pause []
+  (when (on? lp)
+    (off! lp)
+           ;;also update mouse pos
+    (reset! mp (mouse-pos))))
+
+(def pasting (atom false))
 
 (defn paste-roam []
   (let [s (pbpaste)]
@@ -218,6 +225,7 @@
         ;(send-keys* "Roam Research" [:v :command :shift])
           (send-keys* "Roam Research" :ctrl)
           (send-text* "Roam Research" s)
+          (reset! pasting true)
           (send-keys* "Roam Research" :enter))
         )))
 
@@ -226,15 +234,24 @@
   ([interval]
    (let [interval (if (nil? interval) 200 interval)]
      (let [s (bubble-trim (pbpaste))
-           x (if (str/includes? s "。") "。" ".")
-           is-en? (= x ".")
+           chopper (if (str/includes? s "。") "。" ".")
+           is-en? (= chopper ".")
            _ (pbcopy s)]
        (make-bubble)
-       (cbubble x)
+       (cbubble chopper)
        (paste-roam)
-       ;;still have 
+       ;;force stop sendkeys
+       (go!
+        (while true
+          (when (and @pasting (need-pause?))
+            (kill "sendkeys")
+            (println "force killing sendkeys")
+            (reset-pause))
+          (pause 100)))
+
+;;still have 
        (while (not (bubble?))
-         (cbubble x)
+         (cbubble chopper)
          (paste-roam)
          (if is-en?
            (pause interval)
@@ -242,10 +259,7 @@
          (while (need-pause?)
            (pause 500))
          ;;lift pause already works once. remove
-         (when (on? lp)
-           (off! lp)
-           ;;also update mouse pos
-           (reset! mp (mouse-pos)))
+         (reset-pause)
          ;;
          )))))
 

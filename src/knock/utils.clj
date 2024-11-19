@@ -698,6 +698,14 @@
 ;;make it easier. or maybe not.
 (def fs-exists? fs/exists?)
 
+(defn kill [name]
+  (run-cmd "ps axu | grep " name  "| grep -v grep | tr -s ' ' | cut -d ' ' -f 2 | xargs kill"))
+
+;;force kill -9
+(defn kill! [name]
+  (run-cmd "ps axu | grep " name  "| grep -v grep | tr -s ' ' | cut -d ' ' -f 2 | xargs kill -9")
+  )
+
 (defn touch! [path] 
   (let [dir (dirname path)]
     (when-not (fs/exists? dir)
@@ -878,6 +886,7 @@
   (hash-map :a )
 
   (map kv 
+       (->k=v )
        (chop-by "k=v,k1=v1" \, \=)
        )
 
@@ -920,10 +929,10 @@
 
 ;;TOFIX: if ends not sub. should not chop
 (defn trimr! [s sub]
-  (if (str/ends-with? s sub)
-    (.substring s 0 (- (count s) (count sub)))
-    s
-    ))
+  ;;chop-to are using this bug... 
+  (.substring s 0 (- (count s) (count sub)))
+  ;(if (str/ends-with? s sub) (.substring s 0 (- (count s) (count sub))) s)
+  )
 
 (defn triml! [s sub]
   (.substring
@@ -2294,6 +2303,21 @@
    ))
 
 
+(defn parse-k=v [s]
+  (->> 
+    (str/split-lines s)
+    (map #(first (re-seq #"(.*)=(.*)" %)))
+    ;;only need k and v
+    (map (fn [[_ k v]]
+           (if (nil? k)
+             nil
+             {k v}
+             )
+           ))
+    (remove nil?)
+    )
+  )
+
 (defn word-capitial->dash [x]
   (let [s (force-str x)
         words (str/split (str/replace s #"\p{Lu}" " "))]
@@ -3374,6 +3398,10 @@
   (str/replace path " " "\\ ")
   )
 
+(defn quote-back-slash [s]
+  (str/replace s "\\" "\\\\")
+  )
+
 (defn strip [s & chars]
   (let [c (first chars)]
     (println c)
@@ -3480,6 +3508,7 @@
       )
     )
   )
+
 
 (defn alias [s x]
   (let [qstr (if (str/includes? x "'" )
