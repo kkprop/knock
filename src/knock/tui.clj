@@ -31,18 +31,27 @@
     )
   )
 
-(defn choose
-  ([xs]
-   (choose xs 0)
-   )
-  ;;default seconds
-  ([xs timeout]
-   (->
-    (b/gum :choose xs :timeout (str timeout "s"))
-    :result
-    first
+(def tc (atom 0))
+
+(defn tc! []
+  (let [res @tc]
+    (swap! tc inc)
+    res
     )
-   )
   )
 
+(defn confirm? [& xs]
+  "if options appointed. will choose them one by one"
+  (if (empty? xs)
+    (= 0 (:status (b/gum :confirm)))
+    (let [i (mod (tc!) (count xs))] 
+      (nth xs i )
+      )
+    ))
+
+
+(comment 
+  (confirm? true false)
+
+  )
 

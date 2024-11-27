@@ -563,7 +563,7 @@
   (let [c-count (count coll)
         per     (quot c-count n)
         xs (partition!! per coll)
-        _ (println (count xs))
+        ;_ (println (count xs))
         ps      (pmap #(worker! f %) xs)
         ]
     (thread!
@@ -698,11 +698,11 @@
 ;;make it easier. or maybe not.
 (def fs-exists? fs/exists?)
 
-(defn kill [name]
+(defn kill-by-ps [name]
   (run-cmd "ps axu | grep " name  "| grep -v grep | tr -s ' ' | cut -d ' ' -f 2 | xargs kill"))
 
 ;;force kill -9
-(defn kill! [name]
+(defn kill-by-ps! [name]
   (run-cmd "ps axu | grep " name  "| grep -v grep | tr -s ' ' | cut -d ' ' -f 2 | xargs kill -9")
   )
 
@@ -2263,6 +2263,10 @@
 (defn make-url [prefix path & kv]
   (let [kv-pairs (flatten
                   (map #(if (map? %) (flatten (seq %)) %) kv))
+        prefix (if (str/ends-with? prefix "/")
+                 prefix
+                 (str prefix "/")
+                 )
         params (->> kv-pairs
                     (partition 2)
                     (map #(str (name (first %))

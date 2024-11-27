@@ -5,6 +5,7 @@
             [babashka.process :as p]
             ))
 
+
 ;;block is the fundamental component of tree shape data
 :block/string
 
@@ -237,6 +238,7 @@
            chopper (if (str/includes? s "。") "。" ".")
            is-en? (= chopper ".")
            _ (pbcopy s)]
+       (off! lp)
        (make-bubble)
        (cbubble chopper)
        (paste-roam)
@@ -244,7 +246,7 @@
        (go!
         (while true
           (when (and @pasting (need-pause?))
-            (kill "sendkeys")
+            (kill-by-ps "sendkeys")
             (println "force killing sendkeys")
             (reset-pause))
           (pause 100)))
@@ -268,4 +270,5 @@
   (->units "a.b.c a d e")
   )
 
+(tap> pasting)
 
