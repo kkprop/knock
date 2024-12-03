@@ -1,7 +1,7 @@
 (ns knock.chat
   (:require [knock.utils :refer :all]
             [babashka.curl :as curl]
-            [knock.tui :refer :all]
+            [knock.tui :as tui :refer :all]
             [clojure.string :as str]
             [babashka.process :as proc]
             [babashka.fs :as fs]))
@@ -30,7 +30,7 @@
   (let [_ (touch input-file)]
     (let [xs (->> (models)
                   (remove pid-running?))
-          m (choose (models) 10)
+          m (tui/choose (models) 10)
           w (-> m
                 basename
                 file-name
