@@ -13,7 +13,7 @@
    [babashka.curl :as curl]
    [clojure.zip :as z]
    [clojure.core.async :as async :refer [go go-loop
-                                         chan to-chan into
+                                         chan to-chan
                                          <! >!! >! close!
                                          <!! alt!
                                          thread
@@ -3838,7 +3838,7 @@
 
 (defn key-chan []
   (let [in (java.io.PushbackInputStream. System/in)
-        c (chan)
+ c (chan)
         ]
     (loop []
       (>!! c (.read in) )
@@ -3874,16 +3874,16 @@
   )
 
 (comment
-  (def m [:bin [:yin :yang]
+  (def m {:bin [:yin :yang]
            :oct [:sky :marsh :fire :thunder
                  :wind :water :mountain :earth]
            :hex [:force :displacement
                  :great-progression :great-invigorating
                  :small-harvest :attending
                  :great-accumulating :pervading]
-           ])
+           })
   (filization
-   ()) 
+   ())
 
 )
 
@@ -3906,8 +3906,7 @@
       )))
 
 
+(comment
 
-
-
-
+  )
 
