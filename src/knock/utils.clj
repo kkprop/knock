@@ -736,10 +736,36 @@
 
 (defn notify [name title]
   "precondition: open script editor notification in settings"
+  ;(def name "hi")
+  ;(def title "y")
   (run-cmd (format "osascript -e 'display notification \"%s\" with title \"%s\"'"
                    name
                    title)))
 
+(defn osascript [& args]
+  (run-cmd :osascript "-e '"
+           (join-cmd args)))
+
+(defn key-code [x]
+                                        ;(def x 145)
+  (run-cmd (format "osascript -e 'tell application \"System Events\" to key code %d'" x ) )
+  )
+
+(defn brightness-down []
+  (key-code 145)
+  )
+
+(defn brightness-up []
+  (key-code 144)
+  )
+
+(defn max-brightness []
+  (count (repeatedly 16 brightness-up))
+  )
+
+(defn min-brightness []
+  (count (repeatedly 16 brightness-down))
+  )
 
 
 (def work-dir
@@ -3838,7 +3864,7 @@
 
 (defn key-chan []
   (let [in (java.io.PushbackInputStream. System/in)
- c (chan)
+        c (chan)
         ]
     (loop []
       (>!! c (.read in) )
@@ -3874,16 +3900,16 @@
   )
 
 (comment
-  (def m {:bin [:yin :yang]
+  (def m [:bin [:yin :yang]
            :oct [:sky :marsh :fire :thunder
                  :wind :water :mountain :earth]
            :hex [:force :displacement
                  :great-progression :great-invigorating
                  :small-harvest :attending
                  :great-accumulating :pervading]
-           })
+           ])
   (filization
-   ())
+   ()) 
 
 )
 
@@ -3906,7 +3932,8 @@
       )))
 
 
-(comment
 
-  )
+
+
+
 

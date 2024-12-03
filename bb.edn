@@ -83,8 +83,13 @@
 
   aws-change-password (aws/change-password (first *command-line-args*))
   aliyun-change-password (aliyun/change-password (first *command-line-args*))
-  ;;
+
+  ;;click until brightest
+  display-on (u/max-brightness)
+  ;;click until display off
+  display-off (u/min-brightness)
 
   play-bubble (block/play-bubble (when-not (empty? *command-line-args*)
-                                     (u/force-int (first *command-line-args*))))
+                                   (u/force-int (first *command-line-args*))))
+  ;;continue bubble
   lift-pause (u/on! block/lp)}}

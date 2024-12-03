@@ -17,6 +17,9 @@
         - then in the shell simply query wordnet 
             - wn Hesse
             - wn Hermann von Helmholtz 
+    - one command display off
+      - bb display-off
+      - also setting alias shortcut: bb alias doff "cd ~/kkprop/knock && bb display-off" 
 - dependency
     - [babashka](https://github.com/babashka/babashka/releases)
             - brew install borkdude/brew/babashka
