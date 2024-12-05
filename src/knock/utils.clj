@@ -175,6 +175,19 @@
 
   )
 
+
+(defn portal! []
+  "make open portal easier"
+  ;;deps: djblue/portal {:mvn/version "0.32.0"} 
+  (let []
+    (require '[portal.api])
+    ;;open the portal window
+    (portal.api/open)
+    ;;hook to default tap>
+    (add-tap #'portal.api/submit)
+    )
+  )
+
 (def pp clojure.pprint/pprint)
 (defn tp [& more] (apply println (cur-time-str) more))
 
@@ -572,7 +585,7 @@
 
       )
     ;;TODO fix not in flatten way
-    (doall (pmap (fn [x] @x) ps))
+    (apply concat (doall (pmap (fn [x] @x) ps)))
     )
   )
 
@@ -747,8 +760,15 @@
            (join-cmd args)))
 
 (defn key-code [x]
-                                        ;(def x 145)
+  ;;darker
+  ;;(def x 145)
+  ;;brighter
+  ;;(def x 144)
   (run-cmd (format "osascript -e 'tell application \"System Events\" to key code %d'" x ) )
+  )
+
+(defn repeat-key-code [n x]
+  (run-cmd (format "osascript -e 'repeat %d times \n tell application \"System Events\" to key code %d \n end repeat'" n x ) )
   )
 
 (defn brightness-down []
@@ -760,11 +780,11 @@
   )
 
 (defn max-brightness []
-  (count (repeatedly 16 brightness-up))
+  (repeat-key-code 16 144)
   )
 
 (defn min-brightness []
-  (count (repeatedly 16 brightness-down))
+  (repeat-key-code 16 145)
   )
 
 
