@@ -197,7 +197,10 @@
 未去亦無去
 離已去未去
 去時亦無去")
-  (def xs  (str/split-lines s))
+  s
+  (def xs  (second (str/split-lines s)))
+  LISP
+    List Processing 
   ;;
   )
 
@@ -227,7 +230,8 @@
           (send-keys* "Roam Research" :ctrl)
           (send-text* "Roam Research" s)
           (reset! pasting true)
-          (send-keys* "Roam Research" :enter))
+          (send-keys* "Roam Research" :enter)
+          )
         )))
 
 (defn play-bubble
@@ -267,8 +271,9 @@
 
 (comment
 
-  (->units "a.b.c a d e")
-  )
+  (= 2 "2")
+
+  (->units "a.b.c a d e"))
 
 (tap> pasting)
 

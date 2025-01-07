@@ -88,6 +88,7 @@
   display-on (u/max-brightness)
   ;;click until display off
   display-off (u/min-brightness)
+  auto-doff (u/auto-doff)
 
   play-bubble (block/play-bubble (when-not (empty? *command-line-args*)
                                    (u/force-int (first *command-line-args*))))

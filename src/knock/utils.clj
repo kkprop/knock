@@ -11,6 +11,7 @@
    [babashka.fs :as fs]
    [babashka.process :as proc]
    [babashka.curl :as curl]
+   [portal.api :as portal]
    [clojure.zip :as z]
    [clojure.core.async :as async :refer [go go-loop
                                          chan to-chan
@@ -31,6 +32,7 @@
          file-name ext-name var-meta async-fn tail-f
          map-on-key map-on-val mock mock!
          trimr! pause cur-ts
+         mock
          )
 
 (defn uuid []
@@ -94,6 +96,7 @@
                         second 
                         )
                  ]
+             ;;TODO bug when deal with aws cli response
              (if-not (nil? kk)
                {(->keyword (str/replace kk " " "-")) v}
                (if (and (not(empty?  k))
@@ -1060,9 +1063,12 @@
 
 (defn re-seq! [re s]
   "first match second part of matched"
-  (second (first (re-seq re s)))
-  )
+  (if (nil? s) nil
+      (second (first (re-seq re s)))))
 
+(defn re-seq!! [re xs]
+  (->> xs
+       (map #(re-seq! re %))))
 
 
 ;;;;;;;;;;;;;;;;;;
@@ -1131,6 +1137,7 @@
        (do
          (mock! cur-bubble)
          (reset! b-str (mock cur-bubble))))
+     ;(def x "。")
      (let []
        (if (< (count @b-str) (count bub))
          nil
@@ -3551,6 +3558,7 @@
       (str/replace "(" "\\(")
       (str/replace ")" "\\)")))
 (defn ->abs-path [x]
+  ;;
   (let [p (readlink "-f" x)]
     (if (empty? p)
       (readlink "-f" (quote-path x) )
@@ -3952,7 +3960,15 @@
       )))
 
 
+(defn display-data []
+  (run-cmd! "system_profiler SPDisplaysDataType")
+  )
 
+(defn auto-doff []
+  (when (str/includes? (display-data) "PHL")
+    (min-brightness)
+    )
+  )
 
 
 
