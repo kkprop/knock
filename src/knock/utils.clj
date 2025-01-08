@@ -3569,16 +3569,16 @@
 
 
 (defn alias [s x]
-  (let [qstr (if (str/includes? x "'" )
+  (let [qstr (if (str/includes? x "'")
                "\""
-               "'"
-               )
+               "'")
         line (-> (str "alias " (str (force-str s) "=" qstr x qstr))
-                 (quote-parenthese)
-                 )
-        f    (if (osx?)
-            (ls "$HOME/.bash_profile")
-            (ls "$HOME/.bashrc"))]
+                 (quote-parenthese))
+        f    (->abs-path (if (osx?)
+                           (if (fs/exists? "$HOME/.bash_profile")
+                             "$HOME/.bash_profile"
+                             "$HOME/.zshrc")
+                           (ls "$HOME/.bashrc")))]
     (when-not (in? (slurp-lines f) line)
       (spit-line f line))))
 
