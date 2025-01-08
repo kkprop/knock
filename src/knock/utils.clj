@@ -78,6 +78,12 @@
   (sh "sh" "-c" (apply join-cmd cmd))
   )
 
+;;t seconds
+(defn run-cmd-with-timeout [t & cmd]
+  (sh "sh" (format "-c timeout %d ' " t) (str (apply join-cmd cmd) " '"))
+  )
+
+
 (defn run-cmd! [& cmd]
   (:out (apply run-cmd cmd))
   )
@@ -137,10 +143,28 @@
       (future-cancel fut))
     ret)
     )
+
+(defn timeout-eval! [seconds f & args]
+  (let [fut (future (apply f args))
+        ret (deref fut (* 1000 seconds) :timeout)
+        ]
+    (when (= ret :timeout)
+      (future-cancel fut))
+    (if (= ret :timeout)
+      {:exit 124 :err "timeout" :out "" }
+      ret)
+    )
+  )
+
+
 ;;function params to 0
 (defn partial! [f & args]
   (apply partial f args)
   )
+
+
+(defn throw! [& xs]
+  (throw (Exception.  (apply join-cmd xs))))
 
 (defn retry-n-times [n f & args]
   (if (<= n 0)
@@ -170,6 +194,8 @@
       n)
     ))
 
+
+(def join-line (partial str/join "\n" ))
 
 (comment
   ((partial! half-chance-exception 'hi ))
@@ -319,6 +345,7 @@
        )
   )
 
+;;TODO support nested x like {:a {:b v}}
 (def filter! (partial ->>! filter))
 (def remove! (partial ->>! remove))
 
@@ -976,6 +1003,12 @@
    )
   )
 
+(defn trimr-sub [s sub]
+  (if (str/ends-with? s sub)
+    (.substring s 0 (- (count s) (count sub)))
+    s)
+  )
+
 ;;TOFIX: if ends not sub. should not chop
 (defn trimr! [s sub]
   ;;chop-to are using this bug... 
@@ -1175,6 +1208,9 @@
   (openssl "x509 -inform DER -in" path)
   )
 
+(defn cert-text [path]
+  (openssl "x509"" -text -noout -in" path)
+  )
 
 (defn cert->chain [path]
   (openssl "x509 -in" path "-text | grep 'CA Issuers - URI' |awk -FURI: '{print $2}' | xargs curl -s | openssl x509 -inform DER")
@@ -1202,6 +1238,30 @@
         (str/split-lines
          (:out
           (run-cmd "ls" "-f1" path)))))
+
+
+(defn ls! [path]
+  (->> 
+    (str/split-lines (ls path))
+    (map #(join-path path %))
+    )
+  )
+
+
+(defn unzip [path-]
+  (let [dir (dirname path-)
+        f (basename path-)
+        ]
+     (run-cmd "cd " dir "&& open " f
+              )))
+
+(defn ls-dir [path]
+  (->> (ls! path)
+       )
+  )
+
+
+
 
 (defn digit? [s]
   (every? #(Character/isDigit %) s))
@@ -3459,6 +3519,11 @@
   (str/replace s "\\" "\\\\")
   )
 
+(defn quote-slash [s]
+  (str/replace s "/" "\\/")
+  )
+
+
 (defn strip [s & chars]
   (let [c (first chars)]
     (println c)
@@ -3575,7 +3640,7 @@
         line (-> (str "alias " (str (force-str s) "=" qstr x qstr))
                  (quote-parenthese))
         f    (->abs-path (if (osx?)
-                           (if (fs/exists? "$HOME/.bash_profile")
+                           (if (fs/exists? (->abs-path "$HOME/.bash_profile"))
                              "$HOME/.bash_profile"
                              "$HOME/.zshrc")
                            (ls "$HOME/.bashrc")))]
