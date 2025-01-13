@@ -28,6 +28,7 @@
              [knock.browser :as br]
              [knock.poker :as poker]
              [knock.hanzi :as hanzi]
+             [knock.ticker :as ticker]
              [clojure.string :as str]
              [knock.chat :as chat]
              [knock.wn :as w])
@@ -93,4 +94,9 @@
   play-bubble (block/play-bubble (when-not (empty? *command-line-args*)
                                    (u/force-int (first *command-line-args*))))
   ;;continue bubble
-  lift-pause (u/on! block/lp)}}
+  lift-pause (u/on! block/lp)
+
+  watch (ticker/watch)
+  ;;
+  }
+ }

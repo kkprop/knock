@@ -1335,6 +1335,16 @@
        (java.util.TimeZone/getTimeZone "GMT")))
     (java.util.Date.))))
 
+(defn cur-hour []
+  (force-int
+    (cur-time-str "HH"))
+  )
+
+(defn cur-min []
+  (force-int
+   (cur-time-str "mm")))
+
+
 (defn time-tag []
   (cur-time-str "yyyy-MM-dd..hh-mm-ss")
   )
@@ -2208,6 +2218,14 @@
     m
     (dissoc (assoc m new-k (k m)) k))
   )
+
+
+(defn swap-key [m ak bk]
+  (let [a (ak m)
+        b (bk m)]
+    (assoc m ak b
+           bk a)))
+
 
 (defn flatten-hashmap
   ([m]
