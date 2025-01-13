@@ -13,6 +13,7 @@
    [babashka.curl :as curl]
    [portal.api :as portal]
    [clojure.zip :as z]
+
    [clojure.core.async :as async :refer [go go-loop
                                          chan to-chan
                                          <! >!! >! close!
@@ -234,6 +235,12 @@
    (pause 300)
    )
   )
+
+(defn pause-seconds [n]
+  (pause (* 1000 n)))
+
+(defn pause-minutes [n]
+  (pause-seconds (* 60 n)))
 
 (defn do-println [f & args]
   (let [s (apply str (join-cmd args))]
@@ -4034,7 +4041,6 @@
     (min-brightness)
     )
   )
-
 
 
 

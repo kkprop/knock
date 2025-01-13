@@ -206,15 +206,19 @@
 
 
 
-(defn locate! [q uniq-text]
-  (let [d (driver)]
-    (->> (e/query-tree d q)
-         (map (fn [id] {:id id :text (e/get-element-text-el d id)}))
-         (filter #(utils/fuzzy-rev-in? [uniq-text] (:text %)))
-         (map #(assoc % :html (e/get-element-inner-html-el d (:id %))))
-         (map #(assoc % :tag (e/get-element-tag-el d (:id %))))
+(defn locate!
+  ([q]
+   (locate! q "")
+   )
+  ([q uniq-text]
+   (let [d (driver)]
+     (->> (e/query-tree d q)
+          (map (fn [id] {:id id :text (e/get-element-text-el d id)}))
+          (filter #(utils/fuzzy-rev-in? [uniq-text] (:text %)))
+          (map #(assoc % :html (e/get-element-inner-html-el d (:id %))))
+          (map #(assoc % :tag (e/get-element-tag-el d (:id %))))
          ;;
-         )))
+          ))))
 
 (defn has-text? [uniq-text {:keys [text]}]
   (utils/fuzzy-rev-in? [uniq-text] text)
