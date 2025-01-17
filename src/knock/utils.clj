@@ -28,7 +28,7 @@
 (def os-name (System/getProperty "os.name"))
 (defn osx?[] (= os-name "Mac OS X"))
 
-(declare force-str force-int cur-time-str ->keyword ->uuid)
+(declare force-str force-int cur-time-str ->keyword ->uuid int!)
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
          file-name ext-name var-meta async-fn tail-f
          map-on-key map-on-val mock mock!
