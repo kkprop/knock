@@ -45,7 +45,9 @@
 
 ;;load a new etaoin driver load one
 (defn new-driver []
-  (let [d (e/chrome)]
+  (let [d (if (osx?)
+            (e/chrome)
+            (e/chrome {:headless true}))]
     (save-etaoin-local-address d)))
 
 (defn driver-ok? [{:keys []
@@ -61,9 +63,9 @@
 ;;u sing existing driver, load a new session
 (defn load-driver []
   (let [d (try (timeout 3000 (e/chrome
-                                      (if (fs-exists? driver-edn-path)
-                                        (utils/load-edn driver-edn-path)
-                                        nil)))
+                              (if (fs-exists? driver-edn-path)
+                                (utils/load-edn driver-edn-path)
+                                nil)))
                ;;3 seconds should be loaded
                ;;any exception happen means we need a new-driver too.
                ;;  just return :timed-out to trigger a new-driver call
@@ -73,11 +75,14 @@
       (try
         ;;try load a new chrome window
         (new-driver)
-        (catch Exception e (run-cmd "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable")))
+        (catch Exception e
+          (println "got exception when open browser driver" e)
+          (if (osx?) (run-cmd "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable")
+              (println "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable" " download driver"))))
+
       (do
         ;;update etaolin local-address
-        (save-etaoin-local-address d)
-        ))
+        (save-etaoin-local-address d)))
     ;;
     ))
 
