@@ -163,6 +163,12 @@
   (apply partial f args)
   )
 
+(defn ->True-False [s]
+  (-> s
+      (str/replace "true" "True" )
+      (str/replace "false" "False" )
+      )
+  )
 
 (defn throw! [& xs]
   (throw (Exception.  (apply join-cmd xs))))
@@ -766,7 +772,14 @@
   )
 
 (defn pbcopy [s]
-  (run-cmd! "echo" (str "'" s  "'") "| pbcopy"))
+  (run-cmd! "echo" (str "'" s  "'") "| pbcopy")
+  )
+(defn pbcopy! [s]
+  (let []
+    (pbcopy s)
+    s
+    )
+  )
 
 (defn pbimage [path]
   "image to clipboard"
@@ -1009,6 +1022,36 @@
         )
    )
   )
+
+
+;;replace \space \( \) to be empty
+(defn ->keyword! [s]
+  (-> s
+      (str/replace " " "-")
+      (str/replace "(" "")
+      (str/replace ")" "")
+      (str/lower-case)
+      (->keyword)
+      ))
+
+(defn line->kv [s]
+  (let [[k v] (take-last 2 (first (re-seq #"(.*):(.*)" s)))]
+    (if (nil? k)
+      nil
+      {(->keyword! k) (int! (str/trim v))}
+      )
+    )
+  )
+
+(defn rows->hashmap [s]
+  (let [xs (str/split-lines s)]
+    (->> xs
+         (map line->kv)
+         (apply merge)
+         )
+    )
+  )
+
 
 (defn trimr-sub [s sub]
   (if (str/ends-with? s sub)
@@ -1277,8 +1320,13 @@
   (if (str/blank? s) 0 (Long/parseLong (re-find #"\A-?\d+" s))))
 
 (defn force-int [s]
-  (if (string? s) (parse-int s) s)
-  )
+  (if (string? s)
+    (if (digit? s)
+      (parse-int s)
+      ;;if not all digits just return the string
+      s
+      )
+    s))
 
 (def int! force-int)
 
@@ -2793,7 +2841,12 @@
                           :or {config-path (join-path work-dir "resources/config.edn")}}]
   (let [var-name (symbol (force-str name))
         key-word (keyword (force-str name))
-        m (if (nil? config-m) (load-edn config-path) config-m)
+        m (if (nil? config-m)
+            (load-edn (if (str/starts-with? config-path "/")
+                        config-path
+                        (join-path work-dir config-path)
+                        ))
+            config-m)
         value (key-word m)]
     `(def ~var-name
        (if (nil? ~value)
@@ -2821,7 +2874,20 @@
   (let [var-name (symbol (force-str name))
         s (force-str name)
         ]
+    ;;TODO how to make sure it is defined
     `(def ~var-name (System/getenv ~s))
+    (System/getenv s)
+    )
+  )
+
+
+(defmacro env? [name]
+  `(not (nil? (env ~name)))
+  )
+
+(defn test-test []
+  (let []
+    (println (env STAGING_ENV))
     )
   )
 
@@ -3003,6 +3069,10 @@
 
 (def mock! mock-update)
 
+;;TODO
+(defn mock-recent-tolerance []
+  )
+
 (defn mock-clean [f & args]
   (let [{:keys [fm ns-path dir path]} (apply mock-context f args)]
     (when (fs/exists? path)
@@ -3027,10 +3097,11 @@
       (not (= prev (apply mock! f args)))
       )))
 
-(defn recent-files [hours-from-now root pattern]
+(defn recent-files-by-hours [hours-from-now root pattern]
   (->>
    (fs/glob root pattern)
-   (filter (comp #(< % hours-from-now) from-now-hours ->inst str fs/last-modified-time))))
+   (filter (comp #(< % hours-from-now) from-now-hours ->inst str fs/last-modified-time)))
+  )
 
 ;;doing laundry
 ;; clean all not linked cache file
@@ -3050,17 +3121,23 @@
                     )
                   ))))))
 
-;;n times per hour
-(defn mock-with-rate [n f & args]
+;;n times every m hour. support 0.25 for a quarter hour
+(defn mock-with-rate-by-hour [m n f & args]
   (let [{:keys [fm ns-path dir path]}
         (apply mock-context f args)
-        d (dirname path)
-        file (basename path)
-        recent-call-count  (count
-                            (recent-files 1.0 d (str file ".*")))]
+        d                 (dirname path)
+        file              (basename path)
+        recent-call-count (count
+                             (recent-files-by-hours m d (str file ".*")))]
     (if (< n recent-call-count)
       (throw (Exception. (str (:name fm) " mock call over rate : " n " times per hour")))
       (apply mock-update f args))))
+
+;;n times per hour
+(defn mock-with-rate [n f & args] 
+  (apply mock-with-rate-by-hour 1.0 n f args)
+  )
+
 
 
 (defn measure [f & args]
@@ -4060,5 +4137,121 @@
     )
   )
 
+;;print the function params then eval and print the result
+(defn eval! [f & xs]
+  (let [res (apply f xs)]
+    (println "function:" f "\n"  "args:\n"  xs)
+    (println res)
+    res
+    )
+  )
 
+(defn sum-numbers [s]
+  (->> (str/split-lines s)
+       (map ->int)
+       (flatten)
+       (map force-int)
+       (apply eval! +)
+       )
+  )
+
+(comment
+
+
+  (sum-numbers "1a\n2b\n3x\n")
+  )
+
+
+(defn count-leading-space [s]
+  (if (nil? s)
+    nil
+    (count (re-seq! #"(\s+)" s))
+    )
+  )
+
+;;original split-by is about string splitting
+;;this is about chopping a collection
+(defn split-by! [pred coll]
+  (lazy-seq
+    (when-let [s (seq coll)]
+      (let [[xs ys] (split-with pred s)]
+        (if (seq xs)
+          (cons xs (split-by! pred ys))
+          (let [!pred   (complement pred)
+                skip    (take-while !pred s)
+                others  (drop-while !pred s)
+                [xs ys] (split-with pred others)]
+            (cons (concat skip xs)
+                  (split-by! pred ys))))))))
+
+
+(defn ->layer [s]
+  (let [xs (if (string? s)
+             (seq-with-prev-next (str/split-lines s))
+             s)
+        [{:keys [cur next]} & left] xs
+        cc (count-leading-space cur)
+        nc (count-leading-space next)
+        nc (if (nil? nc) -1 nc)
+        ]
+    (cond (< cc nc) [ cur
+                           ;;split-by! eliminated nc < cc cases
+                           (->> left
+                                (split-by! #(< nc (count-leading-space (:cur %))))
+                                (map #(join-line (map :cur %)))
+                                (map ->layer)
+                                )
+                     ]
+          :else (str/split-lines s)
+          )))
+
+(defn ->tree [s]
+  (->> (seq-with-prev-next (str/split-lines s))
+       (split-by! #(< 0 (count-leading-space (:cur %))))
+       (map ->layer)
+       )
+  )
+
+
+(comment
+  (vector? '("    Mufasa" "    Simba"))
+  (pp (->layer s))
+  (pp (->tree s))
+  (println s)
+
+  (def s "hierarchy\n  dog\n    Bailey\n        Bailey's child\n        Bailey's another child\n  cats\n    Robert\n    Trev\n    Gombas\n  lion\n    Mufasa\n    Simba\n")
+  (def s "hierarchy\n  dog\n    Bailey\n  cats\n    Robert\n    Trev\n    Gombas\n  lion\n    Mufasa\n    Simba\nbook\n  history\n    《A History of Western Philosophy》")
+  (def tree ["hierarchy"
+             ["dog"    ["Bailey"]]
+             ["cats"   ["Robert"    "Trev"    "Gombas"]] 
+             ])
+
+  (println s)
+
+  (pp (->layered s))
+  (pp (coll!! (str/split-lines s)))
+  (pp (parse-indented-text s))
+  (def s
+    (display-data))
+
+  (println s)
+
+  (def s "Displays:
+        PHL 276E8V:
+          UI Looks 
+          Main Display
+        Color LCD:
+          Display Type
+          Resolution")
+  )
+
+
+
+(defn saved [from to]
+  (percentage from (float (- to from)) )
+  )
+
+(defn profit [from to]
+  (saved from to)
+  )
 
