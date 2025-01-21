@@ -308,6 +308,7 @@
                  (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
                                               vals
                                               flatten)))]
+             (println (apply str (repeat 80 "-")))
              (map!! println
               (str/split-lines (pp-hashmap @cache :ticker :speed :volunm :change :market-cap :price)))
              (reset! cache xs)))
