@@ -300,18 +300,19 @@
     (thread!
      (while true
        (let [[prev cur] (cur-frames)]
-           (when-not (empty? cur)
+         (when-not (empty? cur)
                ;; compare
-             (let [xs
-                   (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
-                                                vals
-                                                flatten)))]
-               (println "update cache count:" (count xs))
-               (reset! cache xs)
-               ))
-           (pause 1000)
+           (let [xs
+                 (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
+                                              vals
+                                              flatten)))]
+             (println "update cache count:" (count xs))
+             (println
+              (str/split-lines (pp-hashmap @cache :ticker :speed :volunm :change :market-cap :price)))
+             (reset! cache xs)))
+         (pause 1000)
            ;;
-           )))
+         )))
 
     (thread!
      (while true
