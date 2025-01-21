@@ -454,6 +454,7 @@
 ;; hope not have to require async fns everytime
 ;; go! is actually go, but wont bother to do require
 (defmacro go! [& xs] `(go ~@xs))
+(defmacro map!! [& xs] `(apply list(map ~@xs)))
 (defmacro thread! [& xs] `(thread ~@xs))
 (defmacro to-chan! [& xs] `(to-chan ~@xs))
 
