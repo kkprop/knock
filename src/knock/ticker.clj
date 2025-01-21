@@ -153,15 +153,20 @@
       (go tg-pre))
     ;;when found post
     (when (mock-change? post?)
-      (go tg-post))))
+      (go tg-post))
+
+    )
+  )
 
 (defn watch []
   (let []
-    (go-tg)
+    ;(go-tg)
+
+    (when (or (pre?) (post?))
+      (pause-minutes 1))
     (while true
-      (e/refresh (driver))
       (let [s (locate-cur-tickers)]
-        (go-tg!)
+        (go-tg)
         (when (not= @cur-page s)
           (reset! cur-page s)
           (save-tg s)
@@ -169,13 +174,14 @@
                ;;
           )
         (println (cur-time-str))
-        (if (or (pre?)
-                (post?))
+        (if (or (pre?) (post?))
           (pause-minutes (+ 1 (* 0.1 (rand-int 3))))
           (pause-minutes (+ 1 (* 0.1 (rand-int 3)))))
         ;;
-        ))
-;;
+        )
+
+      (e/refresh (driver)))
+    ;;
     ))
 
 (defn watch! []
@@ -204,35 +210,76 @@
     ;;
     ))
 
+(defn frame [f]
+  (let [ts (force-int (file-name (basename f)))]
+    (map #(assoc % :ts ts)
+         (slurp-ej-line f))
+    )
+  )
+
+(defn cur-frame []
+  (let [dir (join-path "ticker" (cur-date-str))]
+    (frame (last (sort (ls! dir))))
+    ;;
+    )
+  )
+
 
 (defn track [dir]
   (let []
     (->>
      (sort (ls! dir))
      (mapcat (fn [f]
-            (let [ts (force-int (file-name (basename f)))]
-              (map #(assoc % :ts ts)
-                   (slurp-ej-line f)))))
+               (let [ts (force-int (file-name (basename f)))]
+                 (map #(assoc % :ts ts)
+                      (slurp-ej-line f)))))
      ;(take 200)
      ;(map (fn [xs] (first xs)))
      (map fix-ticker)
      ;(map (juxt :ticker :ts))
      (traject)
      (filter (fn [{:keys [traj]}]
-               (in? traj 1)
-               ))
+               (in? traj 1)))
      (filter (fn [{:keys [traj]}]
-               (= 1 (last traj))
-               ))
-     pp
-     )
-    ;;
+               (= 1 (last traj)))))
+
+;;
     )
 ;;
   )
 
+(defn live []
+  (let [cur (atom {})]
+
+    (thread!
+     (while true
+       (let [prev (mock cur-frame)]
+         (pause 3000)
+         (when (mock-change? cur-frame)
+           (let [cur (mock cur-frame)]
+             (when-not (empty? cur)
+               ;;
+               compare
+
+               )
+
+             )
+           )
+         )
+       )
+;;
+     )))
 
 (comment
+  prev
+
+  (pp
+   (map-on-val count
+               (group-by :ticker (concat prev cur))
+               )
+   )
+  
+  (def f "/home/devops/knock/ticker/2025-01-18/1737147664.edn")
   (->abs-path "~/kkprop/knock/ticker/table.edn")
 
   (nth
