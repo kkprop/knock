@@ -68,3 +68,60 @@
     )
    )
   )
+
+(defn choose!
+  ([result-fn xs]
+   (choose! result-fn xs 0)
+   )
+  ([result-fn xs timeout]
+   (let [x (choose xs)]
+     (if (result-fn x)
+       x
+       (do
+         (println "retry")
+         (utils/pause 1000)
+         (choose! result-fn xs))
+       )
+     )
+   )
+  )
+
+
+
+
+
+(defn kill-all-gum-pid []
+  (->> (utils/cur-child-pids)
+       (utils/filter! {:COMMAND "gum"})
+       (map :PID)
+       (map utils/kill-pid!)
+       (apply list)
+       )
+  )
+
+(defn render [xs result-fn]
+  (let [t (Thread. (fn []
+                     (try 
+                       ;(while true
+                         ;(repeatedly (count xs) println)
+                         (choose! result-fn xs)
+                         ;)
+                       (catch Exception e
+                         ;;ignore exception
+                         (kill-all-gum-pid)
+                         ))
+                       )
+                   )]
+    (.start t)
+    t
+    )
+  )
+
+(comment
+
+  (utils/show-members (Thread. #(println)))
+  (.start t)
+  (.interrupt t)
+
+
+)

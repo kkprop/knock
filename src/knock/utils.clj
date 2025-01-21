@@ -25,11 +25,15 @@
    [clojure.edn :as edn]
    [clojure.walk :as walk]))
 
+
+(import 'java.lang.ProcessHandle)
+
 (def os-name (System/getProperty "os.name"))
 (defn osx?[] (= os-name "Mac OS X"))
 
 (declare force-str force-int cur-time-str ->keyword ->uuid int!)
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
+         text-cols->hashmap
          file-name ext-name var-meta async-fn tail-f
          map-on-key map-on-val mock mock!
          trimr! pause cur-ts
@@ -751,6 +755,21 @@
 (make-shell-fn :readlink)
 (make-shell-fn :touch)
 
+
+(defn cur-pid []
+  (.pid (ProcessHandle/current))
+  )
+
+(defn child-pids [pid]
+  (text-cols->hashmap (run-cmd! "ps -o pid,comm --ppid" pid) #"\s+")
+  )
+
+(defn cur-child-pids []
+  (child-pids (cur-pid))
+  )
+
+
+
 ;;make it easier. or maybe not.
 (def fs-exists? fs/exists?)
 
@@ -761,6 +780,15 @@
 (defn kill-by-ps! [name]
   (run-cmd "ps axu | grep " name  "| grep -v grep | tr -s ' ' | cut -d ' ' -f 2 | xargs kill -9")
   )
+
+(defn kill-pid [pid]
+  (run-cmd "kill " pid)
+  )
+
+(defn kill-pid! [pid]
+  (run-cmd "kill -9" pid)
+  )
+
 
 (defn touch! [path] 
   (let [dir (dirname path)]
@@ -1383,6 +1411,9 @@
        (java.util.TimeZone/getTimeZone "GMT")))
     (java.util.Date.))))
 
+(defn cur-time-str-ok-as-file []
+  (cur-time-str "yyyy-MM-dd-hh.mm.ss"))
+
 (defn cur-hour []
   (force-int
     (cur-time-str "HH"))
@@ -1686,6 +1717,18 @@
        )
   )
 
+;;slurp ignore file not exists
+(defn slurp-lines!! [f]
+  (try
+    (->> (slurp-lines f)
+         (remove #(str/starts-with? % "#" )))
+    (catch Exception e
+      (println "loading file" f "got exception:" e)
+      (println "ignore")
+      nil
+      )
+    )
+  )
 
 ;;edn or json
 (defn slurp-ej-line [f]
@@ -1871,6 +1914,10 @@
   (when-not (in? (slurp-lines f) s)
     (spit-line f s)))
 
+(defn spit-json [path m & opts]
+  (apply spit path (j m) opts)
+  )
+
 (defn slurp-yaml [f]
   (yaml/parse-string (slurp f)))
 
@@ -1994,13 +2041,32 @@
 (def pp-hashmap! (comp println pp-hashmap))
 (def csv-hashmap! (comp println csv-hashmap))
 
+
+(defn line-pp-hashmap-str [m]
+  (let [sb (StringBuilder.)]
+    (clojure.walk/prewalk
+      (fn [x]
+        (if (map? x)
+          (do
+            (doseq [[k v] x]
+              (let [line (str k " " v "\n")]
+                (.append sb line)))
+            x)
+          x))
+      m)
+    (str sb)))
+
+(defn line-pp-hashmap [m]
+  (println (line-pp-hashmap-str m))
+  )
+
 (defn frequencies->str [xs]
   (pp-hashmap
     (->> 
       (frequencies xs)
       (map (fn [[k v]]
-              {:name k
-               :count v}
+             {:name  k
+              :count v}
              ))))
   )
 
@@ -2131,7 +2197,9 @@
          ;;in case of missing fields set to empty
          ;;(map #(merge selected-defaults %))
          (map (apply juxt selected-k))
-         (map #(write-csv-line path %))))
+         (map #(write-csv-line path %))
+         (apply list)
+         ))
 
       (do
         ;; write header
@@ -2142,7 +2210,9 @@
              ;(map #(println (when (= (type %) 'java.lang.string) (println %))))
              (map vals)
              (map #(write-csv-line path %))
-             )))))
+             (apply list)
+             )
+        ))))
 
 (defn output-seq [filename m]
   (let [path (output-path filename)
@@ -2238,6 +2308,26 @@
    (keys m)
    (map f
    (vals m))))
+
+(defn count-val [m]
+  (map-on-val (fn [v]
+                (if (sequential? v)
+                  (count v)
+                  v
+                  )
+                )
+              m
+              ))
+
+(defn seg-a [ip]
+     (str/join "." (take 3 (str/split ip #"\."))))
+
+
+(defn seg-b [ip]
+     (str/join "." (take 2 (str/split ip #"\."))))
+
+(defn seg-c [ip]
+     (str/join "." (take 2 (str/split ip #"\."))))
 
 (defn cherry-pick-keys [m & ks]
   (let [hs (apply hash-set (map keyword ks))]
@@ -4137,121 +4227,5 @@
     )
   )
 
-;;print the function params then eval and print the result
-(defn eval! [f & xs]
-  (let [res (apply f xs)]
-    (println "function:" f "\n"  "args:\n"  xs)
-    (println res)
-    res
-    )
-  )
 
-(defn sum-numbers [s]
-  (->> (str/split-lines s)
-       (map ->int)
-       (flatten)
-       (map force-int)
-       (apply eval! +)
-       )
-  )
-
-(comment
-
-
-  (sum-numbers "1a\n2b\n3x\n")
-  )
-
-
-(defn count-leading-space [s]
-  (if (nil? s)
-    nil
-    (count (re-seq! #"(\s+)" s))
-    )
-  )
-
-;;original split-by is about string splitting
-;;this is about chopping a collection
-(defn split-by! [pred coll]
-  (lazy-seq
-    (when-let [s (seq coll)]
-      (let [[xs ys] (split-with pred s)]
-        (if (seq xs)
-          (cons xs (split-by! pred ys))
-          (let [!pred   (complement pred)
-                skip    (take-while !pred s)
-                others  (drop-while !pred s)
-                [xs ys] (split-with pred others)]
-            (cons (concat skip xs)
-                  (split-by! pred ys))))))))
-
-
-(defn ->layer [s]
-  (let [xs (if (string? s)
-             (seq-with-prev-next (str/split-lines s))
-             s)
-        [{:keys [cur next]} & left] xs
-        cc (count-leading-space cur)
-        nc (count-leading-space next)
-        nc (if (nil? nc) -1 nc)
-        ]
-    (cond (< cc nc) [ cur
-                           ;;split-by! eliminated nc < cc cases
-                           (->> left
-                                (split-by! #(< nc (count-leading-space (:cur %))))
-                                (map #(join-line (map :cur %)))
-                                (map ->layer)
-                                )
-                     ]
-          :else (str/split-lines s)
-          )))
-
-(defn ->tree [s]
-  (->> (seq-with-prev-next (str/split-lines s))
-       (split-by! #(< 0 (count-leading-space (:cur %))))
-       (map ->layer)
-       )
-  )
-
-
-(comment
-  (vector? '("    Mufasa" "    Simba"))
-  (pp (->layer s))
-  (pp (->tree s))
-  (println s)
-
-  (def s "hierarchy\n  dog\n    Bailey\n        Bailey's child\n        Bailey's another child\n  cats\n    Robert\n    Trev\n    Gombas\n  lion\n    Mufasa\n    Simba\n")
-  (def s "hierarchy\n  dog\n    Bailey\n  cats\n    Robert\n    Trev\n    Gombas\n  lion\n    Mufasa\n    Simba\nbook\n  history\n    《A History of Western Philosophy》")
-  (def tree ["hierarchy"
-             ["dog"    ["Bailey"]]
-             ["cats"   ["Robert"    "Trev"    "Gombas"]] 
-             ])
-
-  (println s)
-
-  (pp (->layered s))
-  (pp (coll!! (str/split-lines s)))
-  (pp (parse-indented-text s))
-  (def s
-    (display-data))
-
-  (println s)
-
-  (def s "Displays:
-        PHL 276E8V:
-          UI Looks 
-          Main Display
-        Color LCD:
-          Display Type
-          Resolution")
-  )
-
-
-
-(defn saved [from to]
-  (percentage from (float (- to from)) )
-  )
-
-(defn profit [from to]
-  (saved from to)
-  )
 
