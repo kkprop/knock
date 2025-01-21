@@ -261,6 +261,21 @@
 ;;
   )
 
+
+
+(defn compare-frame [[pp cc]]
+  (let [p (cur-volumn++ pp)
+        c (cur-volumn++ cc)]
+    (if (or (nil? pp) (nil? cc))
+      (if (nil? pp)
+        (assoc (merge pp cc) :speed 666)
+        (assoc (merge pp cc) :speed -1))
+      (assoc c :speed (- (:cur-volumn c) (:cur-volumn p)))
+;;
+      )
+    ;;
+    ))
+
 (defn live []
   (let [cache (atom {})
         p (promise)]
@@ -289,41 +304,24 @@
          (while (not (realized? p))
            ;; do a new rendering 
            (when-not (= @iid (->uuid @cache))
-             (println (apply str(repeat 80 "-")))
+             (println (apply str (repeat 80 "-")))
              ;;stop previous
              (when-not (nil? @cur-task)
-               (.interrupt @cur-task)
-               )
+               (.interrupt @cur-task))
 
              (let [t (tui/render @cache (fn [x]
-                                          (println "user choose " x)
-                                          ))]
+                                          (println "user choose " x)))]
                (reset! cur-task t)
-               (reset! iid (->uuid @cache))
-               )
-             )
+               (reset! iid (->uuid @cache))))
+
            (Thread/sleep 1000)
 
          ;;
-         )))
-     )
-
+           ))))
     @p
 ;;
     ))
 
-(defn compare-frame [[pp cc]]
-  (let [p (cur-volumn++ pp)
-        c (cur-volumn++ cc)]
-    (if (or (nil? pp) (nil? cc))
-      (if (nil? pp)
-        (assoc (merge pp cc) :speed 666)
-        (assoc (merge pp cc) :speed -1))
-      (assoc c :speed (- (:cur-volumn c) (:cur-volumn p) ))
-;;
-      )
-    ;;
-    ))
 
 
 (comment
