@@ -792,7 +792,7 @@
 
 
 (defn kill-cur-pid-by-name [name]
-  (->> cur-child-pids
+  (->> (cur-child-pids)
        (filter! {:COMMAND name})
        (map :PID)
        (map kill-pid!)
