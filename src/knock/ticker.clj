@@ -161,8 +161,8 @@
 (defn watch []
   (let []
     (go-tg)
-    (when (or (pre?) (post?))
-      (pause-minutes 1))
+    ;(when (or (pre?) (post?))
+    ;  (pause-minutes 1))
     (while true
       (let [s (locate-cur-tickers)]
         (go-tg)
@@ -188,7 +188,7 @@
   (while true
     (try (watch)
          (catch Exception e
-           ;(println e)
+           (println e)
            (println "rerun")
            )
          )
