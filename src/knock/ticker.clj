@@ -250,6 +250,7 @@
 (comment
   (map :ts (cur-frames))
   @cache
+  (def cache (atom nil))
 
   )
 
@@ -305,7 +306,9 @@
                    (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
                                                 vals
                                                 flatten)))]
-               (reset! cache xs)))
+               (println "update cache count:" (count xs))
+               (reset! cache xs)
+               ))
            (pause 1000)
            ;;
            )))
