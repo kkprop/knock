@@ -174,8 +174,9 @@
           )
         (println (cur-time-str))
         (if (or (pre?) (post?))
-          (pause-minutes (+ 1 (* 0.1 (rand-int 3))))
-          (pause-minutes (+ 1 (* 0.1 (rand-int 3)))))
+          (pause-minutes 1)
+          (pause-minutes 1)
+          )
         ;;
         )
 
