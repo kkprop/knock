@@ -160,8 +160,7 @@
 
 (defn watch []
   (let []
-    ;(go-tg)
-
+    (go-tg)
     (when (or (pre?) (post?))
       (pause-minutes 1))
     (while true
