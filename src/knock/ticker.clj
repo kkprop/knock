@@ -230,11 +230,27 @@
     )
   )
 
+
 (defn cur-frame []
   (let [dir (join-path "ticker" (cur-date-str))]
     (frame (last (sort (ls! dir))))
     ;;
     )
+  )
+
+(defn cur-frames []
+  (let [dir (join-path "ticker" (cur-date-str))]
+    (->> (take-last 2 (sort (ls! dir)))
+         (map frame)
+         )
+    ;;
+    )
+  )
+
+(comment
+  (map :ts (cur-frames))
+  @cache
+
   )
 
 
@@ -282,18 +298,17 @@
 
     (thread!
      (while true
-       (let [prev (mock cur-frame)]
-         (pause 3000)
-         (when (mock-change? cur-frame)
-           (let [cur (mock cur-frame)]
-             (when-not (empty? cur)
+       (let [[prev cur] (cur-frames)]
+           (when-not (empty? cur)
                ;; compare
-               (let [xs
-                     (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
-                                                  vals
-                                                       flatten)))]
-                 (reset! cache xs)))
-             (pause 1000))))))
+             (let [xs
+                   (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
+                                                vals
+                                                flatten)))]
+               (reset! cache xs)))
+           (pause 1000)
+           ;;
+           )))
 
     (thread!
      (while true
