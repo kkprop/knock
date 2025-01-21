@@ -76,10 +76,10 @@
 
 (defn cur-volumn [s]
   (-> (if (digit? (last s))
-          s
-          (chop-tail-n s 1))
-      (parse-float)
+        s
+        (chop-tail-n s 1))
       (precision :keep-digit 3)
+      (parse-float)
       )
   )
 
