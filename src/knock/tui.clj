@@ -75,13 +75,14 @@
    )
   ([result-fn xs timeout]
    (let [x (choose xs)]
-     (if (result-fn x)
-       x
-       (do
-         (println "retry")
-         (utils/pause 1000)
-         (choose! result-fn xs))
-       )
+     (when-not (nil? x)
+       (if (result-fn x)
+         x
+         (do
+           (println "retry")
+           (utils/pause 1000)
+           (choose! result-fn xs))
+         ))
      )
    )
   )
