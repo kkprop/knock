@@ -96,7 +96,7 @@
   ;;continue bubble
   lift-pause (u/on! block/lp)
 
-  watch (ticker/watch)
+  watch (ticker/watch!)
   live (ticker/live)
 
   mock-laundry (println "cleaned:" (count (u/mock-laundry)))

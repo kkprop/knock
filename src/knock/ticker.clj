@@ -200,15 +200,14 @@
 
 (defn watch! []
   (while true
-    (try (watch)
-         (catch Exception e
-           (println e)
-           (println "rerun")
-           )
-         )
+    (try
+      (watch)
+      (catch Exception e
+        (println e)
+        (println "rerun")
+        (kill-cur-pid-by-name "chromedriver")
 
-    )
-  )
+        ))))
 
 (defn traject [xs]
   (let [xs (vals (->>

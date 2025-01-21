@@ -770,6 +770,7 @@
 
 
 
+
 ;;make it easier. or maybe not.
 (def fs-exists? fs/exists?)
 
@@ -788,6 +789,15 @@
 (defn kill-pid! [pid]
   (run-cmd "kill -9" pid)
   )
+
+
+(defn kill-cur-pid-by-name [name]
+  (->> cur-child-pids
+       (filter! {:COMMAND name})
+       (map :PID)
+       (map kill-pid!)
+       (apply list)))
+
 
 
 (defn touch! [path] 
