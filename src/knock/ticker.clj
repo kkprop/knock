@@ -187,7 +187,7 @@
   (while true
     (try (watch)
          (catch Exception e
-           (println e)
+           ;(println e)
            (println "rerun")
            )
          )
