@@ -138,10 +138,11 @@
 
 (defn go-tg []
   (when (mock! pre?)
+    (println "go pre ")
     (go tg-pre))
   (when (mock! post?)
+    (println "go post ")
     (go tg-post)))
-
 
 ;;find the changing point of pre / post and go to the correct
 (defn go-tg! []
@@ -150,13 +151,12 @@
       100)
     ;;when found pre
     (when (mock-change? pre?)
+      (println "go pre ")
       (go tg-pre))
     ;;when found post
     (when (mock-change? post?)
-      (go tg-post))
-
-    )
-  )
+      (println "go post ")
+      (go tg-post))))
 
 (defn watch []
   (let []
