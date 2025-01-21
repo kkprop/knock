@@ -165,6 +165,7 @@
     ;  (pause-minutes 1))
     (while true
       (let [s (locate-cur-tickers)]
+        (println "cur tickers count:"(count s))
         (go-tg)
         (when (not= @cur-page s)
           (reset! cur-page s)
@@ -180,7 +181,8 @@
         ;;
         )
 
-      (e/refresh (driver)))
+      (e/refresh (driver))
+      )
     ;;
     ))
 
