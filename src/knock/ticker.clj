@@ -78,7 +78,9 @@
   (-> (if (digit? (last s))
           s
           (chop-tail-n s 1))
-      (parse-float))
+      (parse-float)
+      (precision :keep-digit 3)
+      )
   )
 
 
