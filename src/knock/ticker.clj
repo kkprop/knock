@@ -75,9 +75,8 @@
 (def cur-page (atom ""))
 
 (defn cur-volumn [s]
-  (if (= s "nul")
+  (if (= (str/includes? s  "nul"))
     0
-
     (-> (if (digit? (last s))
           s
           (chop-tail-n s 1))
