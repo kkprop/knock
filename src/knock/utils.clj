@@ -1342,7 +1342,9 @@
 
 
 (defn digit? [s]
-  (every? #(Character/isDigit %) s))
+  (if (char? s)
+    (Character/isDigit s)
+    (every? #(Character/isDigit %) s)))
 
 (defn parse-int [s]
   (if (str/blank? s) 0 (Long/parseLong (re-find #"\A-?\d+" s))))
@@ -1355,6 +1357,14 @@
       s
       )
     s))
+
+(defn chop-tail-n [s n]
+  (apply str (drop-last n s))
+  )
+
+(defn chop-leading-n [s n]
+  (apply str (drop n s)))
+
 
 (def int! force-int)
 

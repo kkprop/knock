@@ -1,6 +1,7 @@
 (ns knock.ticker
   (:require [knock.utils :refer :all]
             [knock.browser :refer :all]
+            [knock.tui :as tui]
             [clojure.string :as str]
             [etaoin.api :as e]))
 
@@ -72,6 +73,18 @@
       (spit-xs f s))))
 
 (def cur-page (atom ""))
+
+(defn cur-volumn [s]
+  (-> (if (digit? (last s))
+          s
+          (chop-tail-n s 1))
+      (parse-float))
+  )
+
+
+(++ cur-volumn volumn)
+
+
 
 (defn fix-ticker [m]
   (let [n (if-not (nil? (:code m))
@@ -180,7 +193,6 @@
           )
         ;;
         )
-
       (e/refresh (driver))
       )
     ;;
@@ -251,7 +263,8 @@
   )
 
 (defn live []
-  (let [cur (atom {})]
+  (let [cache (atom {})
+        p (promise)]
 
     (thread!
      (while true
@@ -260,27 +273,72 @@
          (when (mock-change? cur-frame)
            (let [cur (mock cur-frame)]
              (when-not (empty? cur)
-               ;;
-               compare
+               ;; compare
+               (let [xs
+                     (pp (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
+                                                      vals
+                                                      flatten))))]
+                 (reset! cache xs)))
 
+             (pause 1000))))))
+
+    (thread!
+
+     (while true
+       (let [iid (atom "")
+             cur-task (atom nil)]
+         (while (not (realized? p))
+           ;; do a new rendering 
+           (when-not (= @iid (->uuid @cache))
+             (println (apply str(repeat 80 "-")))
+             ;;stop previous
+             (when-not (nil? @cur-task)
+               (.interrupt @cur-task)
                )
 
+             (let [t (tui/render @cache (fn [x]
+                                          (println "user choose " x)
+                                          ))]
+               (reset! cur-task t)
+               (reset! iid (->uuid @cache))
+               )
              )
-           )
-         )
-       )
+           (Thread/sleep 1000)
+
+         ;;
+         )))
+     )
+
+    @p
 ;;
-     )))
+    ))
+
+(defn compare-frame [[pp cc]]
+  (let [p (cur-volumn++ pp)
+        c (cur-volumn++ cc)]
+    (if (or (nil? pp) (nil? cc))
+      (if (nil? pp)
+        (assoc (merge pp cc) :speed 666)
+        (assoc (merge pp cc) :speed -1))
+      (assoc c :speed (- (:cur-volumn c) (:cur-volumn p) ))
+;;
+      )
+    ;;
+    ))
+
 
 (comment
-  prev
+  (-> (:volumn
+       (def m (first cur))))
+
+  (cur-volumn (:volumn (last prev)))
 
   (pp
-   (map-on-val count
-               (group-by :ticker (concat prev cur))
-               )
-   )
-  
+   (map-on-val compare-frame
+                (group-by :ticker (concat prev cur))
+               ;;
+               ))
+
   (def f "/home/devops/knock/ticker/2025-01-18/1737147664.edn")
   (->abs-path "~/kkprop/knock/ticker/table.edn")
 
