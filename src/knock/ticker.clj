@@ -309,8 +309,10 @@
              (when-not (nil? @cur-task)
                (.interrupt @cur-task))
 
-             (let [t (tui/render @cache (fn [x]
-                                          (println "user choose " x)))]
+             (let [t (tui/render
+                      (str/split-lines (pp-hashmap @cache))
+                      (fn [x]
+                        (println "user choose " x)))]
                (reset! cur-task t)
                (reset! iid (->uuid @cache))))
 
