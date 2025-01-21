@@ -308,9 +308,8 @@
              ;;stop previous
              (when-not (nil? @cur-task)
                (.interrupt @cur-task))
-
              (let [t (tui/render
-                      (str/split-lines (pp-hashmap @cache))
+                      (str/split-lines (pp-hashmap @cache :ticker :speed :volunm :change :market-cap :price)) 
                       (fn [x]
                         (println "user choose " x)))]
                (reset! cur-task t)
@@ -327,6 +326,10 @@
 
 
 (comment
+
+  (def cache (atom {}))
+  (reset! cache prev
+
   (-> (:volumn
        (def m (first cur))))
 
@@ -334,7 +337,7 @@
 
   (pp
    (map-on-val compare-frame
-                (group-by :ticker (concat prev cur))
+               (group-by :ticker (concat prev cur))
                ;;
                ))
 
@@ -346,4 +349,7 @@
    42)
 
 ;;
-  )
+  ) 
+
+
+)
