@@ -75,13 +75,14 @@
 (def cur-page (atom ""))
 
 (defn cur-volumn [s]
-  (-> (if (digit? (last s))
-        s
-        (chop-tail-n s 1))
-      (precision :keep-digit 3)
-      (parse-float)
-      )
-  )
+  (if (= s "nul")
+    0
+
+    (-> (if (digit? (last s))
+          s
+          (chop-tail-n s 1))
+        (precision :keep-digit 3)
+        (parse-float))))
 
 
 (++ cur-volumn volumn)
