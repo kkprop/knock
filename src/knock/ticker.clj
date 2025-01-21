@@ -289,15 +289,13 @@
              (when-not (empty? cur)
                ;; compare
                (let [xs
-                     (pp (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
-                                                      vals
-                                                      flatten))))]
+                     (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
+                                                  vals
+                                                       flatten)))]
                  (reset! cache xs)))
-
              (pause 1000))))))
 
     (thread!
-
      (while true
        (let [iid (atom "")
              cur-task (atom nil)]
@@ -309,7 +307,7 @@
              (when-not (nil? @cur-task)
                (.interrupt @cur-task))
              (let [t (tui/render
-                      (str/split-lines (pp-hashmap @cache :ticker :speed :volunm :change :market-cap :price)) 
+                      (str/split-lines (pp-hashmap @cache :ticker :speed :volunm :change :market-cap :price))
                       (fn [x]
                         (println "user choose " x)))]
                (reset! cur-task t)
