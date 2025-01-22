@@ -314,7 +314,15 @@
         (assoc (merge prev cur) :speed -1))
       (let [p (cur-volumn++ prev)
             c (cur-volumn++ cur)]
-        (assoc c :speed (- (:cur-volumn c) (:cur-volumn p))))
+        (assoc c :speed
+               (let [speed  (- (:cur-volumn c) (:cur-volumn p))]
+                 (if (str/ends-with? (:volumn c) "M")
+                   (precision (str (* 1000 speed)))
+                   (if (str/ends-with? (:volumn c) "K")
+                     (precision (str speed))
+                     (precision (str (/ speed 1000.0)))))
+                 )
+               ))
 ;;
       )
     ;;
@@ -339,15 +347,7 @@
              (println (apply str (repeat 80 "-")) (cur-time-str))
              (map!! println
                     (str/split-lines (apply pp-hashmap
-                                            (map (fn [m]
-                                                   (assoc m :speed
-                                                          (if (str/ends-with? (:volumn m) "M")
-                                                            (precision (str (* 1000 (:speed m))))
-                                                            (if (str/ends-with? (:volumn m) "K")
-                                                              (precision (str (:speed m)))
-                                                              (precision (str (/ (:speed m) 1000.0)))))))
-
-                                                 @cache)
+                                                 @cache
                                             cols-ticker)))
              (reset! cache xs)))
          (pause 10000)
