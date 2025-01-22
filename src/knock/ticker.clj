@@ -176,7 +176,6 @@
 (defn watch []
   (let []
     (when (nil? (go-tg) )
-      (kill-cur-pid-by-name "chromedriver")
       (pause 500)
       )
     (while true
@@ -205,11 +204,9 @@
     (try
       (watch)
       (catch Exception e
-        (println e)
+        (println (count e))
         (println "rerun")
-        (kill-cur-pid-by-name "chromedriver")
-
-        ))))
+        (kill-cur-pid-by-name "chromedriver")))))
 
 (defn traject [xs]
   (let [xs (vals (->>
