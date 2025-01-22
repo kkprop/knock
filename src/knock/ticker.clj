@@ -183,7 +183,8 @@
         (println "cur tickers count:" (count s))
         (go-tg)
         ;;only using idx and price. due to market cap and volumn will be changing on market time
-        (when (apply not= (map #(select-keys % [:idx :price]) [@cur-page s]))
+        ;(when (apply not= (map #(select-keys % [:idx :price]) [@cur-page s]))
+        (when (not= @cur-page s)
           (reset! cur-page s)
           (save-tg s)
           (println "saving")
