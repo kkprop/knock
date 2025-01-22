@@ -320,9 +320,10 @@
                    (* 1000 speed)
                    (if (str/ends-with? (:volumn c) "K")
                      speed
-                     (/ speed 1000.0))))
+                     (/ speed 1000.0))
+                   )
+                 )
                )
-
 ;;
       ))
     ;;
@@ -348,7 +349,8 @@
              (println (apply str (repeat 80 "-")) (cur-time-str))
              (map!! println
                     (str/split-lines (apply pp-hashmap
-                                                 @cache
+                                            (map #(assoc :speed (precision (:speed %)))
+                                                 @cache)
                                             cols-ticker)))
              (reset! cache xs)))
          (pause 10000)
