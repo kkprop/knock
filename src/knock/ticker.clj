@@ -295,6 +295,7 @@
     ;;
     ))
 
+(def cols-ticker [:ticker :speed :volunm :idx :change :market-cap :price])
 (defn live []
   (let [cache (atom {})
         p (promise)]
@@ -317,7 +318,7 @@
                  ]
              (println (apply str (repeat 80 "-")))
              (map!! println
-                    (str/split-lines (pp-hashmap @cache :ticker :speed :volunm :change :market-cap :price)))
+                    (str/split-lines (apply pp-hashmap @cache cols-ticker)))
              (reset! cache xs)))
          (pause 10000)
            ;;
@@ -335,7 +336,7 @@
              (when-not (nil? @cur-task)
                (.interrupt @cur-task))
              (let [t (tui/render
-                      (str/split-lines (pp-hashmap @cache :ticker :speed :volunm :change :market-cap :price))
+                      (str/split-lines (apply pp-hashmap @cache cols-ticker))
                       (fn [x]
                         (println "user choose " x)))]
                (reset! cur-task t)
