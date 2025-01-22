@@ -75,16 +75,17 @@
 (def cur-page (atom ""))
 
 (defn mk->k [s]
-  (let [unit (last s)
-        value (-> (chop-tail-n s 1)
-                  (precision :keep-digit 3)
-                  parse-float)]
-    (case unit
-      \M (* value 1000)
-      \K value
-      (/ value 1000)
-      )
-    )
+  (if (empty? s)
+    0
+    (let [unit (last s)
+          value (-> (chop-tail-n s 1)
+                    (precision :keep-digit 3)
+                    parse-float)]
+      (case unit
+        \M (* value 1000)
+        \K value
+        (/ value 1000))))
+
 ;;
   )
 
@@ -93,8 +94,9 @@
           (empty? s)
           )
     0
-    (mk->k s)))
-
+    (mk->k s)
+    )
+  )
 
 (++ cur-volumn volumn)
 
