@@ -297,7 +297,7 @@
     ;;
     ))
 
-(def cols-ticker [:ticker :speed :volunm :idx :change :market-cap :price])
+(def cols-ticker [:ticker :speed :volumn :idx :change :market-cap :price])
 (defn live []
   (let [cache (atom {})
         p (promise)]
@@ -313,7 +313,7 @@
            (let [xs (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
                                                  vals
                                                  flatten)))]
-             ;(println (apply str (repeat 80 "-")))
+             (println (apply str (repeat 80 "-")) (cur-time-str))
              (map!! println
                     (str/split-lines (apply pp-hashmap
                                             (map (fn [m]
