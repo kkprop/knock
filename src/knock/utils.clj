@@ -762,7 +762,14 @@
   )
 
 (defn child-pids [pid]
-  (text-cols->hashmap (run-cmd! "ps -o pid,comm --ppid" pid) #"\s+")
+  (text-cols->hashmap
+    (->> 
+      (str/split-lines (run-cmd! "ps -o pid,comm --ppid" pid))
+      ;;remove first line space
+      (map str/trim)
+      ;;restore to a string do cols seperation
+      (str/join "\n")
+      ) #"\s+")
   )
 
 (defn cur-child-pids []
@@ -2570,16 +2577,27 @@
                                "="
                                ;;make sure the space and other characters are encoded as url
                                (url-encode
-                                (if (keyword? (second %))
-                                  (str (name (second %)))
-                                  (str (second %))))))
+                                 (if (keyword? (second %))
+                                   (str (name (second %)))
+                                   (str (second %))))))
 
                     (str/join "&")
-                    (apply str))]
+                    (apply str))
+        ;;empty path will cause /?k=v problem
+        xp (if (empty? path)
+          (trimr-sub prefix "/")
+          prefix
+          )
+        ;;path last / should be removed to avoid /?k=v
+        x (trimr-sub path "/")
+        ]
 
     (if (empty? params)
-      (str prefix (force-str path))
-      (str prefix (force-str path) "?" params))))
+      (str xp (force-str x))
+      (str xp (force-str x) "?" params)
+      )
+    )
+  )
 
 (defn ->k=v [xs & {:keys [separator prefix]
                    :or {separator "="

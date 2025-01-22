@@ -180,9 +180,10 @@
     ;  (pause-minutes 1))
     (while true
       (let [s (locate-cur-tickers)]
-        (println "cur tickers count:"(count s))
+        (println "cur tickers count:" (count s))
         (go-tg)
-        (when (not= @cur-page s)
+        ;;only using idx and price. due to market cap and volumn will be changing on market time
+        (when (apply not= (map #(select-keys % [:idx :price]) [@cur-page s]))
           (reset! cur-page s)
           (save-tg s)
           (println "saving")
@@ -191,12 +192,10 @@
         (println (cur-time-str))
         (if (or (pre?) (post?))
           (pause-minutes 1)
-          (pause-minutes 1)
-          )
+          (pause-minutes 1))
         ;;
         )
-      (e/refresh (driver))
-      )
+      (e/refresh (driver)))
     ;;
     ))
 
