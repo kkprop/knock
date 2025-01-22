@@ -89,14 +89,24 @@
 ;;
   )
 
+;(defn cur-volumn [s]
+;  (if (or (str/includes? s  "nul")
+;          (empty? s)
+;          )
+;    0
+;    (mk->k s)
+;    )
+;  )
+
 (defn cur-volumn [s]
-  (if (or (str/includes? s  "nul")
-          (empty? s)
-          )
+  (if (str/includes? s  "nul")
     0
-    (mk->k s)
-    )
-  )
+        (-> (if (digit? (last s))
+          s
+          (chop-tail-n s 1))
+        (precision :keep-digit 3)
+        (parse-float))
+        ))
 
 (++ cur-volumn volumn)
 
