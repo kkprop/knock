@@ -776,6 +776,10 @@
   (child-pids (cur-pid))
   )
 
+(defn cur-child-by-name [name]
+  (->> (cur-child-pids)
+       (filter! {:COMMAND name})
+       ))
 
 
 
