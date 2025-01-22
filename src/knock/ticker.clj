@@ -81,7 +81,8 @@
           s
           (chop-tail-n s 1))
         (precision :keep-digit 3)
-        (parse-float))))
+        (parse-float))
+    ))
 
 
 (++ cur-volumn volumn)
@@ -290,7 +291,8 @@
         (assoc (merge prev cur) :speed -1))
       (let [p (cur-volumn++ prev)
             c (cur-volumn++ cur)]
-        (assoc c :speed (- (:cur-volumn c) (:cur-volumn p))))
+        (assoc c :speed
+               (precision (- (:cur-volumn c) (:cur-volumn p)))))
 ;;
       )
     ;;
@@ -310,14 +312,11 @@
              ]
          (when-not (empty? cur)
                ;; compare
-           (let [_ (println "before compare")
-                 xs
-                 (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
+           (let [xs (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
                                               vals
                                               flatten)))
-                 _ (println "after compare")
                  ]
-             (println (apply str (repeat 80 "-")))
+             ;(println (apply str (repeat 80 "-")))
              (map!! println
                     (str/split-lines (apply pp-hashmap @cache cols-ticker)))
              (reset! cache xs)))
