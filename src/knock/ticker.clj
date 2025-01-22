@@ -292,15 +292,14 @@
       (let [p (cur-volumn++ prev)
             c (cur-volumn++ cur)]
         (assoc c :speed
-               (-> (- (:cur-volumn c) (:cur-volumn p))
-                   str
-                   precision)
+               (precision (str (- (:cur-volumn c) (:cur-volumn p)))
                ;;
                ))
 ;;
       )
     ;;
     ))
+  )
 
 (def cols-ticker [:ticker :speed :volunm :idx :change :market-cap :price])
 (defn live []
