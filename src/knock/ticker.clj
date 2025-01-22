@@ -349,7 +349,7 @@
              (println (apply str (repeat 80 "-")) (cur-time-str))
              (map!! println
                     (str/split-lines (apply pp-hashmap
-                                            (map #(assoc % :speed (precision (:speed %)))
+                                            (map #(assoc % :speed (precision (str (:speed %))))
                                                  @cache)
                                             cols-ticker)))
              (reset! cache xs)))
