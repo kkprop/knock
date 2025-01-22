@@ -316,19 +316,18 @@
             c (cur-volumn++ cur)]
         (assoc c :speed
                (let [speed  (- (:cur-volumn c) (:cur-volumn p))]
-                 ;(if (str/ends-with? (:volumn c) "M")
-                 ;  (precision (str (* 1000 speed)))
-                 ;  (if (str/ends-with? (:volumn c) "K")
-                 ;    (precision (str speed))
-                 ;    (precision (str (/ speed 1000.0)))))
-                 (print (type speed))
-                 speed
+                 (if (str/ends-with? (:volumn c) "M")
+                   (precision (str (* 1000 speed)))
+                   (if (str/ends-with? (:volumn c) "K")
+                     (precision (str speed))
+                     (precision (str (/ speed 1000.0)))))
                  )
                ))
 ;;
       )
     ;;
     ))
+
 
 (def cols-ticker [:ticker :speed :volumn :idx :change :market-cap :price])
 (defn live []
