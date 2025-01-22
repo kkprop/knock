@@ -316,7 +316,9 @@
              ;(println (apply str (repeat 80 "-")))
              (map!! println
                     (str/split-lines (apply pp-hashmap
-                                            (map #(assoc % :speed (precision (:speed %))) @cache)
+                                            (map (fn [m]
+                                                   (assoc % :speed (precision (str (:speed %)))))
+                                                 @cache)
                                             cols-ticker)))
              (reset! cache xs)))
          (pause 10000)
