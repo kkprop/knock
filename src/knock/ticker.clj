@@ -204,7 +204,7 @@
     (try
       (watch)
       (catch Exception e
-        (println (count e))
+        (println (count (str e)))
         (println "rerun")
         (kill-cur-pid-by-name "chromedriver")))))
 
