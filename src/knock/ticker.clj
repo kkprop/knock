@@ -340,7 +340,13 @@
              (map!! println
                     (str/split-lines (apply pp-hashmap
                                             (map (fn [m]
-                                                   (assoc m :speed (precision (str (:speed m)))))
+                                                   (assoc m :speed
+                                                          (if (str/ends-with? (:volumn m) "M")
+                                                            (precision (str (* 1000 (:speed m))))
+                                                            (if (str/ends-with? (:volumn m) "K")
+                                                              (precision (str (:speed m)))
+                                                              (precision (str (/ (:speed m) 1000)))))))
+
                                                  @cache)
                                             cols-ticker)))
              (reset! cache xs)))
