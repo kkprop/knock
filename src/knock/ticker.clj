@@ -345,7 +345,7 @@
                                                             (precision (str (* 1000 (:speed m))))
                                                             (if (str/ends-with? (:volumn m) "K")
                                                               (precision (str (:speed m)))
-                                                              (precision (str (/ (:speed m) 1000)))))))
+                                                              (precision (str (/ (:speed m) 1000.0)))))))
 
                                                  @cache)
                                             cols-ticker)))
