@@ -89,10 +89,11 @@
   )
 
 (defn cur-volumn [s]
-  (if (str/includes? s  "nul")
+  (if (or (str/includes? s  "nul")
+          (empty? s)
+          )
     0
-    (mk->k s)
-    ))
+    (mk->k s)))
 
 
 (++ cur-volumn volumn)
