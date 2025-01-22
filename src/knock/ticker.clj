@@ -280,14 +280,16 @@
 
 
 
-(defn compare-frame [[pp cc]]
-  (let [p (cur-volumn++ pp)
-        c (cur-volumn++ cc)]
-    (if (or (nil? pp) (nil? cc))
-      (if (nil? pp)
-        (assoc (merge pp cc) :speed 666)
-        (assoc (merge pp cc) :speed -1))
-      (assoc c :speed (- (:cur-volumn c) (:cur-volumn p)))
+
+(defn compare-frame [[prev cur]]
+  (let []
+    (if (or (nil? prev) (nil? cur))
+      (if (nil? prev)
+        (assoc (merge prev cur) :speed 666)
+        (assoc (merge prev cur) :speed -1))
+      (let [p (cur-volumn++ prev)
+            c (cur-volumn++ cur)]
+        (assoc c :speed (- (:cur-volumn c) (:cur-volumn p))))
 ;;
       )
     ;;
@@ -298,17 +300,24 @@
         p (promise)]
 
     (thread!
+     ;;( def cache {})
      (while true
-       (let [[prev cur] (cur-frames)]
+       (let [xs (cur-frames)
+             prev (first xs)
+             cur (second xs)
+             ]
          (when-not (empty? cur)
                ;; compare
-           (let [xs
+           (let [_ (println "before compare")
+                 xs
                  (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
                                               vals
-                                              flatten)))]
+                                              flatten)))
+                 _ (println "after compare")
+                 ]
              (println (apply str (repeat 80 "-")))
              (map!! println
-              (str/split-lines (pp-hashmap @cache :ticker :speed :volunm :change :market-cap :price)))
+                    (str/split-lines (pp-hashmap @cache :ticker :speed :volunm :change :market-cap :price)))
              (reset! cache xs)))
          (pause 10000)
            ;;
