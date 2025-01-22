@@ -75,7 +75,7 @@
 (def cur-page (atom ""))
 
 (defn cur-volumn [s]
-  (if (= (str/includes? s  "nul"))
+  (if (str/includes? s  "nul")
     0
     (-> (if (digit? (last s))
           s
@@ -86,6 +86,7 @@
 
 (++ cur-volumn volumn)
 
+;(def s (:volumn prev))
 
 
 (defn fix-ticker [m]
