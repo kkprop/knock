@@ -292,9 +292,10 @@
       (let [p (cur-volumn++ prev)
             c (cur-volumn++ cur)]
         (assoc c :speed
-               (-> (- (:cur-volumn c) (:cur-volumn p)))
-               str
-               precision
+               (-> (- (:cur-volumn c) (:cur-volumn p))
+                   str
+                   precision)
+               ;;
                ))
 ;;
       )
