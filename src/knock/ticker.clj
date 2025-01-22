@@ -175,9 +175,10 @@
 
 (defn watch []
   (let []
-    (go-tg)
-    ;(when (or (pre?) (post?))
-    ;  (pause-minutes 1))
+    (when (nil? (go-tg) )
+      (kill-cur-pid-by-name "chromedriver")
+      (pause 500)
+      )
     (while true
       (let [s (locate-cur-tickers)]
         (println "cur tickers count:" (count s))
