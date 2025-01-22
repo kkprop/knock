@@ -317,14 +317,14 @@
         (assoc c :speed
                (let [speed  (- (:cur-volumn c) (:cur-volumn p))]
                  (if (str/ends-with? (:volumn c) "M")
-                   (precision (str (* 1000 speed)))
+                   (* 1000 speed)
                    (if (str/ends-with? (:volumn c) "K")
-                     (precision (str speed))
-                     (precision (str (/ speed 1000.0)))))
-                 )
-               ))
+                     speed
+                     (/ speed 1000.0))))
+               )
+
 ;;
-      )
+      ))
     ;;
     ))
 
@@ -341,7 +341,7 @@
              prev (first xs)
              cur (second xs)]
          (when-not (empty? cur)
-               ;; compare
+           ;; compare
            (let [xs (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
                                                  vals
                                                  flatten)))]
