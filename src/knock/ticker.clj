@@ -307,44 +307,44 @@
      (while true
        (let [xs (cur-frames)
              prev (first xs)
-             cur (second xs)
-             ]
+             cur (second xs)]
          (when-not (empty? cur)
                ;; compare
            (let [xs (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
-                                              vals
-                                              flatten)))
-                 ]
+                                                 vals
+                                                 flatten)))]
              ;(println (apply str (repeat 80 "-")))
              (map!! println
-                    (str/split-lines (apply pp-hashmap @cache cols-ticker)))
+                    (str/split-lines (apply pp-hashmap
+                                            (map #(assoc % :speed (precision (:speed %))) @cache)
+                                            cols-ticker)))
              (reset! cache xs)))
          (pause 10000)
            ;;
          )))
 
-    (thread!
-     (while true
-       (let [iid (atom "")
-             cur-task (atom nil)]
-         (while (not (realized? p))
-           ;; do a new rendering 
-           (when-not (= @iid (->uuid @cache))
-             (println (apply str (repeat 80 "-")))
-             ;;stop previous
-             (when-not (nil? @cur-task)
-               (.interrupt @cur-task))
-             (let [t (tui/render
-                      (str/split-lines (apply pp-hashmap @cache cols-ticker))
-                      (fn [x]
-                        (println "user choose " x)))]
-               (reset! cur-task t)
-               (reset! iid (->uuid @cache))))
+    ;(thread!
+    ; (while true
+    ;   (let [iid (atom "")
+    ;         cur-task (atom nil)]
+    ;     (while (not (realized? p))
+    ;       ;; do a new rendering 
+    ;       (when-not (= @iid (->uuid @cache))
+    ;         (println (apply str (repeat 80 "-")))
+    ;         ;;stop previous
+    ;         (when-not (nil? @cur-task)
+    ;           (.interrupt @cur-task))
+    ;         (let [t (tui/render
+    ;                  (str/split-lines (apply pp-hashmap @cache cols-ticker))
+    ;                  (fn [x]
+    ;                    (println "user choose " x)))]
+    ;           (reset! cur-task t)
+    ;           (reset! iid (->uuid @cache))))
 
-           (Thread/sleep 1000)
+    ;       (Thread/sleep 1000)
 
-         ;;
-           ))))
+    ;     ;;
+    ;       ))))
     @p
 ;;
     ))
