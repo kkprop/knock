@@ -346,12 +346,13 @@
            (let [xs (reverse (sort-by :speed (-> (map-on-val compare-frame (group-by :ticker (concat prev cur)))
                                                  vals
                                                  flatten)))]
-             (println (apply str (repeat 80 "-")) (cur-time-str))
-             (map!! println
-                    (str/split-lines (apply pp-hashmap
-                                            (map #(assoc % :speed (precision (str (:speed %))))
-                                                 @cache)
-                                            cols-ticker)))
+             (when-not (= (->uuid xs) (->uuid @cache))
+               (println (apply str (repeat 80 "-")) (cur-time-str))
+               (map!! println
+                      (str/split-lines (apply pp-hashmap
+                                              (map #(assoc % :speed (precision (str (:speed %))))
+                                                   @cache)
+                                              cols-ticker))))
              (reset! cache xs)))
          (pause 10000)
            ;;
@@ -384,6 +385,16 @@
     ))
 
 
+(defn taliyun [& args]
+  (apply run-cmd "aliyun --config-path ~/.aliyun/tconfig.json" args)
+  )
+(defn tstart []
+  (pp (taliyun "ecs StopInstance --InstanceId i-j6cjbk2s5jdkc5voxym4"))
+  )
+
+
+(defn tstop []
+  (pp (taliyun "ecs StartInstance --InstanceId i-j6cjbk2s5jdkc5voxym4")))
 
 (comment
 
