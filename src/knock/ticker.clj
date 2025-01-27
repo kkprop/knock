@@ -350,8 +350,19 @@
                (println (apply str (repeat 80 "-")) (cur-time-str))
                (map!! println
                       (str/split-lines (apply pp-hashmap
+                                              ;;after processing
+                                              (map (fn [{:keys [ticker]
+                                                         :as m}]
+                                                     (if (in? (keys (group-by :ticker @cache))
+                                                                    ticker
+                                                                    )
+                                                       m
+                                                       (assoc m :ticker (str "**" ticker "**"))
+                                                       )
+                                                     ))
+                                              ;;
                                               (map #(assoc % :speed (precision (str (:speed %))))
-                                                   @cache)
+                                                   xs)
                                               cols-ticker))))
              (reset! cache xs)))
          (pause 10000)
