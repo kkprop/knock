@@ -347,7 +347,7 @@
                                                  vals
                                                  flatten)))]
              (when-not (= (->uuid xs) (->uuid @cache))
-               (println (apply str (repeat 80 "-")) (cur-time-str))
+               (println (apply str (repeat 80 "-")) (:ts (first xs)))
                (map!! println
                       (str/split-lines (apply pp-hashmap
                                                                                             ;;
