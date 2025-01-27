@@ -349,7 +349,6 @@
              (when-not (= (->uuid xs) (->uuid @cache))
                (println (apply str (repeat 80 "-"))
                         "lag: " ( - (cur-ts) (:ts (first xs)))  "s")
-               ) 
                (map!! println
                       (str/split-lines (apply pp-hashmap
                                                                                             ;;
