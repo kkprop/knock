@@ -348,7 +348,7 @@
                                                  flatten)))]
              (when-not (= (->uuid xs) (->uuid @cache))
                (println (apply str (repeat 80 "-"))
-                        "lag: " ( - (cur-ts) (:ts (first xs)))  "s")
+                        "lag: " (- (cur-ts) (:ts (first xs))  "s")
                (map!! println
                       (str/split-lines (apply pp-hashmap
                                                                                             ;;
@@ -363,7 +363,7 @@
                                                             (assoc m :ticker (str "**" ticker "**"))))))
 
                                               cols-ticker))))
-             (reset! cache xs)))
+             (reset! cache xs))))
          (pause 10000)
            ;;
          )))
