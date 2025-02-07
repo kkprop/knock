@@ -48,6 +48,7 @@
                           :text-align "left"))
 
   wordnet (do (println (apply w/search-wn  *command-line-args*)))
+  test-test (println (u/test-test))
 
   ;;wrap up 
   ;;local-call (apply s/local-call *command-line-args*)
@@ -66,19 +67,21 @@
   ;!!! notice this choosen emoji will be copied to your clipboard 
   emoji (println (e/i-emoji))
 
-  ;; recommending of doing an alias: bb alias chatgpt "cd /Users/dc/kkprop/knock && bb gpt-prompt clojure"
-  gpt-prompt (println (u/mock chat/prompt (apply str *command-line-args*)))
   qq (println (u/quote-quote (apply str *command-line-args*)))
   alias (println (u/alias (first *command-line-args*) (clojure.string/join " " (rest *command-line-args*))))
   cha (hanzi/show (mock hanzi/cha (first *command-line-args*)))
   wen (println (mock br/wiki-source (first *command-line-args*)))
 
   chop (u/pp (block/->phrase 2 (block/->units (str/join *command-line-args*))))
-  run-model (chat/run-model)
-  co-gpt (chat/clipboard-prompt)
+
   shuzhe (println (str/join "\n" [(apply str (repeat 80 "-"))
                                   ""
                                   (block/->shu (first *command-line-args*))]))
+
+  ;; recommending of doing an alias: bb alias chatgpt "cd /Users/dc/kkprop/knock && bb gpt-prompt clojure"
+  ;gpt-prompt (println (u/mock chat/prompt (apply str *command-line-args*)))
+  ;co-gpt (chat/clipboard-prompt)
+  run-model (chat/run-model)
 
   lr (block/lazy-read (first *command-line-args*))
 
@@ -101,6 +104,5 @@
 
   mock-laundry (println "cleaned:" (count (u/mock-laundry)))
 
-
-  ;;
+;;
   }}

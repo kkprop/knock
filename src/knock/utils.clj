@@ -1825,22 +1825,30 @@
   (load-json-str (slurp path)))
 
 
+;;when passing :as :stream
+;;  will return and OutputStream, using ->ch to convert it to be a channel then using async-fn to process the content 
 (defn curl-any [method url & {:keys [headers body]
                               :or {headers {"Content-Type" "application/json"}}
                               :as opts}]
-  (let [req (if (nil? body)
-              {:headers headers}
-              (assoc {:headers headers} :body (j body)))
+  (let [;;_ (println opts)
+        req (if (nil? body)
+              (merge opts {:headers headers})
+              (assoc
+               (merge opts { :headers headers})
+               :body
+               (if-not (string? body)
+                 (j body)
+                 body)))
+
         ;;_ (println req)
         res (try (method url req) (catch Exception e (ex-data e)))]
     (-> res
         (assoc :body (try
-                        (jstr-to-edn (:body res))
+                       (jstr-to-edn (:body res))
                         ;;can't convert to edn, just return
-                        (catch Exception e (:body res))))
+                       (catch Exception e (:body res))))
         ;;remove :process which will cause No reader function for tag object
-        (dissoc :process)
-        )
+        (dissoc :process))
     ;
     ))
 
@@ -2033,6 +2041,9 @@
   (if (nil? readers)
     (clojure.edn/read-string (slurp path))
     (clojure.edn/read-string {:readers readers} (slurp path))))
+
+;;memoize to avoid duplicated read of file
+(def load-edn-mem (memoize load-edn))
 
 (defn spit-edn [path x & opts]
   (let []
@@ -2990,7 +3001,7 @@
   (let [var-name (symbol (force-str name))
         key-word (keyword (force-str name))
         m (if (nil? config-m)
-            (load-edn (if (str/starts-with? config-path "/")
+            (load-edn-mem (if (str/starts-with? config-path "/")
                         config-path
                         (join-path work-dir config-path)
                         ))
@@ -3004,7 +3015,7 @@
 ;;config multiple from the same file
 (defmacro configs [names & {:keys [config-path]
                             :or {config-path (join-path work-dir "resources/config.edn")}}]
-  (let [m (load-edn config-path)]
+  (let [m (load-edn-mem config-path)]
     `(do
        ~@(for [x names]
            `(config ~x :config-m ~m)))))
@@ -3159,7 +3170,13 @@
                   ;;
       )))
 
+;;return the context
 (def mock? mock-context)
+
+;;check whether cache file exists
+(defn mock?? [f & args]
+  (fs/exists? (:path (apply mock-context f args)))
+  )
 
 (defn- do-mock [force? f & args]
   (let [{:keys [fm ns-path dir path tmp-path t]} (apply mock-context f args)
@@ -3551,6 +3568,10 @@
     x
     (md5-uuid (->str x))))
 
+
+(defn cur-uuid []
+  (->uuid (cur-date-str))
+  )
 ;;do spit, but return the file path
 (defn spit! [f content & options]
   (let [_ (apply spit f content options)]
