@@ -205,7 +205,8 @@
   )
 
 (def lp "lift-pause")
-(def mp (atom (mouse-pos)))
+(def mp (atom "" 
+              ))
 
 (defn need-pause? []
   (and
