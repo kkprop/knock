@@ -350,21 +350,21 @@
                ;(println xs)
                (println (apply str (repeat 80 "-"))
                         "lag: " (- (cur-ts) (:ts (first xs))) "s"
-                        (cur-time-str)
-                        (map!! println
-                               (str/split-lines (apply pp-hashmap
+                        (cur-time-str))
+               (map!! println
+                      (str/split-lines (apply pp-hashmap
                                                                                             ;;
-                                                       (->> xs
-                                                            (map #(assoc % :speed (precision (str (:speed %)))))
+                                              (->> xs
+                                                   (map #(assoc % :speed (precision (str (:speed %)))))
                                                    ;;afterwards processing
-                                                            (map (fn [{:keys [ticker]
-                                                                       :as m}]
-                                                                   (if (in? (keys (group-by :ticker @cache))
-                                                                            ticker)
-                                                                     m
-                                                                     (assoc m :ticker (str "**" ticker "**"))))))
+                                                   (map (fn [{:keys [ticker]
+                                                              :as m}]
+                                                          (if (in? (keys (group-by :ticker @cache))
+                                                                   ticker)
+                                                            m
+                                                            (assoc m :ticker (str "**" ticker "**"))))))
 
-                                                       cols-ticker))))
+                                              cols-ticker)))
                (reset! cache xs))))
          (pause 10000)
            ;;
