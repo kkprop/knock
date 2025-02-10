@@ -184,13 +184,18 @@
     (while true
       (print "> ")
       (flush)
-      (print-chat m (read-line))
+      (print-chat m
+                  (let [s (read-line)]
+                    (if (str/starts-with? s "@")
+                      (str "加载一下上下文："
+                           (slurp (chop-leading-n s 1))
+                           )
+                      s)))
+
       (println "")
-      (print "> ")
-      )
+      (print "> "))
     ;;
-    )
-  )
+    ))
 
 
 

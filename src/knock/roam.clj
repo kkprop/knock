@@ -11,6 +11,10 @@
 (def g {:name "xzl"
         :token "roam-graph-token-dW9r1QFGTupMhchw-dmp4mC1Jdw0w4I77pRCVlp6"})
 
+(defn xzl []
+  (load-edn "/Users/dc/xzl.edn")
+  )
+
 (def base "https://api.roamresearch.com/api/graph")
 
 
@@ -38,18 +42,12 @@
         token (:token g)
         headers  {"Content-Type" "application/json"
                   "accept" "application/json"
-                  "Authorization" (str "Bearer " token)
-                  }
+                  "Authorization" (str "Bearer " token)}
         req {:headers  headers
              :body (json/generate-string data)
-             :raw-args ["--location-trusted"]
-             }
-        ]
-    (json/parse-string
-     (:body
-      (curl/post url req)))
-    )
-  )
+             :raw-args ["--location-trusted"]}]
+
+    (:body (curl-post url req))))
 
 (declare create-page update-page update-block  move-block)
 
@@ -237,15 +235,15 @@
 ; )
 
 (defn search-block [g s]
-  (q g '[:find ?block-uid ?block-str
-          :in $ ?search-string
-          :where [?b :block/uid ?block-uid]
-          [?b :block/string ?block-str]
-          [(clojure.string/includes? ?block-str ?search-string)]
-           ]
-     s
-     )
-  )
+  (let [res (q g '[:find ?block-uid ?block-str
+                   :in $ ?search-string
+                   :where [?b :block/uid ?block-uid]
+                   [?b :block/string ?block-str]
+                   [(clojure.string/includes? ?block-str ?search-string)]]
+               s)]
+    (name-xs [:block/uid :block/string]  (:result res))
+    ;;
+    ))
 
 (defn pull-uid [g uid]
   (let []
@@ -262,41 +260,44 @@
 
 (comment
   (server/local-call :rand)
-  (macroexpand 
+  (macroexpand
    (gen-json-fn
-    (load-json "write.json")
-   )
+    (load-json "write.json"))
 
-  (update-block g {:uid "w-9UmjI-0" :string "Hello Roam!"} )
-  (def gt
+   (update-block g {:uid "w-9UmjI-0" :string "Hello Roam!"})
+   (def gt
     ;g
     ;(load-edn "Tickers.edn")
-    )
-  (write gt "Hello" {:heading 3 :text-align "left"})
-
-  (cur-daily-page)
-  (write gt "Hello" )
-
-  (q gt '[:find ?block-uid ?block-str
-               :in $ ?search-string ?search-string2
-               :where [?b :block/uid ?block-uid]
-               [?b :block/string ?block-str]
-               [(clojure.string/includes? ?block-str ?search-string)]
-               [(clojure.string/includes? ?block-str ?search-string2)]
-               ]
-     "library" "zlib"
      )
-  (def d (load-json "roam-api.json"))
+   (write gt "Hello" {:heading 3 :text-align "left"})
 
-  (def j {"update-page"
-          {"action" "update-page"
-           "page" {"uid" "xK98D8L7U",
-                   "title" "List of participants"}}}
-    )
-  (def fname "update-page")
-  (def ks ['action 'uid 'title])
-  (def defaults ['action "update-page" 'uid "xK98D8L7U" 'title "List of participants"] )
-  (fn-parts "update-page" j)
+   (cur-daily-page)
+   (write gt "Hello")
 
-  ))
+   (q gt '[:find ?block-uid ?block-str
+           :in $ ?search-string ?search-string2
+           :where [?b :block/uid ?block-uid]
+           [?b :block/string ?block-str]
+           [(clojure.string/includes? ?block-str ?search-string)]
+           [(clojure.string/includes? ?block-str ?search-string2)]]
+      "library" "zlib")
+   (def d (load-json "roam-api.json"))
+
+   (def j {"update-page"
+           {"action" "update-page"
+            "page" {"uid" "xK98D8L7U",
+                    "title" "List of participants"}}})
+   (def fname "update-page")
+   (def ks ['action 'uid 'title])
+   (def defaults ['action "update-page" 'uid "xK98D8L7U" 'title "List of participants"])
+   (fn-parts "update-page" j))
+
+  (->>
+   (search-block (xzl)
+                 "三月")
+   (map :block/uid)
+   )
+
+;;
+  )
 
