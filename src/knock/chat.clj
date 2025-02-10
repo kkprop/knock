@@ -171,7 +171,13 @@
                                   (map :q (vals @qa-cache))
                                   ;;current 
                                   msg
-                                  )))))))))
+                                  )
+                                 )
+                                )
+                      )))
+     )
+   )
+  )
 
 (defn run-model []
   (let [m (tui/choose (models) 10)]
@@ -179,6 +185,8 @@
       (print "> ")
       (flush)
       (print-chat m (read-line))
+      (println "")
+      (print "> ")
       )
     ;;
     )

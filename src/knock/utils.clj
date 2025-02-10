@@ -90,7 +90,13 @@
 
 
 (defn run-cmd! [& cmd]
-  (:out (apply run-cmd cmd))
+  (let [{:keys [out err exit]
+         :as m} (apply run-cmd cmd)]
+    (if (= 0 exit)
+      out
+      m
+      )
+    )
   )
 
 ;; seperator : to split key value -> a hash map
@@ -268,8 +274,13 @@
     x
     (if (keyword? x)
       (name x)
-      (str x)
-      )))
+      (if (instance? java.io.Reader x)
+        x
+        (str x)
+        )
+      )
+    )
+  )
 
 (defn ->keyword [x]
   (if (keyword? x)
@@ -448,7 +459,42 @@
 (defn async-fn [f c]
   (go-loop [] (when-some [xs (<! c)]
                   (f xs)
-                  (recur))))
+                  (recur)
+                  )
+           ))
+;;collect everything from the channel, then call f on the list of content
+(defn read-lines!! [c]
+  (let [in (if (instance? java.io.Reader c)
+            (->ch c)
+            c
+            )
+        res (atom [])
+        p (promise)
+        ]
+    ;(println "start reading")
+    (go-loop [] (if-some [xs (<! in)]
+                  (do
+                    ;(println "got" xs)
+                    (swap! res conj xs)
+                    (recur)
+                    )
+                  (do
+                    ;(println "got end of stream")
+                    (deliver p @res))
+                  )
+             )
+    @p
+    )
+  )
+
+(defn read!! [c]
+  (str/join "\n" (read-lines!! c))
+  )
+
+(defn sync-fn!! [f c]
+  (f (read!! c))
+  )
+
 
 ;;do cleaning and exit when user input CTRL+C
 (defn trap-exit
@@ -464,6 +510,7 @@
    (trap-exit #(println "no clean to do"))
    )
   )
+
 
 ;; hope not have to require async fns everytime
 ;; go! is actually go, but wont bother to do require
@@ -1697,7 +1744,7 @@
   )
 
 
-
+(++ days-left expire-date)
 
 (def j json/generate-string)
 (def e clojure.edn/read-string)
@@ -1724,7 +1771,11 @@
 
 ;; string of json, edn, parsed to be edn 
 (defn ->edn [s]
-  (let [x (jstr->edn! s)]
+  (let [x (if (string? s)
+            ;;only convert when it's a string
+            (jstr->edn! s)
+            s
+          )]
     (if (nil? x)
       (try 
         (e s)
@@ -3303,6 +3354,29 @@
   (apply mock-with-rate-by-hour 1.0 n f args)
   )
 
+(def a-day-seconds 86400)
+;;min 28 days
+(def a-month-seconds 2419200)
+(def a-year-seconds 31536000)
+
+(defn mock-within [seconds f & args]
+  (let [{:keys [path]} (apply mock-context f args)
+        n (-> (fs/creation-time path)
+            .toMillis 
+            java.util.Date.
+            to-now-seconds
+            )
+        x (- 0 n)
+        ]
+    ;;(println seconds x)
+    (if (< seconds x)
+      (apply mock-update f args)
+      (apply mock f args)
+      )
+    ))
+
+;;when > seconds do mock-update
+(def mock> mock-within)
 
 
 (defn measure [f & args]
