@@ -4328,7 +4328,9 @@
 
 
 (defn mouse-pos []
-  (str/trim (run-cmd! :sendkeys "mouse-position")))
+  (let [s (run-cmd! :sendkeys "mouse-position")]
+    (when (string? s) (str/trim s))
+    ))
 
 ;;TODO: a thing. subscribe changing
 
