@@ -38,6 +38,7 @@
          map-on-key map-on-val mock mock!
          trimr! pause cur-ts
          mock
+         env?
          )
 
 (defn uuid []
