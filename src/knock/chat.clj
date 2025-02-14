@@ -178,7 +178,7 @@
      )
    )
   )
-
+;;This is not good.
 (defn run-model []
   (let [m (tui/choose (models) 10)]
     (while true

@@ -47,7 +47,11 @@
 ;;println but return the element
 (defn println! [x]
   (let []
-    (println x)
+    ;;on REPL call set-debug to set
+    ;;  call unset-debug to switch it off
+    (when (env? :DEBUGGING)
+      (println x)
+      )
     x)
   )
 
@@ -167,6 +171,13 @@
     )
   )
 
+;;use timeout eval for convinience
+(defn eval-with-timeout [seconds f]
+  (let [fut (future (f))
+        ret (deref fut (* 1000 seconds) :timed-out)]
+    (when (= ret :timed-out)
+      (future-cancel fut))
+    ret))
 
 ;;function params to 0
 (defn partial! [f & args]
@@ -463,6 +474,7 @@
                   )
            ))
 ;;collect everything from the channel, then call f on the list of content
+;;   when c is a java.io.Reader, will be converted to be a channel
 (defn read-lines!! [c]
   (let [in (if (instance? java.io.Reader c)
             (->ch c)
@@ -1156,7 +1168,9 @@
   )
 
 (defn rows->hashmap [s]
-  (let [xs (str/split-lines s)]
+  (let [xs
+        (str/split-lines s)
+        ]
     (->> xs
          (map line->kv)
          (apply merge)
@@ -1931,7 +1945,8 @@
 ;;  if running on a server, it happen to be the server's ip
 ;;  when running on a machine behind NAT, it will be the ip of its network
 (defn my-ip []
-  (str/trim (:out (run-cmd "curl -4 ip.sb")))
+  ;;(str/trim (:out (run-cmd "curl -4 ip.sb")))
+  (str/trim (:out (run-cmd "curl -4 ifconfig.me")))
   )
 
 (defn ip? [s]
@@ -2017,8 +2032,11 @@
 
 (defn spit-line! [f s]
   "spit only when string not exist currently"
-  (when-not (in? (slurp-lines f) s)
-    (spit-line f s)))
+  (if (str/includes? (slurp f) s)
+    (println "already exists ignore")
+    (spit-line f s)
+    )
+  )
 
 (defn spit-json [path m & opts]
   (apply spit path (j m) opts)
