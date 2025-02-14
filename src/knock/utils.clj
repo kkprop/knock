@@ -3062,6 +3062,22 @@
                  :cache (conj (:cache context) curRes)
                })))))
 
+
+;; the f should have [limit offset] as params of itself
+;;    when return empty the pull action will stop
+(defn pull-by-step [f step]
+  (loop [i 0 res []]
+    (let [xs (f step i)]
+      (println! i)
+      (if (empty? xs)
+        res
+        (recur (+ i step) (concat res xs))
+        )
+      )
+    )
+  )
+
+
 ;; load from default config file
 ;;  i.e. (config :chrome-profile)
 ;;       a varible chrome-profile is defined
@@ -3098,24 +3114,46 @@
 ;; load from shell environment, accept both keyword and string 
 ;;   def the same name variable
 ;;    i.e. (env :OPENAI_API_KEY)
-(defmacro env [name]
-  (let [var-name (symbol (force-str name))
+(defn env [name]
+  (let [;var-name (symbol (force-str name))
+        ;s (force-str name)
         s (force-str name)
+        v (let [x (System/getenv s)]
+            (if (nil? x)
+              (System/getProperty s)
+              x
+              )
+            )
         ]
     ;;TODO how to make sure it is defined
-    `(def ~var-name (System/getenv ~s))
-    (System/getenv s)
+    ;`(def ~var-name ~v)
+    v
     )
   )
 
 
-(defmacro env? [name]
-  `(not (nil? (env ~name)))
+(defn env? [name]
+  (not (nil? (env name)))
+  )
+
+;;make sure the name is set in System property
+(defn env!
+  ([name]
+   (env! name true)
+   )
+  ([name value] 
+   (System/setProperty (force-str name) (force-str value))
+   )
+  )
+
+
+(defn unset-env! [name]
+  (System/clearProperty (force-str name) )
   )
 
 (defn test-test []
   (let []
-    (println (env STAGING_ENV))
+    (println (env :STAGING_ENV))
     )
   )
 
@@ -3133,7 +3171,27 @@
     ))
 
 
+(defn debug? []
+  (env? :DEBUGGING)
+  )
+
+(defn set-debug []
+  (env! :DEBUGGING)
+  )
+
+(defn unset-debug []
+  (unset-env! :DEBUGGING)
+  )
+
 (comment
+  (env? :DEBUGGING)
+
+  (env! :DEBUGGING)
+
+  (unset-env! :DEBUGGING)
+
+
+
   (dash-dash-kv {:x 'x1 :y 'y1} )
   (tree-diff a b vcf-count)
   (flatten-hashmap  a)
@@ -3379,12 +3437,13 @@
 
 (defn mock-within [seconds f & args]
   (let [{:keys [path]} (apply mock-context f args)
-        n (-> (fs/creation-time path)
-            .toMillis 
-            java.util.Date.
-            to-now-seconds
-            )
-        x (- 0 n)
+        x (if (fs/exists? path) (- 0 (-> (fs/creation-time path)
+                                        .toMillis 
+                                        java.util.Date.
+                                        to-now-seconds
+                                        ))
+              (+ 1 a-year-seconds)
+              )
         ]
     ;;(println seconds x)
     (if (< seconds x)
