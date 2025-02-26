@@ -31,7 +31,7 @@
 (def os-name (System/getProperty "os.name"))
 (defn osx?[] (= os-name "Mac OS X"))
 
-(declare force-str force-int cur-time-str ->keyword ->uuid int!)
+(declare force-str force-int cur-time-str ->keyword ->uuid int! ->inst)
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
          text-cols->hashmap
          file-name ext-name var-meta async-fn tail-f
@@ -46,6 +46,7 @@
   )
 
 ;;println but return the element
+;;also checking the DEBUGGING env to decide whether to print
 (defn println! [x]
   (let []
     ;;on REPL call set-debug to set
@@ -54,6 +55,10 @@
       (println x)
       )
     x)
+  )
+
+(defn print-divide-line []
+  (println (apply str (repeat 80 "-")))
   )
 
 ;;make thing a function.
@@ -93,6 +98,13 @@
   (sh "sh" (format "-c timeout %d ' " t) (str (apply join-cmd cmd) " '"))
   )
 
+(defn exit
+  ([]
+   (exit 0)
+   )
+  ([code]
+   (System/exit code))
+  )
 
 (defn run-cmd! [& cmd]
   (let [{:keys [out err exit]
@@ -144,12 +156,6 @@
 (defn to-path-cmd [path & cmd]
   (sh "sh" "-c" (apply join-cmd "cd " path "&&" cmd)))
 
-(defn eval-with-timeout [seconds f]
-  (let [fut (future (f))
-        ret (deref fut (* 1000 seconds) :timed-out)]
-    (when (= ret :timed-out)
-       (future-cancel fut))
-    ret))
 
 (defn timeout-eval [seconds f & args]
   (let [fut (future (apply f args))
@@ -160,6 +166,7 @@
     ret)
     )
 
+;;run command like response
 (defn timeout-eval! [seconds f & args]
   (let [fut (future (apply f args))
         ret (deref fut (* 1000 seconds) :timeout)
@@ -299,12 +306,16 @@
     x
     ;; (keyword ":abc") should be :abc 
     (keyword
-     (let [s (->str x)]
-       (if (str/starts-with? s ":")
+     (let [s (->str x)
+           ss (-> s
+                  (str/replace " " "-")
+                  (str/replace "." "-"))
+           ]
+       (if (str/starts-with? ss ":")
          ;;remove the leading :
-         (subs s 1)
-         s
-         )))))
+         (subs ss 1)
+         ss)))))
+
 
 (def force-str ->str)
 
@@ -379,6 +390,20 @@
     )
   )
 
+(defn is-or-has< [x]
+  (if (map? x)
+    (let [xs x]
+      #(->> xs
+            (map (fn [[k v]]
+                   (< (get % k) v)
+                   ))
+            (every? true?)
+            )
+      )
+    (partial = x)
+    )
+  )
+
 (defn ->>! [f x colls]
   (->> colls
        (f #((is-or-has x) %))
@@ -388,6 +413,17 @@
 ;;TODO support nested x like {:a {:b v}}
 (def filter! (partial ->>! filter))
 (def remove! (partial ->>! remove))
+
+
+(defn ->><! [f x colls]
+  (->> colls
+       (f #((is-or-has< x) %))
+       )
+  )
+
+
+(def filter< (partial ->><! filter))
+(def remove< (partial ->><! remove))
 
 
 (comment
@@ -934,6 +970,8 @@
   (run-cmd :osascript "-e '"
            (join-cmd args)))
 
+
+
 (defn key-code [x]
   ;;darker
   ;;(def x 145)
@@ -1121,7 +1159,7 @@
   ([s]
    (text-cols->hashmap s #"\s\s+"))
   ([s separator]
-   (let [xs (str/split-lines s)
+   (let [xs (map str/trim (str/split-lines (str s)))
          head (first xs)
          ks (map keyword (str/split head separator))]
      (->> (rest xs)
@@ -1389,6 +1427,12 @@
   (openssl "x509"" -text -noout -in" path)
   )
 
+(defn cert-expire-date [path]
+  (->inst (openssl "x509 -noout -enddate -in" path)
+          :to-trim "notAfter="
+   )
+  )
+
 (defn cert->chain [path]
   (openssl "x509 -in" path "-text | grep 'CA Issuers - URI' |awk -FURI: '{print $2}' | xargs curl -s | openssl x509 -inform DER")
   )
@@ -1519,6 +1563,30 @@
       (.setTimeZone
        (java.util.TimeZone/getTimeZone "GMT")))
     (java.util.Date.))))
+
+(defn cur-week-day []
+  (force-int (cur-time-str "u")))
+
+(defn monday? []
+  (= 1 (cur-week-day)))
+
+(defn tuesday? []
+  (= 2 (cur-week-day)))
+
+(defn wednesday? []
+  (= 3 (cur-week-day)))
+
+(defn thursday? []
+  (= 4 (cur-week-day)))
+
+(defn friday? []
+  (= 5 (cur-week-day)))
+
+(defn saturday? []
+  (= 6 (cur-week-day)))
+
+(defn sunday? []
+  (= 7 (cur-week-day)))
 
 (defn cur-time-str-ok-as-file []
   (cur-time-str "yyyy-MM-dd-hh.mm.ss"))
@@ -1657,7 +1725,6 @@
   )
 
 
-(def n 0)
 (defn today
   ([] (today 0))
   ([n]
@@ -1770,6 +1837,7 @@
     (json/parse-string s true)
     )
   )
+
 (def jstr-to-edn jstr->edn)
 
 ;;ignore failed
@@ -2218,10 +2286,16 @@
 
 (defn spit-xs [path xs & opts]
   (let [_ (clojure.java.io/make-parents path)]
-    (apply spit path
-           ;;an empty line in the end of the fie
-           (str (str/join "\n" xs) "\n")
-           opts)))
+    ;(apply spit path
+    ;       ;;an empty line in the end of the fie
+    ;       (str (str/join "\n" xs) "\n")
+    ;       opts)
+    (->> xs
+         ;;TODO spit-line not support opts
+         (map!! #(spit-line path (str %)))
+         )
+    )
+  )
 
 (defn spit-xs! [path xs & opts]
   (let [res (apply spit-xs path xs opts)
@@ -2669,35 +2743,29 @@
                   (map #(if (map? %) (flatten (seq %)) %) kv))
         prefix (if (str/ends-with? prefix "/")
                  prefix
-                 (str prefix "/")
-                 )
+                 (str prefix "/"))
         params (->> kv-pairs
                     (partition 2)
                     (map #(str (name (first %))
                                "="
                                ;;make sure the space and other characters are encoded as url
                                (url-encode
-                                 (if (keyword? (second %))
-                                   (str (name (second %)))
-                                   (str (second %))))))
+                                (if (keyword? (second %))
+                                  (str (name (second %)))
+                                  (str (second %))))))
 
                     (str/join "&")
                     (apply str))
         ;;empty path will cause /?k=v problem
-        xp (if (empty? path)
-          (trimr-sub prefix "/")
-          prefix
-          )
+        xp (if (empty? (->str path))
+             (trimr-sub prefix "/")
+             prefix)
         ;;path last / should be removed to avoid /?k=v
-        x (trimr-sub path "/")
-        ]
+        x (trimr-sub (->str path) "/")]
 
     (if (empty? params)
       (str xp (force-str x))
-      (str xp (force-str x) "?" params)
-      )
-    )
-  )
+      (str xp (force-str x) "?" params))))
 
 (defn ->k=v [xs & {:keys [separator prefix]
                    :or {separator "="

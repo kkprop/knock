@@ -3,7 +3,8 @@
             [knock.browser :refer :all]
             [knock.tui :as tui]
             [clojure.string :as str]
-            [etaoin.api :as e]))
+            [etaoin.api :as e]
+            [clojure.walk :as cljwalk]))
 
 (config
   :ticker-url :config-path "resources/ticker.edn"
@@ -12,10 +13,35 @@
 (configs [:tg-pre
           :tg-post
           :tl-pre
-          :tl-post]
+          :api-key
+          :tl-post
+          ]
          :config-path "resources/ticker.edn")
 
+(def url "https://www.alphavantage.co/")
 
+(defn vg-keyword [x]
+  (if (keyword? x)
+    (->keyword
+     (let [s (str/lower-case (->str x))]
+       (if (nil? (->int s))
+         s
+         (chop-leading-n s 4))))
+    x))
+
+(defn query [f & kv]
+  (let [{:keys [body err]
+         :as m} (curl-get
+                 (apply make-url url :query :function f :apikey api-key kv))]
+    (when-not (nil? err)
+      (println err))
+    (clojure.walk/postwalk vg-keyword body)))
+
+
+
+(defn symbol [id]
+  (query :GLOBAL_QUOTE :symbol id)
+  )
 
 (defn ->url [id]
   (let [x (if (str/includes? id "-")
@@ -36,7 +62,7 @@
 (defn disc-info [d]
   ;;nil if not trading
   (try
-    (e/get-element-inner-html d {:class "disc-info"})
+    (locate! {:class "disc-info"})
     (catch Exception e
       (if (str/includes? (str e)
                          "no such element: Unable to locate element:")
@@ -49,7 +75,7 @@
 
 (defn price-normal [d]
   (try
-    (e/get-element-inner-html d {:class "price-normal"})
+    (locate! {:class "price-normal"})
     ;(catch Exception e nil ())
     )
   )
@@ -57,12 +83,15 @@
 (defn cur-price [id]
   (let [d (go (->url id) id)]
     ;;TODO clear by click
-    (clear-disturb d)
-    (let [pre-post (disc-info d)]
-      (if (nil? pre-post)
-        (price-normal d)
-        pre-post
-        ))))
+    ;(clear-disturb d)
+    (locate! {:class "price-normal"})))
+
+(comment
+
+  (def id  "CNEY")
+  (cur-price id)
+
+  )
 
 
 (defn save-tg [s]
@@ -407,6 +436,12 @@
 
 (defn tstop []
   (pp (taliyun "ecs StartInstance --InstanceId i-j6cjbk2s5jdkc5voxym4")))
+
+
+
+(defn auto-tstop []
+  (cur-week-day)
+  )
 
 (comment
 
