@@ -194,15 +194,15 @@
 (defn pre? []
   (or
    (and
-    (< 16 (cur-hour))
+    (< 15 (cur-hour))
     (< (cur-hour) 21))
-   (and (= (cur-hour) 21)
+   (and (= (cur-hour) 20)
         (< (cur-min) 30))))
 
 (defn post? []
   (and
-   (< 4 (cur-hour))
-   (< (cur-hour) 9)))
+   (< 3 (cur-hour))
+   (< (cur-hour) 8)))
 
 
 (defn go-tg []
@@ -437,8 +437,6 @@
 (defn tstop []
   (pp (taliyun "ecs StartInstance --InstanceId i-j6cjbk2s5jdkc5voxym4")))
 
-
-
 (defn auto-tstop []
   (cur-week-day)
   )
@@ -471,3 +469,4 @@
 
 
 )
+
