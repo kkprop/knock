@@ -316,6 +316,30 @@
          (subs ss 1)
          ss)))))
 
+(defn symbol! [x]
+  (symbol (->str x))
+  )
+
+(defn includes-or? [s & subs]
+  (->> subs
+       (map #(str/includes? s %))
+       (every? false?)
+       not
+       )
+  )
+
+(defn includes-and? [s & subs]
+  (->> subs
+       (map #(str/includes? s %))
+       (every? true? )
+       )
+  )
+
+(comment
+  (= (symbol! :a)
+     (read)
+     )
+ )
 
 (def force-str ->str)
 
@@ -554,7 +578,13 @@
                     (println "\nShutting down gracefully...")
                     ;; Add cleanup code here
                     (apply f args)
-                    (System/exit 0))))))
+                    ;(System/exit 0)
+                    ;;force halt. !!!means that only one hook can be added
+                    (try 
+                      (.halt (Runtime/getRuntime))
+                      (catch Exception e nil)
+                      )
+                    )))))
   ([]
    (trap-exit #(println "no clean to do"))
    )
@@ -1217,6 +1247,17 @@
     )
   )
 
+
+(defn erase-sub-string [s sub]
+  (str/replace s sub "")
+  )
+
+
+(defn erase-str-in-file [sub f]
+  (let [x (slurp f)]
+    (spit f (erase-sub-string x sub))
+    )
+  )
 
 (defn trimr-sub [s sub]
   (if (str/ends-with? s sub)
@@ -2500,6 +2541,14 @@
 (defn ip-to-instance [ip]
   (str/replace ip #"-" "." ))
 
+
+;;on a key, eval f on it's value
+;;  (partial :p int)
+(defn kfv [k f m]
+  (assoc m k (f (k m)))
+  )
+
+;;all keys of a hashmap 
 (defn map-on-key [f m]
   (zipmap
    (map f (keys m))
@@ -2522,14 +2571,14 @@
               ))
 
 (defn seg-a [ip]
-     (str/join "." (take 3 (str/split ip #"\."))))
+     (str/join "." (take 1 (str/split ip #"\."))))
 
 
 (defn seg-b [ip]
      (str/join "." (take 2 (str/split ip #"\."))))
 
 (defn seg-c [ip]
-     (str/join "." (take 2 (str/split ip #"\."))))
+     (str/join "." (take 3 (str/split ip #"\."))))
 
 (defn cherry-pick-keys [m & ks]
   (let [hs (apply hash-set (map keyword ks))]

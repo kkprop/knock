@@ -3,6 +3,8 @@
         org.clojure/core.logic {:mvn/version "1.0.1"}
         etaoin/etaoin {:mvn/version "1.0.40"}
         djblue/portal {:mvn/version "0.32.0"}
+        org.babashka/http-client {:mvn/version "0.3.11"}
+        com.github.s-expresso/clojobuf-codec {:mvn/version "0.1.6"}
         org.clojure/core.cache {:mvn/version "1.0.225"}
         net.cgrand/xforms {:mvn/version "0.19.5"}
         org.clojure/core.specs.alpha {:mvn/version "0.2.62"}
