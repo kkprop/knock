@@ -285,6 +285,13 @@
   )
 
 
+(defn cur-all-frame []
+  (let [dir (join-path "ticker" (cur-date-str))]
+    (map frame (sort (ls! dir)))
+    ;;
+    ))
+
+
 (defn cur-frame []
   (let [dir (join-path "ticker" (cur-date-str))]
     (frame (last (sort (ls! dir))))
@@ -292,7 +299,8 @@
     )
   )
 
-(defn cur-frames []
+(defn cur-frames
+  []
   (let [dir (join-path "ticker" (cur-date-str))]
     (->> (take-last 2 (sort (ls! dir)))
          (map frame)
@@ -300,6 +308,8 @@
     ;;
     )
   )
+
+
 
 (comment
   (map :ts (cur-frames))
@@ -465,8 +475,16 @@
    42)
 
                                         ;
-  ) 
-
-
+  )
 )
 
+(defn start-collect []
+  (pre?)
+  )
+
+
+(defn track-ticker []
+  (count
+   (take-last 10 (mock cur-all-frame))
+   )
+  )

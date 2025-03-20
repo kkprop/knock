@@ -236,6 +236,8 @@
 (comment
   ((partial! half-chance-exception 'hi ))
 
+  (timeout-eval! 10 pause-seconds 30)
+
   (retry-n-times 6 half-chance-exception 'hi)
 
   )
@@ -388,6 +390,11 @@
 
 (defn join-path [& cmd]
   (str/join "/" cmd))
+
+
+(defn file! [path]
+  (str "file://" path)
+  )
 
 (defn dot-split [s]
   (str/split s #"\."))
@@ -886,6 +893,16 @@
          (:out
           (apply (partial run-cmd ~name) ~@default-args ~args))))))
 
+;;won't run the command  just show it
+(defmacro show-shell-fn [name & default-args]
+  (let [fname (symbol (force-str name))
+        args  (symbol "args")]
+    `(defn ~fname [& ~args]
+       (str/trim-newline
+         (:out
+          (apply (partial show-cmd ~name) ~@default-args ~args)))
+       )))
+
 
 (make-shell-fn "basename")
 (make-shell-fn "openssl")
@@ -897,6 +914,10 @@
 (make-shell-fn :readlink)
 (make-shell-fn :touch)
 
+
+(defn base64! [path]
+  (base64 "<" path)
+  )
 
 (defn cur-pid []
   (.pid (ProcessHandle/current))
@@ -1252,6 +1273,20 @@
   (str/replace s sub "")
   )
 
+(defn erase-sub-string! [s & sub]
+  (let[[x & rest] sub]
+    (if (empty? sub)
+      s
+      (if (empty? rest)
+        (erase-sub-string s x)
+        (apply erase-sub-string! (erase-sub-string s x) rest)
+        ))
+    )
+  )
+
+(defn erase-spaces [s]
+  (erase-sub-string! s " " "\r" "\n")
+  )
 
 (defn erase-str-in-file [sub f]
   (let [x (slurp f)]
@@ -1480,7 +1515,7 @@
 
 (defn dns [path]
   (let [raw (split-by
-              (run-cmd! :openssl "x509 -noout -text -in " path "|grep DNS")
+              (:out (run-cmd :openssl "x509 -noout -text -in " path "|grep DNS"))
               ",")
         xs  (->> raw (mapcat #(re-seq #".*DNS:(.*)" %))
                 (map second)
@@ -1542,13 +1577,19 @@
       )
     s))
 
+;;chop off n from tail
 (defn chop-tail-n [s n]
   (apply str (drop-last n s))
   )
 
+;;chop off n from leading string
 (defn chop-leading-n [s n]
   (apply str (drop n s)))
 
+
+(defn keep-n [n s]
+  (apply str (take n s))
+  )
 
 (def int! force-int)
 
@@ -1592,6 +1633,18 @@
     (if (string? s)
       (parse-float s)
       (float s))))
+
+
+(def fmt-year "yyyy-MM-dd")
+
+(defn time-str
+  ([]
+   (time-str (java.util.Date.) "yyyy-MM-dd hh:mm:ss")
+   )
+  ([t fmt]
+   (.format (java.text.SimpleDateFormat. fmt) t)
+   )
+  )
 
 (defn cur-time-str
   ([]
@@ -1952,6 +2005,8 @@
     )
   )
 
+
+
 ;;edn or json
 (defn slurp-ej-line [f]
   (->> (slurp-lines f)
@@ -2034,6 +2089,7 @@
 
 (def ip-regex #"(?:[0-9]{1,3}\.){3}[0-9]{1,3}")
 (def dash-ip-regex #"(?:[0-9]{1,3}-){3}[0-9]{1,3}")
+(def idc-regex #"([A-Za-z]+-[A-Za-z]+\d)")
 
 
 (defn parse-ips [s]
@@ -2042,12 +2098,22 @@
 
 ;;support 127-0-0-1 to be extraced to be 127.0.0.1
 (defn extract-ip [s]
-  (let [s (if (nil? s) (force-str s) s)
+  (let [s  (if (nil? s) (force-str s) s)
         xs (re-seq ip-regex s)]
     (if (nil? xs)
-      (map #(str/replace % "-" ".")
-           (re-seq dash-ip-regex s))
+      (let [to-remove (concat (distinct (flatten (re-seq idc-regex s)))
+                              ["jiaxing-1" "losangeles-1"]
+                              )
+            xs (re-seq dash-ip-regex
+                       (if (empty? to-remove)
+                         s
+                         (apply erase-sub-string! s to-remove))
+                       )
+            ]
+        (map #(str/replace % "-" ".") xs)
+        )
       xs)))
+
 
 (defn ->ip [s] (first (extract-ip s)))
 (defn ->ips [s] (extract-ip s))
@@ -2101,6 +2167,10 @@
   (not (nil?
         (re-seq #".*\.?.*\..*" x)
         )))
+
+(defn ->base-domain [domain-name]
+  (str/join "." (take-last 2 (str/split domain-name #"\." )))
+  )
 
 (comment
   (domain? "域名")
@@ -2327,14 +2397,15 @@
 
 (defn spit-xs [path xs & opts]
   (let [_ (clojure.java.io/make-parents path)]
-    ;(apply spit path
-    ;       ;;an empty line in the end of the fie
-    ;       (str (str/join "\n" xs) "\n")
-    ;       opts)
-    (->> xs
-         ;;TODO spit-line not support opts
-         (map!! #(spit-line path (str %)))
-         )
+    (apply spit path
+           ;;an empty line in the end of the fie
+           (str (str/join "\n" xs) "\n")
+           opts)
+    ;;caused bug. implement lay way later
+    ;(->> xs
+    ;     ;;TODO spit-line not support opts
+    ;     (map!! #(spit-line path (str %)))
+    ;     )
     )
   )
 
@@ -3549,10 +3620,12 @@
   )
 
 (def a-day-seconds 86400)
+(def a-week-seconds 604800)
 ;;min 28 days
 (def a-month-seconds 2419200)
 (def a-year-seconds 31536000)
 
+;;
 (defn mock-within [seconds f & args]
   (let [{:keys [path]} (apply mock-context f args)
         x (if (fs/exists? path) (- 0 (-> (fs/creation-time path)
@@ -3631,6 +3704,16 @@
 ;;
   )
 
+;;percentage string to decimal
+(defn ->decimal [s]
+  (let [x (if (str/ends-with? s "%")
+            (apply str (drop-last 1 s))
+            s
+            )
+        ]
+    (parse-float x)
+    )
+  )
 
 
 (defn while-change [cb f & args]
@@ -4191,11 +4274,11 @@
 ;;  do distinct by key 
 ;;  then choose same key element by choose-fn
 (defn distinct-by
-  ([xs k choose-fn]
+  ([k choose-fn xs ]
    (vals (map-on-val choose-fn
                      (group-by k xs))))
-  ([xs k]
-   (distinct-by xs k first)))
+  ([k xs]
+   (distinct-by k first xs )))
 
 (comment
   (->abs-path "tmp/1.i")
@@ -4548,6 +4631,52 @@
 
 )
 
+
+(defn res! [& {:keys [exit err out]
+              :or {err ""
+                   out ""
+                   exit 0
+                   }
+             :as m
+             }]
+  {:err err
+   :out out
+   :exit exit
+   }
+  )
+
+(defn ok-res [& out]
+  (res! :out (join-line out))
+  )
+
+(defn err-res
+  ([err]
+   (res! :exit -1 :err err)
+   )
+  ([err code]
+   (res! :exit code :err err)
+   )
+  ([err code  out]
+   (res! :exit code :err err :out out)
+   )
+  )
+
+(defn res-ok? [res]
+  (= 0 (:exit res))
+  )
+
+(def res-err? (complement res-ok?))
+
+(comment
+
+  (res-err? 
+    (ok-res "nice")
+    )
+
+  (res-err? 
+    (err-res -1 "not good"))
+
+  )
 
 (defn ok? [x]
   (let [not-ok (str "❌" x)
