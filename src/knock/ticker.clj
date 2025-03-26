@@ -38,7 +38,6 @@
     (clojure.walk/postwalk vg-keyword body)))
 
 
-
 (defn symbol [id]
   (query :GLOBAL_QUOTE :symbol id)
   )
@@ -440,47 +439,51 @@
   (apply run-cmd "aliyun --config-path ~/.aliyun/tconfig.json" args)
   )
 (defn tstart []
-  (pp (taliyun "ecs StopInstance --InstanceId i-j6cjbk2s5jdkc5voxym4"))
-  )
-
-
-(defn tstop []
   (pp (taliyun "ecs StartInstance --InstanceId i-j6cjbk2s5jdkc5voxym4")))
 
+(defn tstop []
+  (pp (taliyun "ecs StopInstance --InstanceId i-j6cjbk2s5jdkc5voxym4")))
+
 (defn auto-tstop []
-  (cur-week-day)
-  )
+
+  (cur-week-day))
 
 (comment
 
   (def cache (atom {}))
   (reset! cache prev
 
-  (-> (:volumn
-       (def m (first cur))))
+          (-> (:volumn
+               (def m (first cur))))
 
-  (cur-volumn (:volumn (last prev)))
+          (cur-volumn (:volumn (last prev)))
 
-  (pp
-   (map-on-val compare-frame
-               (group-by :ticker (concat prev cur))
+          (pp
+           (map-on-val compare-frame
+                       (group-by :ticker (concat prev cur))
                ;;
-               ))
+                       ))
 
-  (def f "/home/devops/knock/ticker/2025-01-18/1737147664.edn")
-  (->abs-path "~/kkprop/knock/ticker/table.edn")
+          (def f "/home/devops/knock/ticker/2025-01-18/1737147664.edn")
+          (->abs-path "~/kkprop/knock/ticker/table.edn")
 
-  (nth
-   (map :text (locate! {:class "table-row table-row-hover"}))
-   42)
+          (nth
+           (map :text (locate! {:class "table-row table-row-hover"}))
+           42)
 
                                         ;
-  )
-)
+          ))
 
 (defn start-collect []
-  (pre?)
-  )
+  (while true
+    (if (et-true pre?)
+      (do
+        (println "start machine"
+                 (tstart))
+        (pause-seconds 32)
+        (println "start service" (run-cmd "~/ss/ticker.sh sudo service collect restart")))
+      (do (pause-seconds 3)
+          (println "waiting pre")))))
 
 
 (defn track-ticker []
@@ -488,3 +491,5 @@
    (take-last 10 (mock cur-all-frame))
    )
   )
+
+

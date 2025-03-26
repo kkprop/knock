@@ -31,7 +31,7 @@
 (def os-name (System/getProperty "os.name"))
 (defn osx?[] (= os-name "Mac OS X"))
 
-(declare force-str force-int cur-time-str ->keyword ->uuid int! ->inst)
+(declare force-str force-int cur-time-str ->keyword ->uuid int! ->inst quote-str)
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
          text-cols->hashmap
          file-name ext-name var-meta async-fn tail-f
@@ -65,6 +65,32 @@
 ;;when called return the thing
 (defn ->fn [x]
   (partial identity x))
+
+(defn ->fn-name [f]
+  (-> f class .getName)
+  )
+
+
+(def trigger... (atom {}))
+
+;;edge trigger when true
+(defn et-true [f? & args]
+  (let [id  (-> f? class .getName)]
+    (let [prev (get @trigger... id)
+          cur (apply f? args)
+          _ (swap! trigger... assoc id cur)]
+      (if (nil? prev)
+        false
+        (if (true? prev)
+          false
+          (let []
+            (if cur
+              true
+              false)))))))
+
+(comment
+  )
+
 
 (defn ->list [xs]
   (if (sequential? xs)
@@ -386,6 +412,8 @@
                 )
               )
          )))
+
+
 
 
 (defn join-path [& cmd]
@@ -944,6 +972,13 @@
        ))
 
 
+(defn cmd-grep-or [& xs]
+  ;;(def xs ["ago" "bb"])
+  (join-cmd "-E" (quote-str (str/join "|"
+                                      (flatten xs)
+                                      )))
+  )
+
 
 ;;make it easier. or maybe not.
 (def fs-exists? fs/exists?)
@@ -1258,14 +1293,16 @@
   )
 
 (defn rows->hashmap [s]
-  (let [xs
-        (str/split-lines s)
-        ]
-    (->> xs
-         (map line->kv)
-         (apply merge)
-         )
-    )
+  (if (empty? s)
+    nil
+    (let [xs
+          (str/split-lines s)
+          ]
+      (->> xs
+           (map line->kv)
+           (apply merge)
+           )
+      ))
   )
 
 
@@ -1504,9 +1541,13 @@
   )
 
 (defn cert-expire-date [path]
-  (->inst (openssl "x509 -noout -enddate -in" path)
-          :to-trim "notAfter="
-   )
+  (let [x (if (fs/exists? path)
+            path
+            (tmp-file path)
+            )]
+    (->inst (openssl "x509 -noout -enddate -in" x)
+            :to-trim "notAfter="
+            ))
   )
 
 (defn cert->chain [path]
@@ -2098,11 +2139,12 @@
 
 ;;support 127-0-0-1 to be extraced to be 127.0.0.1
 (defn extract-ip [s]
-  (let [s  (if (nil? s) (force-str s) s)
+  (let [ss  (if (nil? s) (force-str s) s)
+        s (erase-sub-string! ss "jiaxing-1" "losangeles-1" "frankfurt101" "hk101")
         xs (re-seq ip-regex s)]
     (if (nil? xs)
       (let [to-remove (concat (distinct (flatten (re-seq idc-regex s)))
-                              ["jiaxing-1" "losangeles-1"]
+                              ["qingdao101"]
                               )
             xs (re-seq dash-ip-regex
                        (if (empty? to-remove)
@@ -2210,6 +2252,7 @@
     )
   )
 
+;;when the line exists, won't spit
 (defn spit-line! [f s]
   "spit only when string not exist currently"
   (if (str/includes? (slurp f) s)
@@ -2409,6 +2452,7 @@
     )
   )
 
+;;return the path after spit
 (defn spit-xs! [path xs & opts]
   (let [res (apply spit-xs path xs opts)
         ]
@@ -4221,12 +4265,9 @@
 
 (defn str-or-file->ips! [path]
   "ignore ip format like: #127.0.0.1 lines"
-  (let [ips (str-or-file->ips path)
-        lines (slurp-lines path)
+  (let [ips (str-or-file->ips (str/join "\n" (slurp-lines! path)))
         ]
-    (->> ips
-         (remove #(in? lines (str "#" %) ))
-         )
+    ips
     )
   )
 
