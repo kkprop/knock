@@ -67,30 +67,48 @@
   (partial identity x))
 
 (defn ->fn-name [f]
-  (-> f class .getName)
-  )
+  (let [{:keys [name ns]} (var-meta f)]
+    (str/join "/" [ns name])))
 
 
-(def trigger... (atom {}))
+(def ...trigger (atom {}))
 
-;;edge trigger when true
+;;edge trigger when false -> true 
 (defn et-true [f? & args]
-  (let [id  (-> f? class .getName)]
-    (let [prev (get @trigger... id)
+  (let [id  (->fn-name f?)]
+    (let [prev (get @...trigger id)
           cur (apply f? args)
-          _ (swap! trigger... assoc id cur)]
+          _ (swap! ...trigger assoc id cur)]
       (if (nil? prev)
+        ;;no prev value.
         false
-        (if (true? prev)
+        (if (= cur prev)
           false
-          (let []
-            (if cur
-              true
-              false)))))))
-
-(comment
+          (if cur
+            true
+            false
+            )
+          )
+        )
+      ))
   )
 
+
+;;edge trigger when true -> false
+(defn et-false [f? & args]
+  (let [id  (->fn-name f?)]
+    (let [prev (get @...trigger id)
+          cur (apply f? args)
+          _ (swap! ...trigger assoc id cur)]
+      (if (nil? prev)
+        ;;no prev value. 
+        false
+        (if (= cur prev)
+          false
+          (if cur
+            false
+            ;;only edge to false will trigger
+            true))))))
 
 (defn ->list [xs]
   (if (sequential? xs)
@@ -1087,6 +1105,20 @@
   )
 
 
+;;return the first element when only one element in the list
+;;  other wise return the list
+(defn first! [x]
+  (if (sequential? x)
+    (if (= 1 (count x))
+      (first x)
+      (if (empty? x)
+        nil
+        x)
+      )
+    x
+    )
+  )
+
 (def work-dir
   (let [path (dirname (System/getProperty "babashka.config"))]
     (if (empty? path)
@@ -1287,7 +1319,7 @@
   (let [[k v] (take-last 2 (first (re-seq #"(.*):(.*)" s)))]
     (if (nil? k)
       nil
-      {(->keyword! k) (int! (str/trim v))}
+      {(->keyword! (str/trim k)) (int! (str/trim v))}
       )
     )
   )
@@ -1540,6 +1572,7 @@
   (openssl "x509"" -text -noout -in" path)
   )
 
+;;a path, or cert string
 (defn cert-expire-date [path]
   (let [x (if (fs/exists? path)
             path
@@ -1781,7 +1814,6 @@
     {:start start
      :end (+ start seconds)}))
 
-
 (defn from-timestamp-ns [ts-ns]
   (let [ts-ns (force-int ts-ns)]
     (java.util.Date. (/ ts-ns 1000))))
@@ -1972,7 +2004,6 @@
     (json/parse-string s true)
     )
   )
-
 (def jstr-to-edn jstr->edn)
 
 ;;ignore failed
@@ -2131,7 +2162,6 @@
 (def ip-regex #"(?:[0-9]{1,3}\.){3}[0-9]{1,3}")
 (def dash-ip-regex #"(?:[0-9]{1,3}-){3}[0-9]{1,3}")
 (def idc-regex #"([A-Za-z]+-[A-Za-z]+\d)")
-
 
 (defn parse-ips [s]
   (re-seq ip-regex s)
@@ -4045,7 +4075,6 @@
                      [{x-or-xs v}]))))
        ;;assure the to-search fields formed string is unique
        (apply merge)))
-
 
 (defn unfold [m & ks]
   (->> ks

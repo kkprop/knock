@@ -439,7 +439,8 @@
   (apply run-cmd "aliyun --config-path ~/.aliyun/tconfig.json" args)
   )
 (defn tstart []
-  (pp (taliyun "ecs StartInstance --InstanceId i-j6cjbk2s5jdkc5voxym4")))
+  (pp (taliyun "ecs StartInstance --InstanceId i-j6cjbk2s5jdkc5voxym4"))
+  )
 
 (defn tstop []
   (pp (taliyun "ecs StopInstance --InstanceId i-j6cjbk2s5jdkc5voxym4")))
@@ -475,15 +476,30 @@
           ))
 
 (defn start-collect []
-  (while true
-    (if (et-true pre?)
-      (do
-        (println "start machine"
-                 (tstart))
-        (pause-seconds 32)
-        (println "start service" (run-cmd "~/ss/ticker.sh sudo service collect restart")))
-      (do (pause-seconds 3)
-          (println "waiting pre")))))
+  (let []
+    ;; watch start when 
+    (go!
+     (while true
+       (if (et-true pre?)
+         (do
+           (println "start machine"
+                    (tstart))
+           (pause-seconds 32)
+           (println "start service" (run-cmd "~/ss/ticker.sh sudo service collect restart")))
+         (do (pause-seconds 3)
+             (println (->log "waiting pre"))))))
+    ;; watch stop after post over
+     (while true
+       (if (et-false post?)
+         (println "stop service" (tstop))
+         (do (pause-seconds 3)
+             (println (->log "waiting post over")))))
+
+;;
+    ))
+
+
+
 
 
 (defn track-ticker []
@@ -492,4 +508,16 @@
    )
   )
 
+
+
+(comment
+  (go! (start-collect))
+
+  (go!
+   (while true
+     (println (->log @...trigger))
+     (pause-minutes 1)
+     ))
+  ;;
+  )
 
