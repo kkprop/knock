@@ -71,14 +71,17 @@
     (str/join "/" [ns name])))
 
 
-(def ...trigger (atom {}))
+
+
+
+(def ..trigger (atom {}))
 
 ;;edge trigger when false -> true 
 (defn et-true [f? & args]
   (let [id  (->fn-name f?)]
-    (let [prev (get @...trigger id)
+    (let [prev (get @..trigger id)
           cur (apply f? args)
-          _ (swap! ...trigger assoc id cur)]
+          _ (swap! ..trigger assoc id cur)]
       (if (nil? prev)
         ;;no prev value.
         false
@@ -97,9 +100,9 @@
 ;;edge trigger when true -> false
 (defn et-false [f? & args]
   (let [id  (->fn-name f?)]
-    (let [prev (get @...trigger id)
+    (let [prev (get @..trigger id)
           cur (apply f? args)
-          _ (swap! ...trigger assoc id cur)]
+          _ (swap! ..trigger assoc id cur)]
       (if (nil? prev)
         ;;no prev value. 
         false
@@ -149,10 +152,16 @@
   ([code]
    (System/exit code))
   )
-
+;;only output out
 (defn run-cmd! [& cmd]
+  (:out (apply run-cmd cmd))
+  )
+
+;;when run exit 0 only return out str 
+;;  when not 0 return full hashmap 
+(defn run-cmd$ [& cmd]
   (let [{:keys [out err exit]
-         :as m} (apply run-cmd cmd)]
+         :as   m} (apply run-cmd cmd)]
     (if (= 0 exit)
       out
       m
@@ -628,7 +637,7 @@
    (-> (Runtime/getRuntime)
        (.addShutdownHook
          (Thread. (fn []
-                    (println "\nShutting down gracefully...")
+                    ;;(println "\nShutting down gracefully...")
                     ;; Add cleanup code here
                     (apply f args)
                     ;(System/exit 0)
@@ -842,6 +851,77 @@
 
   )
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; in mem cache for a key      ;;
+;; also the key can be watched ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def ..cache (atom {}))
+(def kc (chan!))
+(def ..kk (atom {}))
+
+(defn .spit
+  ([k v]
+   (.spit ..cache k v)
+   )
+  ([..c  k v]
+   (let [pv (get @..c k)]
+     (when-not (= v pv)
+       (swap! ..c assoc k v)
+       (clojure.core.async/>! kc k)
+       )
+     ))
+  )
+
+(defn .slurp
+  ([k]
+   (.slurp ..cache k)
+   )
+  ([..c k]
+   (get @..c k))
+  )
+
+(async-fn (fn [k]
+            (when (in? (keys @..kk) k)
+              ((get @..kk k))
+              )
+            )
+          kc
+          )
+
+;;a no args function will be called when new value of  k is set
+(defn .watch [k f]
+  (.spit ..kk k f)
+  )
+
+
+
+(comment
+  (async-fn #(println %) kc)
+  (.watch :spin (fn [] (println (.slurp :spin) )))
+
+  (def k :spin)
+
+  @..kk
+  @..cache
+  (.slurp :spin )
+
+
+
+  (pp
+    (apply str
+           (apply str (cur-child-by-name "tail"))
+           (cur-child-by-name "gum"))
+    )
+
+
+  (confirm! "how")
+
+  )
+
+
+
 (comment
   (def x
     (call! count-print 10)
@@ -970,14 +1050,20 @@
   )
 
 (defn child-pids [pid]
-  (text-cols->hashmap
-    (->> 
-      (str/split-lines (run-cmd! "ps -o pid,comm --ppid" pid))
-      ;;remove first line space
-      (map str/trim)
-      ;;restore to a string do cols seperation
-      (str/join "\n")
-      ) #"\s+")
+  ;(def pid "83861")
+  (remove! {:PID pid}
+           (text-cols->hashmap
+             (->> 
+               (str/split-lines
+                 (if (osx?)
+                   (run-cmd! "ps -o pid,command -g" pid)
+                   (run-cmd! "ps -o pid,comm --ppid" pid))
+                 )
+               ;;remove first line space
+               (map str/trim)
+                       ;;restore to a string do cols seperation
+               (str/join "\n")
+               ) #"\s+"))
   )
 
 (defn cur-child-pids []
@@ -3738,7 +3824,7 @@
 
 
 
-(defn choose [xs]
+(defn choose-nth [xs]
   (let [_ (apply list (map-indexed (fn [i x] (println i x)) xs))
         _ (println "choose the index want to use")
         i (force-int (read-line))]
@@ -3747,7 +3833,7 @@
 (defn mock-choose [f & args]
   (let [{:keys [fm ns-path dir path]} (apply mock-context f args)
         xs (map str (fs/glob (dirname path) (str (basename path) ".*")))
-        tmp-path (choose xs)]
+        tmp-path (choose-nth xs)]
     (when-not (nil? tmp-path)
       (fs/delete-if-exists path)
       (fs/create-sym-link path (basename tmp-path))
