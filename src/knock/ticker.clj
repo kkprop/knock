@@ -515,7 +515,7 @@
 
   (go!
    (while true
-     (println (->log @...trigger))
+     (println (->log @..trigger))
      (pause-minutes 1)
      ))
   ;;
