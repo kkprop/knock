@@ -39,6 +39,8 @@
          trimr! pause cur-ts
          mock
          env?
+         .slurp .spit
+         trim-to*
          )
 
 (defn uuid []
@@ -66,11 +68,19 @@
 (defn ->fn [x]
   (partial identity x))
 
+;;for println
+;; return "clojure.core/println"
 (defn ->fn-name [f]
   (let [{:keys [name ns]} (var-meta f)]
     (str/join "/" [ns name])))
 
 
+(defn if-nil [x default]
+  (if (nil? x)
+    default
+    x
+    )
+  )
 
 
 
@@ -164,6 +174,7 @@
          :as   m} (apply run-cmd cmd)]
     (if (= 0 exit)
       out
+      ;;guess no one will tolerant with this odd different type return
       m
       )
     )
@@ -358,14 +369,20 @@
 
 (defn ->keyword [x]
   (if (keyword? x)
-    x
-    ;; (keyword ":abc") should be :abc 
+    (let [s (str x)]
+      (if (str/starts-with? s "::")
+        ;(def s (str ::block/string))
+        ;;full namespace caused chaos
+        (keyword (trim-to* s "/"))
+        x))
+;; (keyword ":abc") should be :abc 
     (keyword
-     (let [s (->str x)
+     (let [s  (->str x)
            ss (-> s
                   (str/replace " " "-")
-                  (str/replace "." "-"))
-           ]
+                  (str/replace "." "-")
+                  (str/replace "::" ":"))]
+
        (if (str/starts-with? ss ":")
          ;;remove the leading :
          (subs ss 1)
@@ -391,6 +408,7 @@
   )
 
 (comment
+  (->keyword "::block")
   (= (symbol! :a)
      (read)
      )
@@ -630,6 +648,15 @@
   (f (read!! c))
   )
 
+(defn promise! []
+  (let [p (promise)]
+    (.spit :promises (cons p (.slurp :promises)))
+    p
+    )
+  )
+
+(defn done-all-promises[]
+  )
 
 ;;do cleaning and exit when user input CTRL+C
 (defn trap-exit
@@ -660,6 +687,7 @@
 (defmacro map!! [& xs] `(apply list(map ~@xs)))
 (defmacro thread! [& xs] `(thread ~@xs))
 (defmacro to-chan! [& xs] `(to-chan ~@xs))
+(defmacro ..>! [& xs] `(>! ~@xs))
 
 
 ;;TODO local server
@@ -858,7 +886,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def ..cache (atom {}))
-(def kc (chan!))
+(def kc (chan! 101))
 (def ..kk (atom {}))
 
 (defn .spit
@@ -869,7 +897,7 @@
    (let [pv (get @..c k)]
      (when-not (= v pv)
        (swap! ..c assoc k v)
-       (clojure.core.async/>! kc k)
+       (clojure.core.async/>!! kc k)
        )
      ))
   )
@@ -1147,6 +1175,17 @@
   (str/trim
    (run-cmd! :pbpaste)))
 
+;; deliver done to the returned promise to 
+(defn watch-pb [f]
+  (let [p (promise!)]
+    (.watch :pb f)
+    (go!
+     (while (not (realized? p))
+       (let [cur (pbpaste)]
+         (when-not (= cur (.slurp :pb))
+           (.spit :pb cur)))
+       (pause-seconds 1)))
+    p))
 
 (defn notify [name title]
   "precondition: open script editor notification in settings"
@@ -2078,6 +2117,13 @@
     )
   )
 
+(defn walk-on-key [m f]
+  (clojure.walk/postwalk (fn [x] 
+                       (if (map-entry? x)
+                         [(f (first x)) (second x)]
+                         x)
+                           )
+                     m))
 
 (++ days-left expire-date)
 
@@ -2087,9 +2133,10 @@
 (defn jstr->edn [s]
   ;;path or string both fine
   (let [s (if (fs/exists? s) (slurp s) s)]
-    (json/parse-string s true)
-    )
-  )
+    ;(println s)
+    ;(println (str/includes? s "::"))
+    (walk-on-key (json/parse-string s) ->keyword)))
+
 (def jstr-to-edn jstr->edn)
 
 ;;ignore failed
@@ -2279,8 +2326,12 @@
 ;;  if running on a server, it happen to be the server's ip
 ;;  when running on a machine behind NAT, it will be the ip of its network
 (defn my-ip []
-  ;;(str/trim (:out (run-cmd "curl -4 ip.sb")))
-  (str/trim (:out (run-cmd "curl -4 ifconfig.me")))
+  (let [x (->ip (str/trim (:out (run-cmd "curl -4 ifconfig.me"))))]
+    (if (nil? x)
+      (str/trim (:out (run-cmd "curl -4 ip.sb")))
+      x
+      )
+    )
   )
 
 (defn ip? [s]

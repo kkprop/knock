@@ -8,12 +8,17 @@
    [knock.utils :as utils :refer :all]
    ))
 
+;;invalid
 (def g {:name "xzl"
         :token "roam-graph-token-dW9r1QFGTupMhchw-dmp4mC1Jdw0w4I77pRCVlp6"})
 
 (defn xzl []
   (load-edn "/Users/dc/xzl.edn")
   )
+
+(defn personal []
+  (load-edn (->abs-path "~/roam.edn")))
+
 
 (def base "https://api.roamresearch.com/api/graph")
 
@@ -47,44 +52,35 @@
              :body (json/generate-string data)
              :raw-args ["--location-trusted"]}]
 
-    (:body (curl-post url req))))
+    (:body (curl-post url req)))
+  )
 
 (declare create-page update-page update-block  move-block)
 
 ;;create block, default in today's daily notes
 (defn write [g string & {:keys [page order open heading text-align]
-                       :or {page (cur-daily-page) order "last" open false heading 3 text-align "right" children-view-type "document"}
-                       :as opt
-                       }]
-  (let [data {
-              :action "create-block"
+                         :or {page (cur-daily-page) order "last" open false heading 3 text-align "left" children-view-type "document"}
+                         :as opt}]
+  (let [data {:action "create-block"
               :location {:parent-uid page
-                         :order order 
-                         }
+                         :order (if-nil order "last")}
               :block {:string string
                       :open open
                       ;:heading heading
-                      :text-align text-align
-                      }
-              }
-        ]
-    (try 
+                      :text-align (if-nil text-align "left")}}]
+
+    (try
       (println "writing" data)
       (post g "write" data)
       (catch Exception e
         (let [msg (.getMessage e)]
           (if (= msg "babashka.curl: status 400")
             ;;probably no daily note try create
-            (do 
+            (do
               (create-page g {:title (cur-daily-page-title) :uid (cur-daily-page)})
               (post g "write" data)
-              (println data)
-              )
-            msg)
-          )
-        )
-      )
-    ))
+              (println data))
+            msg))))))
 
 (defn q [g query & args]
   (let [data {
@@ -247,18 +243,57 @@
 
 (defn pull-uid [g uid]
   (let []
-    (pull g (format "[:block/uid \"%s\"]" uid)
-          '[:block/uid :node/title :block/string
-            {:block/children [:block/uid :block/string]}
-            {:block/refs [:node/title :block/string :block/uid]}]
-          )))
+    (:result (pull g (format "[:block/uid \"%s\"]" uid)
+                   '[:block/uid :node/title :block/string
+                     {:block/children [:block/uid :block/string]}
+                     {:block/refs [:node/title :block/string :block/uid]}]))))
 
 (defn pull-daily-note [g]
   (pull-uid g (cur-daily-page))
   )
 
 
+(defn personal-block [g]
+  (->>
+   (:block/children (pull-uid (personal) (cur-daily-page)))
+   (filter! {:block/string "[[一天]]"})
+   (mapcat (fn [m]
+          (:block/children (pull-uid (personal) (:block/uid m)))))
+
+   (filter (fn [m]
+             (str/includes? (:block/string m) "#Personal")))
+   first 
+   :block/uid
+   ;;
+   ))
+
+(defn pb->roam []
+  (let [x (if-nil (.slurp :pb) "")
+        s (if (str/includes? x "::")
+            (str "`" x "`")
+            x)]
+
+;;could cause bias when pass 00:00
+    ;;(def s "🌀walk-on-key")
+    (when-not (empty? s)
+
+
+(defn run-pb->roam []
+  (let [p (watch-pb pb->roam)]
+    ;;
+    @p
+    )
+  )
+;;
+
 (comment
+  (str/includes? "::abc" "::")
+
+  (go!
+    (run-pb->roam)
+    )
+
+  (pbpaste)
   (server/local-call :rand)
   (macroexpand
    (gen-json-fn
@@ -295,8 +330,7 @@
   (->>
    (search-block (xzl)
                  "三月")
-   (map :block/uid)
-   )
+   (map :block/uid))
 
 ;;
   )

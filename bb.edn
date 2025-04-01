@@ -45,7 +45,7 @@
           (println "Removing target folder.")
           (fs/delete-tree "target"))
   write-roam-xzl (do (r/write r/g (clojure.string/join " " *command-line-args*) :text-align "left"))
-  write-roam (do (r/write (r/xzl)
+  write-roam (do (r/write (r/personal)
                           (clojure.string/join " " *command-line-args*)
                           :text-align "left"))
 
@@ -105,6 +105,8 @@
   live (ticker/live)
 
   mock-laundry (println "cleaned:" (count (u/mock-laundry)))
+
+  pb-roam (r/run-pb->roam)
 
 ;;
   }}
