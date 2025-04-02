@@ -27,8 +27,7 @@
   (str/join "/" xs))
 
 ;;assemble url that Roam API needed
-(defn api-url [g op]
-  (join-url base (:name g) op))
+(defn api-url [g op] (join-url base (:name g) op))
 
 ;;uid for today's daily note
 (defn cur-daily-page []
@@ -63,11 +62,11 @@
                          :as opt}]
   (let [data {:action "create-block"
               :location {:parent-uid page
-                         :order (if-nil order "last")}
+                         :order (if-nil-then order "last")}
               :block {:string string
                       :open open
                       ;:heading heading
-                      :text-align (if-nil text-align "left")}}]
+                      :text-align (if-nil-then text-align "left")}}]
 
     (try
       (println "writing" data)
@@ -268,15 +267,17 @@
    ))
 
 (defn pb->roam []
-  (let [x (if-nil (.slurp :pb) "")
+  (let [x (if-nil-then (.slurp :pb) "")
         s (if (str/includes? x "::")
             (str "`" x "`")
-            x)]
-
-;;could cause bias when pass 00:00
-    ;;(def s "🌀walk-on-key")
-    (when-not (empty? s)
-
+            x)
+        prev (.slurp :roam/prev)]
+    (when (and (not (empty? s))
+               (not (in? prev s)))
+      (.cons-cap 101 :roam/prev x)
+      (write (personal) s :page (mock-within 1800 personal-block (personal))))
+    ;;
+    ))
 
 (defn run-pb->roam []
   (let [p (watch-pb pb->roam)]

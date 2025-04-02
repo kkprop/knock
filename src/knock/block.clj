@@ -7,11 +7,6 @@
 
 
 ;;block is the fundamental component of tree shape data
-:block/string
-
-:block/refs
-
-:block/children
 
 ;;drive the process of using blokcs by inspecting this file itself.
 
@@ -274,7 +269,8 @@
 
   (= 2 "2")
 
-  (->units "a.b.c a d e"))
+  (->units "a.b.c a d e")
 
-(tap> pasting)
+  (tap> pasting)
+  )
 

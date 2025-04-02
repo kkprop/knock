@@ -33,7 +33,8 @@
              [knock.ticker :as ticker]
              [clojure.string :as str]
              [knock.chat :as chat]
-             [knock.wn :as w])
+             [knock.wn :as w]
+             )
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
               proc (process (str "bb nrepl-server " port) {:inherit true})]
           (wait/wait-for-port "localhost" port)

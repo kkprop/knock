@@ -75,7 +75,7 @@
     (str/join "/" [ns name])))
 
 
-(defn if-nil [x default]
+(defn if-nil-then [x default]
   (if (nil? x)
     default
     x
@@ -909,6 +909,19 @@
   ([..c k]
    (get @..c k))
   )
+
+(defn .cons [k x]
+  (.spit k (cons x (.slurp k)))
+  ;;
+  )
+
+(defn .cons-cap [n k x]
+  (let [xs (.slurp k)]
+    (if (< n (count xs))
+      (.spit k (cons x (drop-last xs)))
+      (.cons k x)
+      )))
+
 
 (async-fn (fn [k]
             (when (in? (keys @..kk) k)
