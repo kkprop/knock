@@ -251,32 +251,58 @@
   (pull-uid g (cur-daily-page))
   )
 
+(defn daily-note-block
+  ([g]
+   (->>
+    (:block/children (pull-uid g (cur-daily-page)))
+    (filter! {:block/string "[[一天]]"})
+    first
+    :block/uid
+   ;;
+    ))
+  ;;search child blocks for first block in daily note
+  ([g s]
+   (->>
+    (:block/children (pull-uid g (daily-note-block g)))
+    (filter (fn [m] (str/includes? (:block/string m) s)))
+    first
+    :block/uid
+    )))
 
 (defn personal-block [g]
-  (->>
-   (:block/children (pull-uid (personal) (cur-daily-page)))
-   (filter! {:block/string "[[一天]]"})
-   (mapcat (fn [m]
-          (:block/children (pull-uid (personal) (:block/uid m)))))
+  ;(def g (personal))
+  (daily-note-block g "#Personal"))
 
-   (filter (fn [m]
-             (str/includes? (:block/string m) "#Personal")))
-   first 
-   :block/uid
-   ;;
-   ))
+(defn work-block [g]
+  (daily-note-block g "#Work")
+  )
 
 (defn pb->roam []
   (let [x (if-nil-then (.slurp :pb) "")
         s (if (str/includes? x "::")
             (str "`" x "`")
             x)
-        prev (.slurp :roam/prev)]
+        prev (if-nil-then (.slurp :roam/prev) [])
+        work-uid (mock-within 1800 work-block (personal))
+        personal-uid (mock-within 1800 personal-block (personal))
+        ]
+
     (when (and (not (empty? s))
-               (not (in? prev s)))
-      (.cons-cap 101 :roam/prev x)
-      (write (personal) s :page (mock-within 1800 personal-block (personal))))
-    ;;
+               (not (in? prev s))
+               (not (digit? s))
+               (not (in? ["Roam Research"] (front-most-app) )
+               ;;
+               )
+               )
+      (println (front-most-app))
+      (.cons-cap 101 :roam/prev s)
+      ;(def s "148-153-61-217")
+      (write (personal) s
+             :page
+             (if (ip? (->ip s))
+               work-uid
+               personal-uid)))
+;;;
     ))
 
 (defn run-pb->roam []

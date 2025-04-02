@@ -1209,8 +1209,10 @@
                    title)))
 
 (defn osascript [& args]
-  (run-cmd :osascript "-e '"
-           (join-cmd args)))
+  (run-cmd! :osascript :-e "'"
+           (apply join-cmd args)
+           "'"
+           ))
 
 
 
@@ -4611,6 +4613,11 @@
 (defn opt-text [s]
   (str "-c " (format "\"%s\"" s))
   )
+
+(defn front-most-app []
+  (if (osx?)
+    (str/trim (osascript "tell application \"System Events\" to get name of first application process whose frontmost is true"))
+    nil))
 
 (defn send-keys*
   ([keys]
