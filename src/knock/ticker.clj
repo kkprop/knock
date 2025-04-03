@@ -475,7 +475,7 @@
                                         ;
           ))
 
-(defn start-collect []
+(defn watch-collect []
   (let []
     ;; watch start when 
     (go!

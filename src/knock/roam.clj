@@ -284,24 +284,23 @@
             x)
         prev (if-nil-then (.slurp :roam/prev) [])
         work-uid (mock-within 1800 work-block (personal))
-        personal-uid (mock-within 1800 personal-block (personal))
-        ]
+        personal-uid (mock-within 1800 personal-block (personal))]
 
     (when (and (not (empty? s))
                (not (in? prev s))
                (not (digit? s))
-               (not (in? ["Roam Research"] (front-most-app) )
+               (not (in? ["Roam Research"] (front-most-app))
                ;;
-               )
-               )
+                    ))
       (println (front-most-app))
       (.cons-cap 101 :roam/prev s)
       ;(def s "148-153-61-217")
-      (write (personal) s
-             :page
-             (if (ip? (->ip s))
-               work-uid
-               personal-uid)))
+      (if (ip? (->ip s))
+        (write (personal) s :page work-uid :order "first")
+        (write (personal) s :page personal-uid)
+        )
+      )
+
 ;;;
     ))
 
