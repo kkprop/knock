@@ -15,6 +15,7 @@
           :tl-pre
           :api-key
           :tl-post
+          :server-ip
           ]
          :config-path "resources/ticker.edn")
 
@@ -196,7 +197,10 @@
     (< 15 (cur-hour))
     (< (cur-hour) 21))
    (and (= (cur-hour) 20)
-        (< (cur-min) 30))))
+        (< (cur-min) 30))
+
+   )
+  )
 
 (defn post? []
   (and
@@ -485,15 +489,20 @@
            (println "start machine"
                     (tstart))
            (pause-seconds 32)
-           (println "start service" (run-cmd "~/ss/ticker.sh sudo service collect restart")))
-         (do (pause-seconds 3)
-             (println (->log "waiting pre"))))))
+           (when (res-ok? (retry-n-times-until-res-ok 20 (partial! (fn []
+                                                                     (pause-seconds 3)
+                                                                     (ssh-up? server-ip)))))
+
+             (println "start service" (run-cmd "~/ss/ticker.sh sudo service collect restart"))
+             (pause-seconds 10)
+             (do (pause-seconds 3)
+                 (println (->log "waiting pre"))))))))
     ;; watch stop after post over
-     (while true
-       (if (et-false post?)
-         (println "stop service" (tstop))
-         (do (pause-seconds 3)
-             (println (->log "waiting post over")))))
+    (while true
+      (if (et-false post?)
+        (println "stop service" (tstop))
+        (do (pause-seconds 3)
+            (println (->log "waiting post over")))))
 
 ;;
     ))
@@ -505,6 +514,7 @@
 (defn track-ticker []
   (count
    (take-last 10 (mock cur-all-frame))
+
    )
   )
 

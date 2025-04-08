@@ -13,7 +13,6 @@
    [babashka.curl :as curl]
    [portal.api :as portal]
    [clojure.zip :as z]
-
    [clojure.core.async :as async :refer [go go-loop
                                          chan to-chan
                                          <! >!! >! close!
@@ -24,7 +23,6 @@
    [clj-yaml.core :as yaml ]
    [clojure.edn :as edn]
    [clojure.walk :as walk]))
-
 
 (import 'java.lang.ProcessHandle)
 
@@ -39,6 +37,7 @@
          trimr! pause cur-ts
          mock
          env?
+         err-res res-ok? res-err? ok-res
          .slurp .spit
          trim-to*
          )
@@ -81,8 +80,6 @@
     x
     )
   )
-
-
 
 (def ..trigger (atom {}))
 
@@ -154,6 +151,7 @@
 (defn run-cmd-with-timeout [t & cmd]
   (sh "sh" (format "-c timeout %d ' " t) (str (apply join-cmd cmd) " '"))
   )
+
 
 (defn exit
   ([]
@@ -251,6 +249,13 @@
       (future-cancel fut))
     ret))
 
+(defn port-up? [ip port]
+   (timeout-eval! 3 run-cmd :nc :-zv ip port))
+
+(defn ssh-up? [ip]
+  (port-up? ip "22")
+  )
+
 ;;function params to 0
 (defn partial! [f & args]
   (apply partial f args)
@@ -284,6 +289,19 @@
         res
         (recur (- n 1) f)
         ))))
+
+(defn retry-n-times-until-res-ok [n f & args]
+  (if (<= n 0)
+    ;;no more chance
+    (err-res "reached max retry")
+    (let [res (apply f args)]
+      (if (res-ok? res)
+        res
+        (recur (- n 1) f)
+        )
+      )
+    )
+  )
 
 (defn half-chance-exception [x]
   (let [n (rem (cur-ts) 10)]
@@ -457,8 +475,6 @@
                 )
               )
          )))
-
-
 
 
 (defn join-path [& cmd]
@@ -699,7 +715,6 @@
     ))
 
 
-
 (comment
 
   (def c (to-chan! [1 2 nil 3]))
@@ -851,21 +866,26 @@
   )
 
 ;;wait util all worker completed
-(defn pipeline!! [n f coll]
-  (let [c-count (count coll)
-        per     (quot c-count n)
-        xs (partition!! per coll)
-        ;_ (println (count xs))
-        ps      (pmap #(worker! f %) xs)
-        ]
-    (thread!
+(defn pipeline!!
+  ([wfn n f coll]
+   (let [c-count (count coll)
+         per     (quot c-count n)
+         xs      (partition!! per coll)
+                                        ;_ (println (count xs))
+         ps      (pmap #(wfn f %) xs)
+         ]
+     (thread!
 
-      (filter realized? ps)
+       (filter realized? ps)
 
-      )
-    ;;TODO fix not in flatten way
-    (apply concat (doall (pmap (fn [x] @x) ps)))
-    )
+       )
+     ;;TODO fix not in flatten way
+     (apply concat (doall (pmap (fn [x] @x) ps)))
+     ))
+  ([n f coll]
+   ;;default worker! will only run fn on coll
+   (pipeline!! worker! n f coll)
+   )
   )
 
 (comment
@@ -889,6 +909,10 @@
 (def kc (chan! 101))
 (def ..kk (atom {}))
 
+(defn pub-change [k]
+  (when-not (.slurp :exiting)  (clojure.core.async/>!! kc k))
+  )
+
 (defn .spit
   ([k v]
    (.spit ..cache k v)
@@ -896,11 +920,10 @@
   ([..c  k v]
    (let [pv (get @..c k)]
      (when-not (= v pv)
+       (pub-change k)
        (swap! ..c assoc k v)
-       (clojure.core.async/>!! kc k)
        )
-     ))
-  )
+     )))
 
 (defn .slurp
   ([k]
@@ -910,9 +933,38 @@
    (get @..c k))
   )
 
+(defn .swap! [k f x]
+  (swap! ..cache (fn [m x]
+                   (let [pv (get m k)
+                         v  (f x pv)]
+                     (pub-change k)
+                     (assoc m k v)
+                     )
+                   ) x))
+
+(defn .swap-right! [k f x]
+  (swap! ..cache (fn [m x]
+                   (let [pv (get m k)
+                         v  (f pv x)]
+                     (pub-change k)
+                     (assoc m k v)
+                     )
+                   ) x))
+
 (defn .cons [k x]
-  (.spit k (cons x (.slurp k)))
-  ;;
+  (k (.swap! k cons x))
+  )
+
+(defn .conj [k x]
+  (k (.swap-right! k conj x))
+  )
+
+
+(comment
+  (.cons :l :a)
+  (.cons :l :b)
+  (.conj :l :d)
+
   )
 
 (defn .cons-cap [n k x]
@@ -1197,7 +1249,7 @@
        (let [cur (pbpaste)]
          (when-not (= cur (.slurp :pb))
            (.spit :pb cur)))
-       (pause-seconds 1)))
+       (pause-seconds 0.1)))
     p))
 
 (defn notify [name title]
@@ -1575,6 +1627,9 @@
                  first)]
 
     (trimr! x sub)))
+
+(defn epub-clean [s]
+  (chop-to! s "摘录来自"))
 
 (comment
   (triml! ".def" ".")
@@ -3872,6 +3927,12 @@
 ;;when > seconds do mock-update
 (def mock> mock-within)
 
+(defn mock-stat [f & args]
+  (if (mock-exists? f args)
+    (mock f args)
+    (err-res "no such file" 2 )
+    )
+  )
 
 (defn measure [f & args]
   (let [start (cur-ts-13)

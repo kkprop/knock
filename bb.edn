@@ -12,6 +12,7 @@
         dawran6/emoji {:mvn/version "0.1.5"}
         org.babashka/spec.alpha {:git/url "https://github.com/babashka/spec.alpha"
                                  :git/sha "1a841c4cc1d4f6dab7505a98ed2d532dd9d56b78"} refactor-nrepl/refactor-nrepl {:mvn/version "2.5.1"}
+        progrock/progrock            {:mvn/version "0.1.2"}
         io.github.lispyclouds/bblgum {:git/sha "1d4de3d49b84f64d1b71930fa1161f8d2622a4d9"}
         selmer/selmer {:mvn/version "1.12.50"}}
  :repl-options {:init-ns search.main}
@@ -33,8 +34,7 @@
              [knock.ticker :as ticker]
              [clojure.string :as str]
              [knock.chat :as chat]
-             [knock.wn :as w]
-             )
+             [knock.wn :as w])
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
               proc (process (str "bb nrepl-server " port) {:inherit true})]
           (wait/wait-for-port "localhost" port)

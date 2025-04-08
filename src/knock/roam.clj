@@ -253,38 +253,48 @@
 
 (defn daily-note-block
   ([g]
-   (->>
-    (:block/children (pull-uid g (cur-daily-page)))
-    (filter! {:block/string "[[一天]]"})
-    first
-    :block/uid
-   ;;
-    ))
+   (let [uid (cur-daily-page)]
+     (if-nil-then (->>
+                   (:block/children (pull-uid g uid))
+                   (filter! {:block/string "[[一天]]"})
+                   first
+                   :block/uid
+      ;;
+                   )
+       uid
+       )))
   ;;search child blocks for first block in daily note
   ([g s]
-   (->>
-    (:block/children (pull-uid g (daily-note-block g)))
-    (filter (fn [m] (str/includes? (:block/string m) s)))
-    first
-    :block/uid
-    )))
+   (let [uid (daily-note-block g)]
+     (if-nil-then
+      (->>
+       (:block/children (pull-uid g uid))
+       (filter (fn [m] (str/includes? (:block/string m) s)))
+       first
+       :block/uid)
+      uid))))
 
 (defn personal-block [g]
   ;(def g (personal))
-  (daily-note-block g "#Personal"))
+  (let [x (mock-within 1800 daily-note-block g "#Personal")]
+    ;(pull-daily-note g x)
+    x
+    )
+  )
 
 (defn work-block [g]
-  (daily-note-block g "#Work")
+  (mock-within 1800 daily-note-block g "#Work")
   )
 
 (defn pb->roam []
   (let [x (if-nil-then (.slurp :pb) "")
-        s (if (str/includes? x "::")
-            (str "`" x "`")
-            x)
+        s (cond
+            (str/includes? x "::") (str "`" x "`")
+            (str/includes? x "摘录来自") (epub-clean x)
+            :else x)
         prev (if-nil-then (.slurp :roam/prev) [])
-        work-uid (mock-within 1800 work-block (personal))
-        personal-uid (mock-within 1800 personal-block (personal))]
+        work-uid (work-block (personal))
+        personal-uid (personal-block (personal))]
 
     (when (and (not (empty? s))
                (not (in? prev s))
@@ -297,9 +307,7 @@
       ;(def s "148-153-61-217")
       (if (ip? (->ip s))
         (write (personal) s :page work-uid :order "first")
-        (write (personal) s :page personal-uid)
-        )
-      )
+        (write (personal) s :page personal-uid)))
 
 ;;;
     ))
@@ -315,9 +323,10 @@
 (comment
   (str/includes? "::abc" "::")
 
+  (pbpaste)
+
   (go!
-    (run-pb->roam)
-    )
+   (run-pb->roam))
 
   (pbpaste)
   (server/local-call :rand)
@@ -357,6 +366,9 @@
    (search-block (xzl)
                  "三月")
    (map :block/uid))
+
+  (pp (pull-uid (personal)  "TnKJ1RiBH"))
+  (pp (pull-uid (personal) "jUaOmeNk7"))
 
 ;;
   )
