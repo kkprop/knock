@@ -188,9 +188,11 @@
   )
 
 (trap-exit (fn []
+             (let []
              (println (.spit :exiting true))
              (println (.slurp :exiting))
-             (clean-screen)
+             (.local-save)
+             (clean-screen))
              ))
 
 

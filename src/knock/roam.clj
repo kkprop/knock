@@ -286,6 +286,11 @@
   (mock-within 1800 daily-note-block g "#Work")
   )
 
+
+(.local-load)
+;;make sure
+(.local :roam/prev)
+
 (defn pb->roam []
   (let [x (if-nil-then (.slurp :pb) "")
         s (cond

@@ -38,6 +38,7 @@
          mock
          env?
          err-res res-ok? res-err? ok-res
+         load-edn triml-sub
          .slurp .spit
          trim-to*
          )
@@ -910,7 +911,9 @@
 (def ..kk (atom {}))
 
 (defn pub-change [k]
-  (when-not (.slurp :exiting)  (clojure.core.async/>!! kc k))
+  (when-not (.slurp :exiting)
+    (clojure.core.async/>!! kc k)
+    )
   )
 
 (defn .spit
@@ -959,11 +962,39 @@
   (k (.swap-right! k conj x))
   )
 
+;;serialize cache to disk. when starting load them into mem
+(defn .local [k]
+  (when-not (in? (.slurp :local/keys) k)
+    (.cons :local/keys k)))
+
+(defn .local-save []
+  (let []
+    (println "local.saving")
+    (spit "resources/local-cache.edn" (select-keys @..cache (distinct (.slurp :local/keys))))))
+
+(defn .local-load []
+  (let [f "resources/local-cache.edn"]
+    (if (fs/exists? f)
+      (let [x (->>
+               (load-edn f)
+               (map (fn [[k v]]
+                      (.spit k v)))
+               (count))]
+        (println! (str "loading local-cache, total key count: " x)))
+      (println! "try loading found no cache file. ignore.")
+      )
+    )
+  )
 
 (comment
   (.cons :l :a)
   (.cons :l :b)
   (.conj :l :d)
+
+  (.local :l)
+
+  ..cache
+
 
   )
 
@@ -1560,6 +1591,14 @@
     (.substring s 0 (- (count s) (count sub)))
     s)
   )
+
+(defn triml-sub [s sub]
+  (if (str/starts-with? s sub)
+    (.substring s (count sub) (- 1 (count s)))
+    s))
+
+
+
 
 ;;TOFIX: if ends not sub. should not chop
 (defn trimr! [s sub]
