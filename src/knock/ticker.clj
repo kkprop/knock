@@ -494,10 +494,12 @@
                                                                      (ssh-up? server-ip)))))
 
              (println "start service" (run-cmd "~/ss/ticker.sh sudo service collect restart"))
-             (pause-seconds 10)
-             (do (pause-seconds 3)
-                 (println (->log "waiting pre"))))))))
-    ;; watch stop after post over
+             (pause-seconds 10)))
+
+         (do (pause-seconds 3)
+             (println (->log "waiting pre"))))))
+
+;; watch stop after post over
     (while true
       (if (et-false post?)
         (println "stop service" (tstop))

@@ -970,7 +970,10 @@
 (defn .local-save []
   (let []
     (println "local.saving")
-    (spit "resources/local-cache.edn" (select-keys @..cache (distinct (.slurp :local/keys))))))
+    (when (fs/exists? "resources")
+      (spit "resources/local-cache.edn" (select-keys @..cache (distinct (.slurp :local/keys)))))
+    )
+  )
 
 (defn .local-load []
   (let [f "resources/local-cache.edn"]
@@ -1142,7 +1145,7 @@
        (str/trim-newline
          (:out
           (apply (partial run-cmd ~name) ~@default-args ~args))))))
-
+"
 ;;won't run the command  just show it
 (defmacro show-shell-fn [name & default-args]
   (let [fname (symbol (force-str name))
