@@ -39,7 +39,7 @@
          env?
          err-res res-ok? res-err? ok-res
          load-edn triml-sub
-         .slurp .spit
+         .slurp .spit .local-load
          trim-to*
          )
 
@@ -971,7 +971,12 @@
   (let []
     (println "local.saving")
     (when (fs/exists? "resources")
-      (spit "resources/local-cache.edn" (select-keys @..cache (distinct (.slurp :local/keys)))))
+      (let [prev (load-edn "resources/local-cache.edn")
+            xs (distinct (.slurp :local/keys))
+            ]
+        (spit "resources/local-cache.edn" (merge prev (select-keys @..cache xs)))
+        )
+      )
     )
   )
 
@@ -1145,7 +1150,7 @@
        (str/trim-newline
          (:out
           (apply (partial run-cmd ~name) ~@default-args ~args))))))
-"
+
 ;;won't run the command  just show it
 (defmacro show-shell-fn [name & default-args]
   (let [fname (symbol (force-str name))
@@ -2489,8 +2494,44 @@
         (re-seq #".*\.?.*\..*" x)
         )))
 
+(defn ->base-domains [domain-name]
+  ;(def domain-name "a.b.c.x.com")
+  ;(def domain-name "*.a.b.c.x.com")
+  (remove #(str/starts-with? % "*") 
+    (reverse (let [xs (str/split domain-name #"\." )
+                   n  (- (count xs) 1)
+                   ]
+               (loop [x n acc []]
+                 (if(= 0 x) 
+                   acc
+                   (recur (- x 1) (cons (str/join "." (take-last (+ 1 x) xs)) acc))
+                   )
+                 )
+               ))))
+
+
+(defn ->dnsauth [s]
+  ;;(def s "域名 记录类型 主机记录 记录值 b.a.x.io TXT _dnsauth.b.a复制 2025040900000005ztt2sw6npdgvrulgrr12k1zjxef8t6zfscovenhuv1z3bv2d复制")
+  ;;(def s "主机记录: _dnsauth 记录值: _13xdq6kq36hlz43iue2kuo8d0tr5trg 记录类型: TXT")
+  {:record-name (re-seq! #"(_dnsauth(.\w+)*)" s)
+   :value       (let [x  (re-seq! (re-pattern (format "(%s\\w*)" (cur-year))) s)]
+                  (if (nil? x)
+                    (last (last (re-seq #"(_\w*)" s)))
+                    x
+                    )
+                  )
+   }
+  )
+
+(defn ->dot-ends-domain [domain-name]
+  (if (str/ends-with? domain-name ".")
+    domain-name
+    (str domain-name ".")
+    )
+  )
+
 (defn ->base-domain [domain-name]
-  (str/join "." (take-last 2 (str/split domain-name #"\." )))
+  (first (->base-domains domain-name))
   )
 
 (comment
@@ -2514,6 +2555,11 @@
   ;;
   )
 
+
+(defn dig-txt [domain]
+  ;(def domain "_dnsauth.ap.sd-rtn.com")
+  (println (run-cmd! :dig :TXT domain ))
+  )
 
 ;; File creating. cleaning. path assembling
 (defn clean-file [f-name]

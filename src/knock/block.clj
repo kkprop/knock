@@ -146,7 +146,7 @@
 (defn verticalize [xs]
   ;;full size
   (let [c (apply max (map count xs))
-        n 16
+        n 8
         ln (count xs)]
     (->> xs
          (map #(fill-after % n \u3000))
