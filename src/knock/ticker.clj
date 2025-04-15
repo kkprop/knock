@@ -195,10 +195,11 @@
   (or
    (and
     (< 15 (cur-hour))
-    (< (cur-hour) 21))
+    (< (cur-hour) 21)
+    (< (cur-week-day) 6))
    (and (= (cur-hour) 20)
-        (< (cur-min) 30))
-
+        (< (cur-min) 30)
+        (< (cur-week-day) 6))
    )
   )
 
@@ -530,6 +531,8 @@
      (println (->log @..trigger))
      (pause-minutes 1)
      ))
+
+  (pre?)
   ;;
   )
 

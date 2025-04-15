@@ -359,4 +359,17 @@
   (->>
    (ns-publics 'etaoin.api)
    (take 2)
-   (map #(meta (second %)))))
+   (map #(meta (second %))))
+  ;;
+  (def url "https://www.youtube.com/watch?v=4yXK9OMc2OU"))
+
+
+(defn ->html [url]
+  (try
+    (e/with-chrome-headless driver
+      (e/go driver url)
+      (e/get-source driver))
+    (catch Exception e
+      (println "got exception when open browser driver" e)
+      (if (osx?) (run-cmd "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable")
+          (println "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable" " download driver")))))

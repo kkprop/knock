@@ -339,7 +339,7 @@
   )
 
 (def pp clojure.pprint/pprint)
-(defn tp [& more] (apply println (cur-time-str) more))
+(defn tp [& more] (apply println (cur-time-str) " " more))
 
 (defn mpp [& args]
   (binding [*print-meta* true]
@@ -971,7 +971,10 @@
   (let []
     (println "local.saving")
     (when (fs/exists? "resources")
-      (let [prev (load-edn "resources/local-cache.edn")
+      (let [prev (if (fs/exists? "resources/local-cache.edn")
+                   (load-edn "resources/local-cache.edn")
+                   nil
+                   )
             xs (distinct (.slurp :local/keys))
             ]
         (spit "resources/local-cache.edn" (merge prev (select-keys @..cache xs)))
@@ -1392,9 +1395,10 @@
 
 (comment
   (dec "PASSWORD"
-    (enc "PASSWORD" "abc\n")
+       (enc "PASSWORD" "abc\n"))
+  (def uuid (str (->uuid "")))
+  (def id (->uuid " ollama")
     )
-  (def uuid (str(->uuid "")))
   )
 
 
@@ -1406,10 +1410,9 @@
 (defn tmux [s]
   (let [id (->uuid s)]
     (if (str/includes? (run-cmd! "tmux list-sessions") (str id))
-      (run-shell "tmux new-session -s " id)
-      (run-shell "tmux attach -t " id))
+      (run-shell "tmux attach -t " id)
+      (run-shell "tmux new-session -s " id))
     id))
-
 
 (defn send-text [id & xs]
   (run-cmd "tmux send-keys -t" id "'" (str/join " " xs) "'"))
@@ -2411,7 +2414,8 @@
 
 (def ip-regex #"(?:[0-9]{1,3}\.){3}[0-9]{1,3}")
 (def dash-ip-regex #"(?:[0-9]{1,3}-){3}[0-9]{1,3}")
-(def idc-regex #"([A-Za-z]+-[A-Za-z]+\d)")
+;(def dash-ip-regex #"(\d{1,3}-\d{1,3}-\d{1,3}-\d{1,3})(?=(-\d+)?)")
+(def idc-regex #"([A-Za-z]+-[A-Za-z]+\d+)")
 
 (defn parse-ips [s]
   (re-seq ip-regex s)
@@ -2531,7 +2535,7 @@
   )
 
 (defn ->base-domain [domain-name]
-  (first (->base-domains domain-name))
+  (last (->base-domains domain-name))
   )
 
 (comment
@@ -4016,7 +4020,7 @@
 (def mock> mock-within)
 
 (defn mock-stat [f & args]
-  (if (mock-exists? f args)
+  (if (apply mock-exists? f args)
     (mock f args)
     (err-res "no such file" 2 )
     )

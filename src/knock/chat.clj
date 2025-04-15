@@ -103,8 +103,8 @@
        "tags" (:body (curl-get (make-url url-ollama path)))
        (:body (curl-post (make-url url-ollama path)
                          :body opts
-                         :as :stream))
-
+                         :as :stream
+                         ))
 ;;
        ))))
 
@@ -127,7 +127,7 @@
   )
 
 (defn last-model []
-)
+  )
 
 (def qa-cache (atom {}))
 
@@ -178,6 +178,7 @@
      )
    )
   )
+
 ;;This is not good.
 (defn run-model []
   (let [m (tui/choose (models) 10)]
@@ -212,4 +213,33 @@
   (:out
    (prompt "what is socrate question method when doing inquery?"))
 ;
+  )
+
+
+
+
+;; stdout stdin 
+
+(defn o []
+  (go! (tmux "ollama"))
+
+  (send-text  (->uuid "ollama")
+              "ollama run deepseek-r1:8b")
+
+  (send-keys (->uuid "ollama")
+             "Enter"
+             )
+
+  ( )
+
+  ;;
+  )
+
+(comment
+  (def p
+    (proc/shell "ollama" "run" "deepseek-r1:8b"))
+
+  (def id (tmux "ollama")
+    )
+  ;;
   )
