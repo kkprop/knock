@@ -261,8 +261,7 @@
                    :block/uid
       ;;
                    )
-       uid
-       )))
+                  uid)))
   ;;search child blocks for first block in daily note
   ([g s]
    (let [uid (daily-note-block g)]
@@ -272,7 +271,12 @@
        (filter (fn [m] (str/includes? (:block/string m) s)))
        first
        :block/uid)
-      uid))))
+      (do
+        (go!
+          (pause-seconds 30)
+          (mock daily-note-block g s)
+          )
+        uid)))))
 
 (defn personal-block [g]
   ;(def g (personal))

@@ -265,11 +265,8 @@
 
   (driver)
 
-
-
   (e/get-source
-   (driver)
-   )
+   (driver))
   (go "https://www.google.com")
   (e/get-source (driver))
 
@@ -280,8 +277,7 @@
   (def dd
     (e/chrome
      (->opts
-      (conn (driver))))
-    )
+      (conn (driver)))))
 
   (driver)
   dd
@@ -319,7 +315,7 @@
 
   (go "https://jisho.org/search/慈")
 
-;
+  ;
   )
 
 (defn list-equal-match [xsa xsb]
@@ -372,4 +368,28 @@
     (catch Exception e
       (println "got exception when open browser driver" e)
       (if (osx?) (run-cmd "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable")
+          (println "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable" " download driver")))
+    )
+  )
+
+(defn ->class [url name]
+  (try
+    (e/with-chrome-headless driver
+      (e/go driver url)
+      (e/query-tree driver {:class name})
+      )
+    (catch Exception e
+      (println "got exception when open browser driver" e)
+      (if (osx?) (run-cmd "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable")
           (println "open" "https://googlechromelabs.github.io/chrome-for-testing/#stable" " download driver")))))
+
+
+(comment
+  (go "https://www.youtube.com/watch?v=4yXK9OMc2OU")
+  (click  {:id "expand"})
+  (count
+   (map :html
+        (locate! {:class "style-scope ytd-macro-markers-list-renderer"})))
+
+;;
+  )

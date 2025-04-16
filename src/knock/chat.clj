@@ -223,14 +223,14 @@
 (defn o []
   (go! (tmux "ollama"))
 
-  (send-text  (->uuid "ollama")
-              "ollama run deepseek-r1:8b")
+  (send-text  (->uuid "ollama") "ollama run deepseek-r1:8b")
 
   (send-keys (->uuid "ollama")
              "Enter"
              )
 
-  ( )
+
+  
 
   ;;
   )
