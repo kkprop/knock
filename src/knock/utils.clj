@@ -542,8 +542,14 @@
        )
   )
 
+(defn ->>>! [f x colls]
+  (->> colls
+       (f #((is-or-has> x) %))
+       )
+  )
 
 (def filter< (partial ->><! filter))
+(def filter> (partial ->>>! filter))
 (def remove< (partial ->><! remove))
 
 
@@ -969,7 +975,7 @@
 
 (defn .local-save []
   (let []
-    (println "local.saving")
+    ;(println "local.saving")
     (when (fs/exists? "resources")
       (let [prev (if (fs/exists? "resources/local-cache.edn")
                    (load-edn "resources/local-cache.edn")
@@ -1410,9 +1416,11 @@
 (defn tmux [s]
   (let [id (->uuid s)]
     (if (str/includes? (run-cmd! "tmux list-sessions") (str id))
-      (run-shell "tmux attach -t " id)
-      (run-shell "tmux new-session -s " id))
-    id))
+      (run-shell "tmux new-session -s " id)
+      (run-shell "tmux attach -t " id))
+    id)
+  )
+
 
 (defn send-text [id & xs]
   (run-cmd "tmux send-keys -t" id "'" (str/join " " xs) "'"))
@@ -2022,6 +2030,11 @@
   (parse-int
    (cur-time-str "YYYY"))
   )
+
+(defn prev-year []
+  (- (cur-year) 1)
+  )
+
 
 (defn cur-date-str []
   (cur-time-str "YYYY-MM-dd")
