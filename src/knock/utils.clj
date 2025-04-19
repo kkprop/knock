@@ -525,6 +525,20 @@
     )
   )
 
+(defn is-or-has> [x]
+  (if (map? x)
+    (let [xs x]
+      #(->> xs
+            (map (fn [[k v]]
+                   (> (get % k) v)
+                   ))
+            (every? true?)
+            )
+      )
+    (partial = x)
+    )
+  )
+
 (defn ->>! [f x colls]
   (->> colls
        (f #((is-or-has x) %))
