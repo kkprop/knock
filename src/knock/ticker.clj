@@ -503,7 +503,7 @@
 ;; watch stop after post over
     (while true
       (if (et-false post?)
-        (println "stop service" (tstop))
+        (println "stop service" (run-cmd "~/ss/ticker.sh sudo service collect stop") )
         (do (pause-seconds 3)
             (println (->log "waiting post over")))))
 

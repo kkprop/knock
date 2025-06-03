@@ -199,21 +199,27 @@
     )
   )
 
-(defn locate!! [url q uniq-text]
-  (go url)
-  (e/wait-visible (driver) q)
-  (->> (e/query-tree (driver) q)
-       (map (fn [id] {:id id :text (e/get-element-text-el (driver) id)}))
-       (filter #(utils/fuzzy-rev-in? [uniq-text] (:text %)))
-       (map #(assoc % :html (e/get-element-inner-html-el (driver) (:id %))))
-       ;;
-       ))
+;;go to the url then locate
+(defn locate!!
+  ([url q]
+   (locate!! url q)
+   )
+  ([url q uniq-text]
+   (go url)
+   (e/wait-visible (driver) q)
+   (->> (e/query-tree (driver) q)
+        (map (fn [id] {:id id :text (e/get-element-text-el (driver) id)}))
+        (filter #(utils/fuzzy-rev-in? [uniq-text] (:text %)))
+        (map #(assoc % :html (e/get-element-inner-html-el (driver) (:id %))))
+        ;;
+        )))
 
-
-
+;;locate in current driver
 (defn locate!
   ([q]
-   (locate! q "")
+   (if (sequential? q)
+     (apply locate! q)
+     (locate! q ""))
    )
   ([q uniq-text]
    (let [d (driver)]
@@ -222,8 +228,10 @@
           (filter #(utils/fuzzy-rev-in? [uniq-text] (:text %)))
           (map #(assoc % :html (e/get-element-inner-html-el d (:id %))))
           (map #(assoc % :tag (e/get-element-tag-el d (:id %))))
-         ;;
-          ))))
+          (idx)
+          ;;
+          ))
+   ))
 
 (defn has-text? [uniq-text {:keys [text]}]
   (utils/fuzzy-rev-in? [uniq-text] text)
@@ -243,6 +251,7 @@
   (el-children (driver) el q uniq-text)
   )
 
+;;the :text is exacttly in [uniq-text]
 (defn locate-in! [q uniq-text]
   (let [d (driver)]
     (->> (e/query-tree d q)
@@ -260,6 +269,30 @@
 (defn click-el! [id]
   (e/click-el (driver) id)
   )
+
+(defn fill-el! [id text]
+  (when-not (nil? id)
+    (e/fill-el (driver) id text)))
+
+
+(defn fill [q s] (fill-el! (->el (locate! q)) s))
+
+(defn click
+  ([q]
+   (if (sequential? q )
+     (apply click q)
+     (click q "")
+     )
+   )
+  ([q text]
+   (let [id (->el (locate! q text))]
+     (when-not (nil? id)
+       (click-el! id))
+     ))
+  )
+
+
+
 
 (comment
 
@@ -315,7 +348,7 @@
 
   (go "https://jisho.org/search/慈")
 
-  ;
+;
   )
 
 (defn list-equal-match [xsa xsb]

@@ -60,11 +60,10 @@
     (= 0 (:status (b/gum :confirm [msg] :default "no"))))
   )
 
-
-
-(comment 
-  (confirm! "reboot through maas" )
-
+(defn yes-confirm! [msg]
+  (let []
+                                        ;(println msg)
+    (= 0 (:status (b/gum :confirm [msg] :default "yes"))))
   )
 
 
@@ -83,6 +82,9 @@
   )
 
 (defn choose!
+  ([xs]
+   (choose! (fn [x] true) xs)
+   )
   ([result-fn xs]
    (choose! result-fn xs 0)
    )
@@ -101,11 +103,16 @@
   )
 
 
-(defn input [prompt placeholder]
-  (-> (b/gum :input :prompt prompt :placeholder placeholder)
-      :result
-      first
-      )
+(defn input
+  ([placeholder]
+   (input "" placeholder)
+   )
+  ([prompt placeholder]
+   (-> (b/gum :input :prompt prompt :placeholder placeholder)
+       :result
+       first
+       )
+   )
   )
 
 
@@ -189,8 +196,8 @@
 
 (trap-exit (fn []
              (let []
-             (println (.spit :exiting true))
-             (println (.slurp :exiting))
+             ;(println (.spit :exiting true))
+             ;(println (.slurp :exiting))
              (.local-save)
              (clean-screen))
              ))

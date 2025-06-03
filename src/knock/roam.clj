@@ -265,6 +265,7 @@
   ;;search child blocks for first block in daily note
   ([g s]
    (let [uid (daily-note-block g)]
+     uid
      (if-nil-then
       (->>
        (:block/children (pull-uid g uid))
@@ -282,14 +283,11 @@
   ;(def g (personal))
   (let [x (mock-within 1800 daily-note-block g "#Personal")]
     ;(pull-daily-note g x)
-    x
-    )
-  )
+    ;(when-not (empty? (re-seq #"\d\d-\d\d-\d\d\d\d" "21-05-2025")) (mock! daily-note-block g "#Personal"))
+    x))
 
 (defn work-block [g]
-  (mock-within 1800 daily-note-block g "#Work")
-  )
-
+  (mock-within 1800 daily-note-block g "#Work"))
 
 (.local-load)
 ;;make sure
@@ -297,6 +295,7 @@
 
 (defn pb->roam []
   (let [x (if-nil-then (.slurp :pb) "")
+        ;;doing decoration
         s (cond
             (str/includes? x "::") (str "`" x "`")
             (str/includes? x "摘录来自") (epub-clean x)
@@ -306,6 +305,9 @@
         personal-uid (personal-block (personal))]
 
     (when (and (not (empty? s))
+               (not (str/includes? s "-----BEGIN CERTIFICATE-----"))
+               (not (str/includes? s "-----BEGIN CERTIFICATE REQUEST-----"))
+               (not (str/includes? s "-----BEGIN RSA PRIVATE KEY-----"))
                (not (in? prev s))
                (not (digit? s))
                (not (in? ["Roam Research"] (front-most-app))

@@ -29,7 +29,7 @@
 (def os-name (System/getProperty "os.name"))
 (defn osx?[] (= os-name "Mac OS X"))
 
-(declare force-str force-int cur-time-str ->keyword ->uuid int! ->inst quote-str)
+(declare force-str force-int cur-time-str ->keyword ->uuid ->uuid! int! ->inst quote-str)
 (declare split-by tmp-file mock md5-uuid ->abs-path spit-line pp-hashmap!
          text-cols->hashmap
          file-name ext-name var-meta async-fn tail-f
@@ -956,6 +956,12 @@
    (get @..c k))
   )
 
+(defn .delete [k]
+  (let []
+    (swap! ..cache dissoc k)
+    (swap! ..kk dissoc k))
+  )
+
 (defn .swap! [k f x]
   (swap! ..cache (fn [m x]
                    (let [pv (get m k)
@@ -981,6 +987,11 @@
 (defn .conj [k x]
   (k (.swap-right! k conj x))
   )
+
+(defn .dissoc [k x]
+  (k (.swap-right! k dissoc x))
+  )
+
 
 ;;serialize cache to disk. when starting load them into mem
 (defn .local [k]
@@ -1017,10 +1028,28 @@
     )
   )
 
+(defn inc! [x]
+  (if (nil? x)
+    1
+    (inc x)
+    )
+  )
+
+(defn .inc [k]
+  (.spit k (inc! (.slurp k)))
+  )
+
+
 (comment
+
+  (def k :clean-disk)
+
   (.cons :l :a)
   (.cons :l :b)
   (.conj :l :d)
+  (.spit :tmp/test {:a 1 :b 2})
+  (.dissoc :tmp/test :a)
+  (.slurp :tmp/test)
 
   (.local :l)
 
@@ -1415,9 +1444,7 @@
 
 (comment
   (dec "PASSWORD"
-       (enc "PASSWORD" "abc\n"))
-  (def uuid (str (->uuid "")))
-  (def id (->uuid " ollama")
+    (enc "PASSWORD" "abc\n")
     )
   )
 
@@ -1428,19 +1455,22 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn tmux [s]
-  (let [id (->uuid s)]
-    (if (str/includes? (run-cmd! "tmux list-sessions") (str id))
-      (run-shell "tmux new-session -s " id)
-      (run-shell "tmux attach -t " id))
-    id)
-  )
+  (let [id (->uuid! s)]
+    (go! (if (str/includes? (run-cmd! "tmux list-sessions") id)
+           (run-shell "tmux attach -t " id)
+           (run-shell "tmux new-session -s " id)))
+    id))
 
 
 (defn send-text [id & xs]
   (run-cmd "tmux send-keys -t" id "'" (str/join " " xs) "'"))
 
+(defn send-line [id & xs]
+  (run-cmd "tmux send-keys -t" id "'" (str/join " " xs) "\n'")
+  )
+
 (defn send-keys [id & xs]
-  (apply run-cmd "tmux send-keys -t" id xs))
+     (apply run-cmd "tmux send-keys -t" id xs))
 
 (defn clear [id]
   (send-keys id "c-c")
@@ -1480,9 +1510,11 @@
   (let [c (->re (if (nil? re)
                   " "
                   (first re)))]
-    (if (< (count s) 2)
-      s
-      (str/split s c))))
+    (if (nil? s)
+      nil
+      (if (< (count s) 2)
+        s
+        (str/split s c)))))
 
 
 (defn split-pairs [s re & keys]
@@ -1560,6 +1592,13 @@
    )
   )
 
+
+(defn hash-map! [& args]
+  (if (= 1 (count args))
+    nil
+    (apply hash-map args)
+    )
+  )
 
 ;;replace \space \( \) to be empty
 (defn ->keyword! [s]
@@ -2047,6 +2086,9 @@
 
 (defn prev-year []
   (- (cur-year) 1)
+  )
+(defn next-year []
+  (+ (cur-year) 1)
   )
 
 
@@ -2611,7 +2653,7 @@
 ;;when the line exists, won't spit
 (defn spit-line! [f s]
   "spit only when string not exist currently"
-  (if (str/includes? (slurp f) s)
+  (if (str/includes? (if (fs/exists? f) (slurp f) "") s)
     (println "already exists ignore")
     (spit-line f s)
     )
@@ -2621,17 +2663,26 @@
   (apply spit path (j m) opts)
   )
 
+;;input a path or string
 (defn slurp-yaml [f]
-  (yaml/parse-string (slurp f)))
+  (if (fs/exists? f)
+    (yaml/parse-string (slurp f))
+    (yaml/parse-string f)
+    )
+  )
 
 ;;multiple yaml
 (defn slurp-yaml! [f]
-  (->> (str/split (slurp f) #"---")
+  (let [x (if (fs/exists? f)
+            (slurp f)
+            f
+            )]
+    (->> (str/split x #"---")
        (map yaml/parse-string) 
        ;;there are nil between two yaml. just remove 
        (remove nil?)
        )
-  )
+  ))
 
 (defn ->yaml [m]
   (yaml/generate-string m :dumper-options {:flow-style :block}))
@@ -3243,17 +3294,19 @@
     {(->keyword k) v}))
 
 (defn parse-uri [s]
-  (let [raw (java.net.URLDecoder/decode s)
-        [path params] (str/split raw #"\?")]
-    [ ;;first part path
-     (remove empty? (str/split path #"/"))
-     ;;second part kv-params
-     (if (nil? params)
-       nil
-       (->> (str/split params #"&")
-            (map url-kv->hashmap)
-            (apply merge)))]
-    ))
+  (if (nil? s)
+    nil
+    (let [raw           (java.net.URLDecoder/decode s)
+          [path params] (str/split raw #"\?")]
+      [ ;;first part path
+       (remove empty? (str/split path #"/"))
+       ;;second part kv-params
+       (if (nil? params)
+         nil
+         (->> (str/split params #"&")
+              (map url-kv->hashmap)
+              (apply merge)))]
+      )))
 
 (defn url-encode [v] (java.net.URLEncoder/encode v))
 (defn url-decode [v] (java.net.URLDecoder/decode v))
@@ -4321,11 +4374,20 @@
         ]
     (java.util.UUID. (.getLong bb) (.getLong bb))))
 
+(defn passwd
+  ([s]
+   (first (str/split  (str (md5-uuid s)) #"-"))
+   )
+  )
 (defn ->uuid [x]
   (if (uuid? x)
     x
     (md5-uuid (->str x))))
 
+;;to uuid str
+(defn ->uuid! [x]
+  (str (->uuid x))
+  )
 
 (defn cur-uuid []
   (->uuid (cur-date-str))
@@ -5068,8 +5130,13 @@
    )
   )
 
-(defn res-ok? [res]
-  (= 0 (:exit res))
+(defn res-ok?
+  ([res]
+   (= 0 (:exit res))
+   )
+  ([res str-indicate-ok]
+   (str/includes? (str res) str-indicate-ok)
+   )
   )
 
 (def res-err? (complement res-ok?))
@@ -5102,6 +5169,21 @@
         )
       )))
 
+(defn str-ok
+  ([x]
+   (if x
+     "✅"
+     "❌"
+     )
+   )
+  ([res str-indicate-ok]
+   (str-ok (res-ok? res str-indicate-ok))
+   )
+  )
+
+(defn ok-str? [x]
+  (= x "✅")
+  )
 
 (defn display-data []
   (run-cmd! "system_profiler SPDisplaysDataType")

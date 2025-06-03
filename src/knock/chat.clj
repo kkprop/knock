@@ -4,7 +4,9 @@
             [knock.tui :as tui :refer :all]
             [clojure.string :as str]
             [babashka.process :as proc]
-            [babashka.fs :as fs]))
+            [babashka.fs :as fs]
+            )
+  )
 
 ;(config :model-dir :default (->abs-path "~/models")) ;(def input-file "/tmp/input-for-models.pid")
 ;
@@ -227,17 +229,16 @@
 
   (send-keys (->uuid "ollama")
              "Enter"
-             )
+             ))
 
 
-  
-
-  ;;
-  )
 
 (comment
+
+
   (def p
-    (proc/shell "ollama" "run" "deepseek-r1:8b"))
+    (proc/exec "ollama" "run" "deepseek-r1:8b")
+    )
 
   (def id (tmux "ollama")
     )
