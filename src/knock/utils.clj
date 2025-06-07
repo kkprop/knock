@@ -1476,11 +1476,8 @@
   (send-keys id "c-c")
   (send-keys id "c-l"))
 
-
-
-
-(defn file-ext [s]
-  (last (str/split s #"\."))
+(defn tmux-read-screen [id]
+  (run-cmd! "tmux capture-pane -p -t"  id)
   )
 
 (defn file-name [s]

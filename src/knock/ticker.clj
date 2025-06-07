@@ -4,7 +4,9 @@
             [knock.tui :as tui]
             [clojure.string :as str]
             [etaoin.api :as e]
-            [clojure.walk :as cljwalk]))
+            [clojure.walk :as cljwalk])
+  (:import [java.util Date TimeZone]
+           [java.text SimpleDateFormat]))
 
 (config
   :ticker-url :config-path "resources/ticker.edn"
@@ -191,6 +193,53 @@
        ))
 
 
+(defn market-open?
+  "Determines if the US stock market is currently open based on local time.
+   Returns a map with :open? boolean and :status description."
+  []
+  (let [now (Date.)
+        eastern-tz (TimeZone/getTimeZone "America/New_York")
+
+        ;; Create formatters for extracting time components
+        day-format (doto (SimpleDateFormat. "u") ; 1=Monday, 7=Sunday
+                     (.setTimeZone eastern-tz))
+        hour-format (doto (SimpleDateFormat. "HH")
+                      (.setTimeZone eastern-tz))
+        minute-format (doto (SimpleDateFormat. "mm")
+                        (.setTimeZone eastern-tz))
+
+        ;; Extract time components
+        day-of-week (Integer/parseInt (.format day-format now))
+        hour (Integer/parseInt (.format hour-format now))
+        minute (Integer/parseInt (.format minute-format now))
+        time-value (+ hour (/ minute 60.0))
+
+        ;; Market is open 9:30 AM - 4:00 PM ET, Monday-Friday
+        weekday? (<= 1 day-of-week 5)  ;; 1=Monday, 5=Friday in this format
+        after-open? (>= time-value 9.5)  ;; 9:30 AM
+        before-close? (< time-value 16.0) ;; 4:00 PM
+
+        market-open? (and weekday? after-open? before-close?)
+
+        status (cond
+                 (not weekday?) "Market closed (weekend)"
+                 (not after-open?) "Market not yet open today"
+                 (not before-close?) "Market closed for the day"
+                 :else "Market is open")
+
+        time-formatter (doto (SimpleDateFormat. "HH:mm:ss")
+                         (.setTimeZone eastern-tz))
+        day-formatter (doto (SimpleDateFormat. "EEEE")
+                        (.setTimeZone eastern-tz))]
+
+    {:open? market-open?
+     :status status
+     :current-time-et (.format time-formatter now)
+     :current-day (.format day-formatter now)}))
+
+
+
+
 (defn pre? []
   (or
    (and
@@ -208,6 +257,9 @@
    (< 3 (cur-hour))
    (< (cur-hour) 8)))
 
+
+(defn open? []
+  (:open? (market-open?)))
 
 (defn go-tg []
   (when (mock! pre?)
@@ -233,27 +285,27 @@
 
 (defn watch []
   (let []
-    (when (nil? (go-tg) )
-      (pause 500)
-      )
+    (when (nil? (go-tg))
+      (pause 500))
     (while true
-      (let [s (locate-cur-tickers)]
-        (println "cur tickers count:" (count s))
-        (go-tg)
+      (when (or (open?) (pre?) (post?))
+        (let [s (locate-cur-tickers)]
+          (println "cur tickers count:" (count s))
+          (go-tg)
         ;;only using idx and price. due to market cap and volumn will be changing on market time
         ;(when (apply not= (map #(select-keys % [:idx :price]) [@cur-page s]))
-        (when (not= @cur-page s)
-          (reset! cur-page s)
-          (save-tg s)
-          (println "saving")
+          (when (not= @cur-page s)
+            (reset! cur-page s)
+            (save-tg s)
+            (println "saving")
                ;;
-          )
-        (println (cur-time-str))
-        (if (or (pre?) (post?))
-          (pause-minutes 1)
-          (pause-minutes 1))
+            )
+          (println (cur-time-str))
+          (if (or (pre?) (post?))
+            (pause-minutes 1)
+            (pause-minutes 1))
         ;;
-        )
+          ))
       (e/refresh (driver)))
     ;;
     ))
