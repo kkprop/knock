@@ -1476,9 +1476,14 @@
   (send-keys id "c-c")
   (send-keys id "c-l"))
 
+(defn file-ext [s]
+  (last (str/split s #"\."))
+  )
+
 (defn tmux-read-screen [id]
   (run-cmd! "tmux capture-pane -p -t"  id)
   )
+
 
 (defn file-name [s]
   (let [xs (str/split (basename s) #"\.")]
@@ -3739,7 +3744,12 @@
 ;;config multiple from the same file
 (defmacro configs [names & {:keys [config-path]
                             :or {config-path (join-path work-dir "resources/config.edn")}}]
-  (let [m (load-edn-mem config-path)]
+  (let [path (if (str/starts-with? config-path "/")
+               config-path
+               (join-path work-dir config-path)
+               )
+        m (load-edn-mem path)
+        ]
     `(do
        ~@(for [x names]
            `(config ~x :config-m ~m)))))

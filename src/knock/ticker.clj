@@ -193,9 +193,8 @@
        ))
 
 
-(defn market-open?
-  "Determines if the US stock market is currently open based on local time.
-   Returns a map with :open? boolean and :status description."
+(defn get-market-time
+  "Gets the current market time components in Eastern Time"
   []
   (let [now (Date.)
         eastern-tz (TimeZone/getTimeZone "America/New_York")
@@ -214,49 +213,99 @@
         minute (Integer/parseInt (.format minute-format now))
         time-value (+ hour (/ minute 60.0))
 
-        ;; Market is open 9:30 AM - 4:00 PM ET, Monday-Friday
-        weekday? (<= 1 day-of-week 5)  ;; 1=Monday, 5=Friday in this format
+        time-formatter (doto (SimpleDateFormat. "HH:mm:ss")
+                         (.setTimeZone eastern-tz))
+        day-formatter (doto (SimpleDateFormat. "EEEE")
+                        (.setTimeZone eastern-tz))]
+
+    {:day-of-week day-of-week
+     :hour hour
+     :minute minute
+     :time-value time-value
+     :weekday? (<= 1 day-of-week 5)
+     :formatted-time (.format time-formatter now)
+     :formatted-day (.format day-formatter now)}))
+
+(defn regular-market-open?
+  "Determines if the US stock market regular session is currently open.
+   Regular hours: 9:30 AM - 4:00 PM ET, Monday-Friday"
+  []
+  (let [market-time (get-market-time)
+        weekday? (:weekday? market-time)
+        time-value (:time-value market-time)
+
         after-open? (>= time-value 9.5)  ;; 9:30 AM
         before-close? (< time-value 16.0) ;; 4:00 PM
 
         market-open? (and weekday? after-open? before-close?)
 
         status (cond
-                 (not weekday?) "Market closed (weekend)"
-                 (not after-open?) "Market not yet open today"
-                 (not before-close?) "Market closed for the day"
-                 :else "Market is open")
-
-        time-formatter (doto (SimpleDateFormat. "HH:mm:ss")
-                         (.setTimeZone eastern-tz))
-        day-formatter (doto (SimpleDateFormat. "EEEE")
-                        (.setTimeZone eastern-tz))]
+                 (not weekday?) "Regular market closed (weekend)"
+                 (not after-open?) "Regular market not yet open today"
+                 (not before-close?) "Regular market closed for the day"
+                 :else "Regular market is open")]
 
     {:open? market-open?
      :status status
-     :current-time-et (.format time-formatter now)
-     :current-day (.format day-formatter now)}))
+     :current-time-et (:formatted-time market-time)
+     :current-day (:formatted-day market-time)}))
 
+(defn pre-market-open?
+  "Determines if the US stock market pre-market session is currently open.
+   Pre-market hours: 4:00 AM - 9:30 AM ET, Monday-Friday"
+  []
+  (let [market-time (get-market-time)
+        weekday? (:weekday? market-time)
+        time-value (:time-value market-time)
+
+        after-open? (>= time-value 4.0)  ;; 4:00 AM
+        before-close? (< time-value 9.5) ;; 9:30 AM
+
+        pre-market-open? (and weekday? after-open? before-close?)
+
+        status (cond
+                 (not weekday?) "Pre-market closed (weekend)"
+                 (not after-open?) "Pre-market not yet open today"
+                 (not before-close?) "Pre-market closed for the day"
+                 :else "Pre-market is open")]
+
+    {:open? pre-market-open?
+     :status status
+     :current-time-et (:formatted-time market-time)
+     :current-day (:formatted-day market-time)}))
+
+(defn post-market-open?
+  "Determines if the US stock market post-market session is currently open.
+   Post-market hours: 4:00 PM - 8:00 PM ET, Monday-Friday"
+  []
+  (let [market-time (get-market-time)
+        weekday? (:weekday? market-time)
+        time-value (:time-value market-time)
+
+        after-open? (>= time-value 16.0)  ;; 4:00 PM
+        before-close? (< time-value 20.0) ;; 8:00 PM
+
+        post-market-open? (and weekday? after-open? before-close?)
+
+        status (cond
+                 (not weekday?) "Post-market closed (weekend)"
+                 (not after-open?) "Post-market not yet open today"
+                 (not before-close?) "Post-market closed for the day"
+                 :else "Post-market is open")]
+
+    {:open? post-market-open?
+     :status status
+     :current-time-et (:formatted-time market-time)
+     :current-day (:formatted-day market-time)}))
 
 
 
 (defn pre? []
-  (or
-   (and
-    (< 15 (cur-hour))
-    (< (cur-hour) 21)
-    (< (cur-week-day) 6))
-   (and (= (cur-hour) 20)
-        (< (cur-min) 30)
-        (< (cur-week-day) 6))
-   )
-  )
+  (:open? (pre-market-open?)))
 
 (defn post? []
-  (and
-   (< 3 (cur-hour))
-   (< (cur-hour) 8)))
-
+  (:open? (post-market-open?))
+  )
 
 (defn open? []
   (:open? (market-open?)))
