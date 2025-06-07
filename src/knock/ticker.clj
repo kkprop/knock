@@ -308,7 +308,7 @@
   )
 
 (defn open? []
-  (:open? (market-open?)))
+  (:open? (regular-market-open?)))
 
 (defn go-tg []
   (when (mock! pre?)
