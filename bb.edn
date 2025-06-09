@@ -32,7 +32,6 @@
              [knock.poker :as poker]
              [knock.hanzi :as hanzi]
              [knock.ticker :as ticker]
-             [knock.c :as c]
              [clojure.string :as str]
              [knock.chat :as chat]
              [knock.wn :as w])
