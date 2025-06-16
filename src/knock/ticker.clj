@@ -514,28 +514,6 @@
            ;;
          )))
 
-    ;(thread!
-    ; (while true
-    ;   (let [iid (atom "")
-    ;         cur-task (atom nil)]
-    ;     (while (not (realized? p))
-    ;       ;; do a new rendering 
-    ;       (when-not (= @iid (->uuid @cache))
-    ;         (println (apply str (repeat 80 "-")))
-    ;         ;;stop previous
-    ;         (when-not (nil? @cur-task)
-    ;           (.interrupt @cur-task))
-    ;         (let [t (tui/render
-    ;                  (str/split-lines (apply pp-hashmap @cache cols-ticker))
-    ;                  (fn [x]
-    ;                    (println "user choose " x)))]
-    ;           (reset! cur-task t)
-    ;           (reset! iid (->uuid @cache))))
-
-    ;       (Thread/sleep 1000)
-
-    ;     ;;
-    ;       ))))
     @p
 ;;
     ))

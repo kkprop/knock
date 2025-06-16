@@ -1922,7 +1922,7 @@
 (defn ls! [path]
   (->> 
     (str/split-lines (ls path))
-    (map #(join-path path %))
+    ;(map #(join-path path %))
     )
   )
 
