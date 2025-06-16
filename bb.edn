@@ -115,6 +115,6 @@
   tips (chat/o)
 
   asciinema-player {:doc "Replay an asciinema cast file in the terminal"
-                   :task (apply shell "bb -m knock.asciinema-player --input" *command-line-args*)}
+                   :task (shell "bb -m knock.asciinema-player --input" (first *command-line-args*))}
 ;;
   }}
