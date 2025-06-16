@@ -275,12 +275,13 @@
       (do
         (go!
           (pause-seconds 30)
-          (mock daily-note-block g s)
+          (mock! daily-note-block g s)
           )
         uid)))))
 
 (defn personal-block [g]
-  ;(def g (personal))
+  ;;(def g (personal))
+  ;;(def s "#Personal")
   (let [x (mock-within 1800 daily-note-block g "#Personal")]
     ;(pull-daily-note g x)
     ;(when-not (empty? (re-seq #"\d\d-\d\d-\d\d\d\d" "21-05-2025")) (mock! daily-note-block g "#Personal"))

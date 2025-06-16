@@ -3721,6 +3721,18 @@
     )
   )
 
+(defn pull-by-page [f limit]
+  (loop [i 1 res []]
+    (let [xs (f limit i)]
+      (println! i)
+      (if (empty? xs)
+        res
+        (recur (+ i 1) (concat res xs))
+        )
+      )
+    )
+  )
+
 
 ;; load from default config file
 ;;  i.e. (config :chrome-profile)

@@ -10,6 +10,8 @@
         - query wordnet
             - bb wordnet reality
             - bb wordnet Lao Zi
+        - convert asciinema to PowerPoint:
+            - bb asciinema2ppt --input recording.cast --output presentation.pptx
     - put alias into .bashrc or .zshrc or ...
         - · 
             - wn='bb --config ~/kkprop/knock/bb.edn wordnet'
@@ -38,6 +40,10 @@
     - pandoc
         - brew install pandoc
         - sudo apt-get install pandoc
+    - For asciinema2ppt:
+        - pip install python-pptx
+        - brew install imagemagick
+        - npm install -g termtosvg
 
 - Lucy
 ======
