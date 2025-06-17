@@ -88,8 +88,11 @@
 (defn run-q-with-context
   "Runs Amazon Q CLI with the selected context file."
   [context-dir file]
-  (let [full-path (str (expand-home context-dir) "/" file)]
+  (let [expanded-dir (expand-home context-dir)
+        ;; Ensure we don't have double slashes in the path
+        full-path (str (fs/path expanded-dir file))]
     (println (format "Starting Amazon Q with context file: %s" file))
+    (println (format "Full path: %s" full-path))
     (println "Type your queries after Amazon Q starts...")
     (println)
     
