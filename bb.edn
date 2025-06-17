@@ -112,6 +112,9 @@
   td (ticker/watch-collect)
 
 
+  asciinema-batch {:doc "Choose and play an asciinema cast file from a directory"
+                   :task (shell "bb -m knock.asciinema-batch" (first *command-line-args*))}
+
   tips (chat/o)
 
   asciinema-player {:doc "Replay an asciinema cast file in the terminal"
