@@ -40,9 +40,47 @@
             39 :right    ; '
             37 :left     ; %
             106 :next    ; j (next frame)
+            113 :quit    ; q (quit)
             nil))))
     (catch Exception e
       nil)))
+
+;; Function for non-blocking sleep that checks for key presses
+(defn non-blocking-sleep [milliseconds]
+  (let [end-time (+ (System/currentTimeMillis) milliseconds)]
+    (loop []
+      (let [current-time (System/currentTimeMillis)
+            key-press (check-key-press)]
+        (cond
+          ;; If j key is pressed, return :next
+          (= key-press :next) 
+          :next
+          
+          ;; If faster key is pressed, return :faster
+          (= key-press :faster)
+          :faster
+          
+          ;; If slower key is pressed, return :slower
+          (= key-press :slower)
+          :slower
+          
+          ;; If quit key is pressed, return :quit
+          (= key-press :quit)
+          :quit
+          
+          ;; If pause key is pressed, return :pause
+          (= key-press :pause)
+          :pause
+          
+          ;; If we've waited long enough, return nil
+          (>= current-time end-time) 
+          nil
+          
+          ;; Otherwise, sleep a small amount and check again
+          :else
+          (do
+            (Thread/sleep 10) ; Sleep for 10ms
+            (recur)))))))
 
 ;; Function to set up raw terminal mode using stty
 (defn setup-raw-mode []
@@ -78,7 +116,7 @@
         filled-bar (apply str (repeat filled-width "="))
         empty-bar (apply str (repeat empty-width " "))
         percentage (int (* 100 progress))
-        shortcuts " [ESC:quit j:next-line SPACE:pause .:faster ,:slower]"
+        shortcuts " [ESC/q:quit j:next-line SPACE:pause .:faster ,:slower]"
         status-line (format " %.2f [%s%s] %3d%% %.1f/%.1f %s%s"
                             (double speed)
                             filled-bar
@@ -122,12 +160,11 @@
 
 ;; Function to play events from start to end index
 (defn play-events-range [events start-idx end-idx speed]
-  ;; Play each event in the range
   (loop [idx start-idx
          last-time (if (> start-idx 0) 
                      (first (nth events (dec start-idx)))
                      0.0)]
-    (when (< idx end-idx)
+    (if (< idx end-idx)
       (let [[time type content] (nth events idx)
             delay-time (/ (- time last-time) speed)]
         
@@ -149,7 +186,8 @@
           (print content))
         (flush)
         
-        (recur (inc idx) time)))))
+        (recur (inc idx) time))
+      nil)))
 
 ;; Main function to play an asciinema recording
 (defn play-recording [file & {:keys [speed]
@@ -160,7 +198,7 @@
   (println "  Left Arrow or ',' - Slow down playback")
   (println "  j - Next frame (after newline)")
   (println "  Space - Pause/Resume")
-  (println "  ESC - Quit")
+  (println "  ESC or q - Quit")
 
   ;; Initialize speed from file cache or use default
   (let [initial-speed (get-current-speed speed)]
@@ -212,88 +250,128 @@
                current-speed initial-speed
                paused? false]
           
-          (let [key-press (check-key-press)
-                new-speed (update-speed current-speed key-press)]
+          (if (>= current-idx (count output-events))
+            ;; End of events
+            nil
             
-            ;; Handle key presses
-            (cond
-              (= key-press :quit)
-              nil ; Exit the loop
+            (let [[time type content] (nth output-events current-idx)
+                  delay-time (/ (- time last-time) current-speed)
+                  progress-pct (/ time total-duration)
+                  new-event-count (inc event-count)]
               
-              (= key-press :pause)
-              (do
-                (draw-progress-bar (/ last-time total-duration) new-speed event-count total-events total-duration last-time (not paused?))
-                (Thread/sleep 500)
-                (recur current-idx last-time event-count new-speed (not paused?)))
+              ;; Update progress bar
+              (draw-progress-bar progress-pct current-speed new-event-count total-events total-duration time paused?)
               
-              (= key-press :next)
-              (let [next-frame-idx (find-next-frame-end output-events current-idx)]
-                (if next-frame-idx
-                  (let [next-idx (inc next-frame-idx)  ; Start from the event after the frame end
-                        next-time (if (< next-idx (count output-events))
-                                    (first (nth output-events next-idx))
-                                    total-duration)]
-                    
-                    ;; First, finish playing the current frame if we're in the middle of it
-                    ;; Use a fast speed (8.0) to finish the current frame immediately
-                    (when (< current-idx next-frame-idx)
-                      (play-events-range output-events current-idx (inc next-frame-idx) 8.0))
-                    
-                    ;; Draw progress bar
-                    (draw-progress-bar (/ next-time total-duration) new-speed next-idx total-events total-duration next-time paused?)
-                    
-                    ;; Play all events up to the next frame end at normal speed
-                    (when (< next-idx (count output-events))
-                      (let [end-idx (or (find-next-frame-end output-events next-idx) (count output-events))]
-                        (play-events-range output-events next-idx end-idx current-speed)))
-                    
-                    ;; Continue from the next frame
-                    (recur (min (count output-events) (inc next-idx)) next-time next-idx new-speed paused?))
-                  (recur current-idx last-time event-count new-speed paused?)))
-              
-              (and (not= current-speed new-speed) (not paused?))
-              (do
-                (draw-progress-bar (/ last-time total-duration) new-speed event-count total-events total-duration last-time paused?)
-                (Thread/sleep 500)
-                (recur current-idx last-time event-count new-speed paused?))
-              
-              paused?
-              (do
-                (Thread/sleep 100) ; Small delay when paused
-                (recur current-idx last-time event-count new-speed paused?))
-              
-              :else
-              (if (< current-idx (count output-events))
-                (let [[time type content] (nth output-events current-idx)
-                      delay-time (/ (- time last-time) new-speed)
-                      progress-pct (/ time total-duration)
-                      new-event-count (inc event-count)]
-                  
-                  ;; Update progress bar
-                  (draw-progress-bar progress-pct new-speed new-event-count total-events total-duration time paused?)
-                  
-                  ;; Wait for the appropriate delay
-                  (when (> delay-time 0)
-                    (Thread/sleep (long (* 1000 delay-time))))
-                  
-                  ;; Print the content
-                  (if (and (= type "o") (string? content))
-                    (let [lines (str/split content #"\r?\n")]
-                      (doseq [[i line] (map-indexed vector lines)]
-                        (when (> i 0)
-                          ;; For lines after the first one, move cursor to beginning of line first
-                          (print "\r\n"))
-                        (print line))
-                      ;; Always print the trailing newline if this is a frame end
-                      (when (frame-end? content)
-                        (print "\r\n")))
-                    ;; never run into
-                    (print content))
-                  (flush)
-                  
-                  ;; Process the next event
-                  (recur (inc current-idx) time new-event-count new-speed paused?))
-                nil))))  ; End of events
+              (if paused?
+                ;; If paused, just check for key presses
+                (let [key-press (check-key-press)]
+                  (Thread/sleep 100) ; Small delay when paused
+                  (case key-press
+                    :quit nil
+                    :pause (recur current-idx last-time event-count current-speed false)
+                    :next (let [next-frame-idx (find-next-frame-end output-events current-idx)]
+                            (if next-frame-idx
+                              (recur (inc next-frame-idx) 
+                                     (if (< (inc next-frame-idx) (count output-events))
+                                       (first (nth output-events (inc next-frame-idx)))
+                                       total-duration)
+                                     (+ event-count (- (inc next-frame-idx) current-idx))
+                                     current-speed
+                                     false)
+                              (recur current-idx last-time event-count current-speed false)))
+                    :faster (recur current-idx last-time event-count (update-speed current-speed :faster) paused?)
+                    :slower (recur current-idx last-time event-count (update-speed current-speed :slower) paused?)
+                    (recur current-idx last-time event-count current-speed paused?)))
+                
+                ;; Not paused, normal playback
+                (let [key-press (check-key-press)]
+                  (case key-press
+                    :quit nil
+                    :pause (recur current-idx last-time event-count current-speed true)
+                    :next (let [next-frame-idx (find-next-frame-end output-events current-idx)]
+                            (if next-frame-idx
+                              (do
+                                ;; First, finish playing the current frame if we're in the middle of it
+                                (when (< current-idx next-frame-idx)
+                                  (play-events-range output-events current-idx (inc next-frame-idx) 8.0))
+                                
+                                ;; Move to the next frame
+                                (let [next-idx (inc next-frame-idx)
+                                      next-time (if (< next-idx (count output-events))
+                                                  (first (nth output-events next-idx))
+                                                  total-duration)]
+                                  
+                                  ;; Draw progress bar
+                                  (draw-progress-bar (/ next-time total-duration) current-speed (+ event-count (- next-idx current-idx)) total-events total-duration next-time paused?)
+                                  
+                                  ;; Continue from the next frame
+                                  (recur next-idx next-time (+ event-count (- next-idx current-idx)) current-speed paused?)))
+                              (recur current-idx last-time event-count current-speed paused?)))
+                    :faster (recur current-idx last-time event-count (update-speed current-speed :faster) paused?)
+                    :slower (recur current-idx last-time event-count (update-speed current-speed :slower) paused?)
+                    nil (do
+                          ;; Wait for the appropriate delay with non-blocking sleep
+                          (if (> delay-time 0)
+                            (let [sleep-result (non-blocking-sleep (long (* 1000 delay-time)))]
+                              (case sleep-result
+                                :next (let [next-frame-idx (find-next-frame-end output-events current-idx)]
+                                        (if next-frame-idx
+                                          (do
+                                            ;; First, finish playing the current frame if we're in the middle of it
+                                            (when (< current-idx next-frame-idx)
+                                              (play-events-range output-events current-idx (inc next-frame-idx) 8.0))
+                                            
+                                            ;; Move to the next frame
+                                            (let [next-idx (inc next-frame-idx)
+                                                  next-time (if (< next-idx (count output-events))
+                                                              (first (nth output-events next-idx))
+                                                              total-duration)]
+                                              
+                                              ;; Draw progress bar
+                                              (draw-progress-bar (/ next-time total-duration) current-speed (+ event-count (- next-idx current-idx)) total-events total-duration next-time paused?)
+                                              
+                                              ;; Continue from the next frame
+                                              (recur next-idx next-time (+ event-count (- next-idx current-idx)) current-speed paused?)))
+                                          (recur (inc current-idx) time new-event-count current-speed paused?)))
+                                :faster (recur current-idx last-time event-count (update-speed current-speed :faster) paused?)
+                                :slower (recur current-idx last-time event-count (update-speed current-speed :slower) paused?)
+                                :pause (recur current-idx last-time event-count current-speed true)
+                                :quit nil
+                                nil (do
+                                      ;; Print the content
+                                      (if (and (= type "o") (string? content))
+                                        (let [lines (str/split content #"\r?\n")]
+                                          (doseq [[i line] (map-indexed vector lines)]
+                                            (when (> i 0)
+                                              ;; For lines after the first one, move cursor to beginning of line first
+                                              (print "\r\n"))
+                                            (print line))
+                                          ;; Always print the trailing newline if this is a frame end
+                                          (when (frame-end? content)
+                                            (print "\r\n")))
+                                        (print content))
+                                      (flush)
+                                      
+                                      ;; Process the next event
+                                      (recur (inc current-idx) time new-event-count current-speed paused?))))
+                            ;; No delay needed, just print the content
+                            (do
+                              ;; Print the content
+                              (if (and (= type "o") (string? content))
+                                (let [lines (str/split content #"\r?\n")]
+                                  (doseq [[i line] (map-indexed vector lines)]
+                                    (when (> i 0)
+                                      ;; For lines after the first one, move cursor to beginning of line first
+                                      (print "\r\n"))
+                                    (print line))
+                                  ;; Always print the trailing newline if this is a frame end
+                                  (when (frame-end? content)
+                                    (print "\r\n")))
+                                (print content))
+                              (flush)
+                              
+                              ;; Process the next event
+                              (recur (inc current-idx) time new-event-count current-speed paused?))))))))))
         
         (finally
           ;; Restore terminal settings
