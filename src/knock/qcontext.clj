@@ -73,7 +73,7 @@
       (do
         (println "Use gum filter to select a file (type to filter, arrow keys to navigate, Enter to select):")
         (try
-          (let [result (p/shell {:out :string :in (str/join "\n" (conj files "[Exit]"))} "gum" "filter")
+          (let [result (p/shell {:out :string :in (str/join "\n" (concat files ["[Exit]"]))} "gum" "filter")
                 selected (str/trim (:out result))]
             (when-not (= selected "[Exit]")
               selected))

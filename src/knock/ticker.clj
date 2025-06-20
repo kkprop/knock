@@ -407,7 +407,7 @@
 (defn cur-frames
   []
   (let [dir (join-path "ticker" (cur-date-str))]
-    (->> (take-last 2 (sort (ls! dir)))
+    (->> (take-last 2 (sort (ls-abs dir)))
          (map frame)
          )
     ;;

@@ -1926,6 +1926,14 @@
     )
   )
 
+(defn ls-abs [path]
+  (->>
+   (str/split-lines (ls path))
+    (map #(join-path path %))
+   ))
+
+
+
 
 (defn unzip [path-]
   (let [dir (dirname path-)
