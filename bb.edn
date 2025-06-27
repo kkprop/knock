@@ -122,5 +122,20 @@
 
   q-context {:doc "Select a context file and launch Amazon Q with it"
              :task (shell "bb -m knock.qcontext" (first *command-line-args*))}
+
+  qreplay {:doc "Select and play a .cast file from ~/rec/ directory"
+           :task (shell "bb -m knock.qreplay")}
+
+  qbrowser {:doc "Start MCP server for browser automation (background service)"
+            :task (shell "bb -m knock.qbrowser")}
+
+  qbrowser-start {:doc "Start QBrowser MCP server in background"
+                  :task (shell "./scripts/start-qbrowser-server.sh")}
+
+  qbrowser-stop {:doc "Stop QBrowser MCP server"
+                 :task (shell "./scripts/stop-qbrowser-server.sh")}
+
+  qbrowser-test {:doc "Test QBrowser MCP server with sample requests"
+                 :task (shell "./scripts/test-qbrowser-client.sh")}
 ;;
   }}

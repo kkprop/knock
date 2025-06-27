@@ -47,7 +47,8 @@
 
 ;; Function for non-blocking sleep that checks for key presses
 (defn non-blocking-sleep [milliseconds]
-  (let [end-time (+ (System/currentTimeMillis) milliseconds)]
+  (let [end-time (+ (System/currentTimeMillis) milliseconds)
+        check-interval 5] ; Check every 5ms for better responsiveness
     (loop []
       (let [current-time (System/currentTimeMillis)
             key-press (check-key-press)]
@@ -79,7 +80,7 @@
           ;; Otherwise, sleep a small amount and check again
           :else
           (do
-            (Thread/sleep 10) ; Sleep for 10ms
+            (Thread/sleep check-interval)
             (recur)))))))
 
 ;; Function to set up raw terminal mode using stty
@@ -108,22 +109,45 @@
     (catch Exception e
       (println "Note: Could not restore terminal settings -" (.getMessage e)))))
 
+;; Function to get file creation time in milliseconds
+(defn get-file-creation-time [file-path]
+  (try
+    (let [file (io/file file-path)
+          attrs (java.nio.file.Files/readAttributes 
+                 (.toPath file)
+                 java.nio.file.attribute.BasicFileAttributes
+                 (make-array java.nio.file.LinkOption 0))]
+      (long (.toMillis (.creationTime attrs))))
+    (catch Exception e
+      ;; Fallback to last modified time if creation time is not available
+      (long (.lastModified (io/file file-path))))))
+
+;; Function to format time as yyyy-MM-dd HH:MM:SS
+(defn format-time [timestamp]
+  (let [date (java.util.Date. (long timestamp))
+        formatter (java.text.SimpleDateFormat. "yyyy-MM-dd HH:mm:ss")]
+    (.format formatter date)))
+
 ;; Function to draw the progress bar at the top of the screen
-(defn draw-progress-bar [progress speed event-count total-events total-duration current-time paused?]
-  (let [bar-width 40  ; Reduced width to make room for shortcuts
+(defn draw-progress-bar [progress speed event-count total-events total-duration current-time paused? file-creation-time]
+  (let [bar-width 25  ; Further reduced width to make room for ISO date format
         filled-width (int (* bar-width progress))
         empty-width (- bar-width filled-width)
         filled-bar (apply str (repeat filled-width "="))
         empty-bar (apply str (repeat empty-width " "))
         percentage (int (* 100 progress))
+        ;; Calculate current real time: file creation time + playback offset
+        current-real-time (+ file-creation-time (* current-time 1000))
+        time-display (format-time current-real-time)
         shortcuts " [ESC/q:quit j:next-line SPACE:pause .:faster ,:slower]"
-        status-line (format " %.2f [%s%s] %3d%% %.1f/%.1f %s%s"
+        status-line (format " %.2f [%s%s] %3d%% %.1f/%.1f | %s %s%s"
                             (double speed)
                             filled-bar
                             empty-bar
                             percentage
                             (double current-time)
                             (double total-duration)
+                            time-display
                             (if paused? "(paused)" "")
                             shortcuts)]
     ;; Save current cursor position
@@ -137,6 +161,54 @@
     ;; Restore cursor position
     (print "\u001b[u")
     (flush)))
+
+;; Function for non-blocking sleep that checks for key presses and updates progress
+(defn non-blocking-sleep-with-progress [milliseconds current-time total-duration speed event-count total-events file-creation-time]
+  (let [end-time (+ (System/currentTimeMillis) milliseconds)
+        check-interval 50 ; Check every 50ms and update progress
+        start-real-time (System/currentTimeMillis)]
+    (loop [last-progress-update 0]
+      (let [current-real-time (System/currentTimeMillis)
+            elapsed-real-time (- current-real-time start-real-time)
+            simulated-time (+ current-time (/ elapsed-real-time 1000.0))
+            key-press (check-key-press)]
+        (cond
+          ;; If j key is pressed, return :next
+          (= key-press :next) 
+          :next
+          
+          ;; If faster key is pressed, return :faster
+          (= key-press :faster)
+          :faster
+          
+          ;; If slower key is pressed, return :slower
+          (= key-press :slower)
+          :slower
+          
+          ;; If quit key is pressed, return :quit
+          (= key-press :quit)
+          :quit
+          
+          ;; If pause key is pressed, return :pause
+          (= key-press :pause)
+          :pause
+          
+          ;; If we've waited long enough, return nil
+          (>= current-real-time end-time) 
+          nil
+          
+          ;; Otherwise, update progress if enough time has passed and continue
+          :else
+          (do
+            ;; Update progress bar every 200ms during long pauses
+            (when (> (- current-real-time last-progress-update) 200)
+              (let [progress-pct (/ simulated-time total-duration)]
+                (draw-progress-bar progress-pct speed event-count total-events total-duration simulated-time false file-creation-time)))
+            
+            (Thread/sleep check-interval)
+            (recur (if (> (- current-real-time last-progress-update) 200)
+                     current-real-time
+                     last-progress-update))))))))
 
 ;; Base64 decode function
 (defn base64-decode [s]
@@ -168,9 +240,12 @@
       (let [[time type content] (nth events idx)
             delay-time (/ (- time last-time) speed)]
         
-        ;; Wait for the appropriate delay
+        ;; Wait for the appropriate delay with non-blocking sleep
         (when (> delay-time 0)
-          (Thread/sleep (long (* 1000 delay-time))))
+          (let [sleep-result (non-blocking-sleep (long (* 1000 delay-time)))]
+            ;; If user wants to quit during fast playback, respect it
+            (when (= sleep-result :quit)
+              (throw (ex-info "User quit" {:type :user-quit})))))
         
         ;; Print the content
         (if (and (= type "o") (string? content))
@@ -226,10 +301,13 @@
           total-events (count output-events)
           total-duration (if (empty? output-events)
                            0.0
-                           (first (first (reverse output-events))))]
+                           (first (first (reverse output-events))))
+          ;; Get file creation time for real-time display
+          file-creation-time (get-file-creation-time file)]
 
       (println "Total duration:" (format "%.2f" total-duration) "seconds")
       (println "Total events:" total-events)
+      (println "File created at:" (format-time file-creation-time))
       (println "Starting replay in 1 seconds...")
       (Thread/sleep 1000)
 
@@ -238,7 +316,7 @@
       (flush)
       
       ;; Draw initial progress bar
-      (draw-progress-bar 0.0 initial-speed 0 total-events total-duration 0.0 false)
+      (draw-progress-bar 0.0 initial-speed 0 total-events total-duration 0.0 false file-creation-time)
       
       ;; Set terminal to raw mode for key capture
       (setup-raw-mode)
@@ -260,28 +338,39 @@
                   new-event-count (inc event-count)]
               
               ;; Update progress bar
-              (draw-progress-bar progress-pct current-speed new-event-count total-events total-duration time paused?)
+              (draw-progress-bar progress-pct current-speed new-event-count total-events total-duration time paused? file-creation-time)
               
               (if paused?
-                ;; If paused, just check for key presses
-                (let [key-press (check-key-press)]
-                  (Thread/sleep 100) ; Small delay when paused
-                  (case key-press
-                    :quit nil
-                    :pause (recur current-idx last-time event-count current-speed false)
-                    :next (let [next-frame-idx (find-next-frame-end output-events current-idx)]
-                            (if next-frame-idx
-                              (recur (inc next-frame-idx) 
-                                     (if (< (inc next-frame-idx) (count output-events))
-                                       (first (nth output-events (inc next-frame-idx)))
-                                       total-duration)
-                                     (+ event-count (- (inc next-frame-idx) current-idx))
-                                     current-speed
-                                     false)
-                              (recur current-idx last-time event-count current-speed false)))
-                    :faster (recur current-idx last-time event-count (update-speed current-speed :faster) paused?)
-                    :slower (recur current-idx last-time event-count (update-speed current-speed :slower) paused?)
-                    (recur current-idx last-time event-count current-speed paused?)))
+                ;; If paused, wait for key presses with proper delay and update display
+                (do
+                  ;; Update progress bar to show paused state
+                  (draw-progress-bar progress-pct current-speed new-event-count total-events total-duration time true file-creation-time)
+                  
+                  ;; Wait with blocking sleep to prevent CPU spinning
+                  (Thread/sleep 100)
+                  
+                  ;; Check for key press
+                  (let [key-press (check-key-press)]
+                    (case key-press
+                      :quit nil
+                      :pause (do
+                               ;; Update display to show unpaused state
+                               (draw-progress-bar progress-pct current-speed new-event-count total-events total-duration time false file-creation-time)
+                               (recur current-idx last-time event-count current-speed false))
+                      :next (let [next-frame-idx (find-next-frame-end output-events current-idx)]
+                              (if next-frame-idx
+                                (recur (inc next-frame-idx) 
+                                       (if (< (inc next-frame-idx) (count output-events))
+                                         (first (nth output-events (inc next-frame-idx)))
+                                         total-duration)
+                                       (+ event-count (- (inc next-frame-idx) current-idx))
+                                       current-speed
+                                       false)
+                                (recur current-idx last-time event-count current-speed false)))
+                      :faster (recur current-idx last-time event-count (update-speed current-speed :faster) paused?)
+                      :slower (recur current-idx last-time event-count (update-speed current-speed :slower) paused?)
+                      ;; No key pressed, continue in paused state
+                      (recur current-idx last-time event-count current-speed paused?))))
                 
                 ;; Not paused, normal playback
                 (let [key-press (check-key-press)]
@@ -293,7 +382,11 @@
                               (do
                                 ;; First, finish playing the current frame if we're in the middle of it
                                 (when (< current-idx next-frame-idx)
-                                  (play-events-range output-events current-idx (inc next-frame-idx) 8.0))
+                                  (try
+                                    (play-events-range output-events current-idx (inc next-frame-idx) 8.0)
+                                    (catch Exception e
+                                      (when (= (:type (ex-data e)) :user-quit)
+                                        (throw e)))))
                                 
                                 ;; Move to the next frame
                                 (let [next-idx (inc next-frame-idx)
@@ -302,7 +395,7 @@
                                                   total-duration)]
                                   
                                   ;; Draw progress bar
-                                  (draw-progress-bar (/ next-time total-duration) current-speed (+ event-count (- next-idx current-idx)) total-events total-duration next-time paused?)
+                                  (draw-progress-bar (/ next-time total-duration) current-speed (+ event-count (- next-idx current-idx)) total-events total-duration next-time paused? file-creation-time)
                                   
                                   ;; Continue from the next frame
                                   (recur next-idx next-time (+ event-count (- next-idx current-idx)) current-speed paused?)))
@@ -312,14 +405,22 @@
                     nil (do
                           ;; Wait for the appropriate delay with non-blocking sleep
                           (if (> delay-time 0)
-                            (let [sleep-result (non-blocking-sleep (long (* 1000 delay-time)))]
+                            (let [sleep-result (if (> delay-time 1.0)
+                                                 ;; For long delays (>1s), use progress-aware sleep
+                                                 (non-blocking-sleep-with-progress (long (* 1000 delay-time)) time total-duration current-speed new-event-count total-events file-creation-time)
+                                                 ;; For short delays, use regular non-blocking sleep
+                                                 (non-blocking-sleep (long (* 1000 delay-time))))]
                               (case sleep-result
                                 :next (let [next-frame-idx (find-next-frame-end output-events current-idx)]
                                         (if next-frame-idx
                                           (do
                                             ;; First, finish playing the current frame if we're in the middle of it
                                             (when (< current-idx next-frame-idx)
-                                              (play-events-range output-events current-idx (inc next-frame-idx) 8.0))
+                                              (try
+                                                (play-events-range output-events current-idx (inc next-frame-idx) 8.0)
+                                                (catch Exception e
+                                                  (when (= (:type (ex-data e)) :user-quit)
+                                                    (throw e)))))
                                             
                                             ;; Move to the next frame
                                             (let [next-idx (inc next-frame-idx)
@@ -328,7 +429,7 @@
                                                               total-duration)]
                                               
                                               ;; Draw progress bar
-                                              (draw-progress-bar (/ next-time total-duration) current-speed (+ event-count (- next-idx current-idx)) total-events total-duration next-time paused?)
+                                              (draw-progress-bar (/ next-time total-duration) current-speed (+ event-count (- next-idx current-idx)) total-events total-duration next-time paused? file-creation-time)
                                               
                                               ;; Continue from the next frame
                                               (recur next-idx next-time (+ event-count (- next-idx current-idx)) current-speed paused?)))
@@ -372,6 +473,11 @@
                               
                               ;; Process the next event
                               (recur (inc current-idx) time new-event-count current-speed paused?))))))))))
+        
+        (catch Exception e
+          ;; Handle user quit gracefully
+          (when (not= (:type (ex-data e)) :user-quit)
+            (println "\nError during playback:" (.getMessage e))))
         
         (finally
           ;; Restore terminal settings

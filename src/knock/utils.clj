@@ -2003,7 +2003,9 @@
   )
 
 (defn ->int[s]
-  (re-seq #"\d+" s)
+  (if (nil? s)
+    nil
+    (re-seq #"\d+" s))
   )
 
 (defn ->int! [s]
@@ -2117,6 +2119,9 @@
 (defn str-to-datetime [s]
   (str-to-date-by-fmt s "yyyy-MM-dd"))
 
+
+(def fmt-date-str (java.text.SimpleDateFormat. "yyyy-MM-dd"))
+
 ;;to timestamp in seconds
 (defn date-to-ts [date-str]
   (/ (inst-ms (str-to-date date-str)) 1000))
@@ -2165,7 +2170,6 @@
       ;;set reverse zone get correct value
      (. java.time.ZoneId of (str "Etc/GMT" gmt)))))
 
-(def fmt-date-str (java.text.SimpleDateFormat. "yyyy-MM-dd"))
 
 (defn ->date-format [s]
   (java.text.SimpleDateFormat. s)
@@ -2209,6 +2213,42 @@
 (defn cur-ts []
   (quot (cur-ts-13) 1000))
 
+
+(defn date-range [date-str n]
+  "Generate a date range from a given date string.
+   date-str: starting date in format 'yyyy-MM-dd'
+   n: number of days (positive for future, negative for past)
+   Returns a vector of date strings including the start date"
+  (let [start-date (str-to-date date-str)]
+    (if (>= n 0)
+      ;; Forward range (positive n)
+      (->> (range (+ n 1))
+           (map #(+days start-date %))
+           (map #(.format fmt-date-str %))
+           vec)
+      ;; Backward range (negative n)
+      (->> (range (Math/abs n) -1 -1)
+           (map #(-days start-date %))
+           (map #(.format fmt-date-str %))
+           vec))))
+(defn date-range+- [date-str n]
+  "Generate a date range both forward and backward from a given date string.
+   date-str: center date in format 'yyyy-MM-dd'
+   n: number of days in each direction (positive integer)
+   Returns a vector of distinct date strings sorted chronologically
+   
+   Examples:
+   (date-range+- \"2025-06-17\" 1) => [\"2025-06-16\" \"2025-06-17\" \"2025-06-18\"]
+   (date-range+- \"2025-06-17\" 2) => [\"2025-06-15\" \"2025-06-16\" \"2025-06-17\" \"2025-06-18\" \"2025-06-19\"]
+   (date-range+- \"2025-06-17\" 0) => [\"2025-06-17\"]"
+  (let [forward-dates (date-range date-str n)
+        backward-dates (date-range date-str (- n))
+        all-dates (concat backward-dates forward-dates)]
+    (->> all-dates
+         distinct
+         sort
+         vec)))
+
 (comment
   (ts
     (->inst "*  expire date: Jul 24 23:30:12 2023 GMT")
@@ -2221,6 +2261,13 @@
   ([n]
    (.format fmt-date-str
             (from-timestamp (+ (cur-ts) (* n 86400))))))
+
+(defn date-str [t]
+  (if (string? t)
+    (.format fmt-date-str (->inst t))
+    (.format fmt-date-str t)
+    )
+  )
 
 (defn days [from to]
   (if (nil? to)
@@ -5088,6 +5135,21 @@
     #(println ":" %)
     (key-chan))
   )
+
+
+
+(defn find-prefix-pairs
+  "Find all pairs of strings where one is a prefix of another.
+   Returns a vector of maps with :base and :extended keys."
+  [strings]
+  (let [sorted-strings (sort strings)]
+    (->> (for [base     sorted-strings
+               extended sorted-strings
+               :when    (and (not= base extended)
+                          (str/starts-with? extended base))]
+           {:base base :extended extended})
+         (into []))))
+
 
 
 (defn hhmmss [s]
