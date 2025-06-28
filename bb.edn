@@ -112,13 +112,10 @@
   td (ticker/watch-collect)
 
 
-  asciinema-batch {:doc "Choose and play an asciinema cast file from a directory"
-                   :task (shell "bb -m knock.asciinema-batch" (first *command-line-args*))}
-
   tips (chat/o)
 
   asciinema-player {:doc "Replay an asciinema cast file in the terminal"
-                   :task (shell "bb -m knock.asciinema-player --input" (first *command-line-args*))}
+                   :task (shell (str "bb -m knock.asciinema-player " (clojure.string/join " " *command-line-args*)))}
 
   q-context {:doc "Select a context file and launch Amazon Q with it"
              :task (shell "bb -m knock.qcontext" (first *command-line-args*))}
@@ -137,5 +134,8 @@
 
   qbrowser-test {:doc "Test QBrowser MCP server with sample requests"
                  :task (shell "./scripts/test-qbrowser-client.sh")}
+
+  q-tmux {:doc "Select tmux session with gum, start asciinema recording, and attach"
+          :task (shell "bb -m knock.qtmux")}
 ;;
   }}
