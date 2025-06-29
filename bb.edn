@@ -104,6 +104,8 @@
 
   watch (ticker/watch)
   live (ticker/live)
+  ticker-replay {:doc "Replay ticker data with speed calculation and interactive controls"
+                :task (shell "bb -m knock.ticker-replay-main" (first *command-line-args*))}
 
   mock-laundry (println "cleaned:" (count (u/mock-laundry)))
 

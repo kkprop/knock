@@ -194,6 +194,11 @@
     )
   )
 
+(defn clear-screen []
+  "Clear the terminal screen"
+  (print "\033[H\033[2J")
+  (flush))
+
 (trap-exit (fn []
              (let []
              ;(println (.spit :exiting true))
