@@ -137,5 +137,8 @@
 
   q-tmux {:doc "Select tmux session with gum, start asciinema recording, and attach"
           :task (shell "bb -m knock.qtmux")}
+
+  lan-ip {:doc "Get the LAN IP address of the current machine"
+          :task (println (u/lan-ip))}
 ;;
   }}

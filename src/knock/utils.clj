@@ -5284,5 +5284,20 @@
     )
   )
 
+(defn lan-ip []
+  "Get the LAN IP address of the current machine"
+  (try
+    (if (osx?)
+      ;; macOS method
+      (str/trim (:out (run-cmd "ifconfig | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}'")))
+      ;; Linux method  
+      (str/trim (:out (run-cmd "hostname -I | awk '{print $1}'"))))
+    (catch Exception e
+      ;; Fallback method using ip command
+      (try
+        (str/trim (:out (run-cmd "ip route get 1 | awk '{print $7; exit}'")))
+        (catch Exception e2
+          nil)))))
+
 
 
