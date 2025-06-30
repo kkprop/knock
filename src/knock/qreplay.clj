@@ -38,7 +38,10 @@
 (defn run-asciinema-player [cast-file]
   "Run bb asciinema-player on the selected cast file"
   (let [full-path (str (System/getProperty "user.home") "/rec/" cast-file)]
-    (p/shell ["bb" "-m" "knock.asciinema-player" "--input" full-path])))
+    (p/shell ["bb" "-m" "knock.asciinema-player" "--input" full-path])
+    ;; Wait for user confirmation before returning to menu
+    (println "\nPress Enter to return to main menu...")
+    (read-line)))
 
 (defn main-loop []
   "Main loop for selecting and playing cast files"
