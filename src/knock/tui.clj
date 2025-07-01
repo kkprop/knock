@@ -20,6 +20,10 @@
   (b-res (b/gum :filter :in (clojure.java.io/input-stream f))))
 
 
+(defn filter-xs [xs]
+  (b-res (b/gum :filter :in (join-line xs)) )
+  )
+
 ;; !! side effect the content choose will be copy to clipboard 
 (defn search [xs to-choose & to-search]
   (let [m (if (nil? to-search)
