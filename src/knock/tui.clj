@@ -266,50 +266,50 @@
 ;;[0 100]
 (defn set-bar-progress [n]
   ;(def n 23)
-  (.spit :tui/bar/progress n)
+  (.spit :tui-bar-progress n)
   )
 
 (defn set-bar-total [n]
-  (.spit :tui/bar/total n)
+  (.spit :tui-bar-total n)
   )
 
 (defn tick-bar-progress []
-  (let [cur (force-int (.slurp :tui/bar/progress))]
+  (let [cur (force-int (.slurp :tui-bar-progress))]
     (if (nil? cur) 
-      (.spit :tui/bar/progress 0)
-      (.spit :tui/bar/progress (+ 1 cur)  )
+      (.spit :tui-bar-progress 0)
+      (.spit :tui-bar-progress (+ 1 cur)  )
       )
     )
   )
 
 
 (defn init-bar []
-  (let [k :bar/refresh?]
+  (let [k :bar-refresh]
      (set-bar-progress 0)
      (set-bar-total 100)
-     (.watch :tui/bar/progress (fn [] (.spit :bar/refresh? true)))
+     (.watch :tui-bar-progress (fn [] (.spit :bar-refresh true)))
      )
   )
 
 (defn .bar []
-  (let [p (.spin :tui/bar)
+  (let [p (.spin :tui-bar)
         _ (init-bar)
         ]
     (go! 
       (while (not (realized? p))
-        (when (.slurp :bar/refresh? )
-          (let [bar (-> (pr/progress-bar (.slurp :tui/bar/total))
-                        (assoc-in [:progress] (.slurp :tui/bar/progress) )
+        (when (.slurp :bar-refresh )
+          (let [bar (-> (pr/progress-bar (.slurp :tui-bar-total))
+                        (assoc-in [:progress] (.slurp :tui-bar-progress) )
                         )]
             (if (= (:progress bar) (:total bar))
-              (do (.spit :tui/bar (str "✅" (pr/render (pr/done bar))))
+              (do (.spit :tui-bar (str "✅" (pr/render (pr/done bar))))
                   (pause-seconds 1)
                   (deliver p :done)
                   (clean-screen)
                   )
-              (.spit :tui/bar (pr/render bar))
+              (.spit :tui-bar (pr/render bar))
               ))
-          (.spit :bar/refresh? false)
+          (.spit :bar-refresh false)
           )
         (pause-seconds 1)
         ))
@@ -342,7 +342,7 @@
   (def k :choose)
   @..kk
   @..cache
-  (.spit :tui/bar/progress 23)
+  (.spit :tui-bar-progress 23)
   (.spit :choose [:a :b ])
   (.spit :choose [:a :b (cur-time-str) ])
 
