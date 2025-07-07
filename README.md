@@ -40,10 +40,6 @@
     - pandoc
         - brew install pandoc
         - sudo apt-get install pandoc
-    - For asciinema2ppt:
-        - pip install python-pptx
-        - brew install imagemagick
-        - npm install -g termtosvg
 
 - Lucy
 ======

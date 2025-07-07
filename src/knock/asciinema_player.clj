@@ -80,7 +80,7 @@
           ;; Otherwise, sleep a small amount and check again
           :else
           (do
-            (Thread/sleep check-interval)
+            (Thread/sleep (long check-interval))
             (recur)))))))
 
 ;; Function to set up raw terminal mode using stty
@@ -205,7 +205,7 @@
               (let [progress-pct (/ simulated-time total-duration)]
                 (draw-progress-bar progress-pct speed event-count total-events total-duration simulated-time false file-creation-time)))
             
-            (Thread/sleep check-interval)
+            (Thread/sleep (long check-interval))
             (recur (if (> (- current-real-time last-progress-update) 200)
                      current-real-time
                      last-progress-update))))))))
@@ -309,7 +309,7 @@
       (println "Total events:" total-events)
       (println "File created at:" (format-time file-creation-time))
       (println "Starting replay in 1 seconds...")
-      (Thread/sleep 1000)
+      (Thread/sleep (long 1000))
 
       ;; Clear screen and set up for display
       (print "\u001b[2J\u001b[H")
@@ -347,7 +347,7 @@
                   (draw-progress-bar progress-pct current-speed new-event-count total-events total-duration time true file-creation-time)
                   
                   ;; Wait with blocking sleep to prevent CPU spinning
-                  (Thread/sleep 100)
+                  (Thread/sleep (long 100))
                   
                   ;; Check for key press
                   (let [key-press (check-key-press)]

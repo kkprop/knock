@@ -311,9 +311,10 @@
                (not (str/includes? s "-----BEGIN RSA PRIVATE KEY-----"))
                (not (in? prev s))
                (not (digit? s))
-               (not (in? ["Roam Research"] (front-most-app))
+               (not (in? ["Roam Research"] (front-most-app)))
+               (not (< 1000 (count s)))
                ;;
-                    ))
+               )
       (println (front-most-app))
       (.cons-cap 101 :roam/prev s)
       ;(def s "148-153-61-217")

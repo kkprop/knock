@@ -295,7 +295,7 @@
             ;; Otherwise, sleep a small amount and check again
             :else
             (do
-              (Thread/sleep check-interval)
+              (Thread/sleep (long check-interval))
               (recur))))))
     (catch Exception e
       (add-debug-log (str "Sleep error: " (.getMessage e)))
@@ -352,7 +352,7 @@
       
       (println "Starting replay in 3 seconds...")
       (println "Controls: [SPACE]=pause/play, [j]=next frame, [k]=previous frame, [.]=speed up, [,]=speed down, [q]=quit")
-      (Thread/sleep 300)
+      (Thread/sleep (long 300))
       
       ;; Set up raw terminal mode
       (setup-raw-terminal)

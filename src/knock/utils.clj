@@ -349,7 +349,7 @@
 
 (defn pause
   ([ms]
-   (Thread/sleep ms))
+   (Thread/sleep (long ms)))
   ;;default pause 300 ms
   ([]
    (pause 300)
@@ -771,7 +771,7 @@
   (->> (range n)
        (map (fn [x]
               (println x)
-              (Thread/sleep 1000)))
+              (Thread/sleep (long 1000))))
        count))
 
 
@@ -913,9 +913,9 @@
   (partition-all 3 (range 10))
 
   ;;3 worker. each print wi
-  (pipeline!! 6 #(do (Thread/sleep 100)
+  (pipeline!! 6 #(do (Thread/sleep (long 100))
                      (println %)
-                     (Thread/sleep 100)
+                     (Thread/sleep (long 100))
                      ) (range 3))
 
   )
@@ -940,11 +940,11 @@
   ([k v]
    (.spit ..cache k v)
    )
-  ([..c  k v]
-   (let [pv (get @..c k)]
+  ([c  k v]
+   (let [pv (get @c k)]
      (when-not (= v pv)
        (pub-change k)
-       (swap! ..c assoc k v)
+       (swap! c assoc k v)
        )
      )))
 
@@ -952,8 +952,8 @@
   ([k]
    (.slurp ..cache k)
    )
-  ([..c k]
-   (get @..c k))
+  ([c k]
+   (get @c k))
   )
 
 (defn .delete [k]
@@ -1124,7 +1124,7 @@
   (thread!
    (while (.isAlive proc)
      (println "cur:" (:out (run-cmd "tail -n 1 " log)))
-     (Thread/sleep 1000)
+     (Thread/sleep (long 1000))
      (deliver res m)
      )
    ))
@@ -1145,7 +1145,7 @@
     (thread!
      (while (some-alive? xs)
        (println (str/join "" (repeat 42 "-")))
-       (Thread/sleep 1000)
+       (Thread/sleep (long 1000))
        (pp-hashmap! (->> xs (map #(assoc % :cur-log (cur-line (:log %))))) :log :cur-log))
      ;;completed
      (doseq [x xs] (deliver (:res x) x)))
@@ -1170,7 +1170,7 @@
 
   (def p (promise))
 
-  (thread! (Thread/sleep 3)
+  (thread! (Thread/sleep (long 3))
            (deliver p nil)
            )
 
@@ -1932,9 +1932,6 @@
     (map #(join-path path %))
    ))
 
-
-
-
 (defn unzip [path-]
   (let [dir (dirname path-)
         f (basename path-)
@@ -2371,7 +2368,7 @@
                            )
                      m))
 
-(++ days-left expire-date)
+;(++ days-left expire-date)
 
 (def j json/generate-string)
 (def e clojure.edn/read-string)
@@ -4214,7 +4211,7 @@
 
 (defn slow-repeater [x n]
   (let []
-    (Thread/sleep (* 1000 n))
+    (Thread/sleep (long (* 1000 n)))
     (take n (repeat x))
     ))
 

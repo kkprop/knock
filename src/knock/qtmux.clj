@@ -56,11 +56,32 @@
     (println (str "Starting asciinema recording: " (.getAbsolutePath cast-file)))
     (.getAbsolutePath cast-file)))
 
+(defn set-shell-title [title]
+  "Set the shell window title, removing any environment suffixes"
+  (try
+    ;; Clean the title by removing any environment indicators
+    (let [clean-title (-> title
+                          str/trim
+                          ;; Remove any parenthetical content
+                          (str/replace #"\s*\([^)]*\)" "")
+                          str/trim)]
+      
+      ;; Set the clean title using ANSI escape sequences
+      (print (str "\033]0;" clean-title "\007"))
+      (flush)
+      
+      (println (str "Set terminal title to: '" clean-title "'")))
+    (catch Exception e
+      (println "Warning: Could not set shell title:" (.getMessage e)))))
+
 (defn attach-to-session-with-recording [session-name cast-file]
   "Attach to tmux session with asciinema recording"
   (try
     (println (str "Attaching to tmux session: " session-name))
     (println (str "Recording to: " cast-file))
+    
+    ;; Set shell title to session name
+    (set-shell-title session-name)
     
     ;; Use asciinema rec to record the tmux attach command
     (p/shell "asciinema" "rec" cast-file "-c" (str "tmux attach-session -t " session-name))

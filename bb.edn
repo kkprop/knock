@@ -125,6 +125,9 @@
   qreplay {:doc "Select and play a .cast file from ~/rec/ directory"
            :task (shell "bb -m knock.qreplay")}
 
+  qdiff {:doc "Compare and sync .clj files between two directories"
+         :task (shell "bb -m knock.qdiff" (first *command-line-args*) (second *command-line-args*))}
+
   qbrowser {:doc "Start MCP server for browser automation (background service)"
             :task (shell "bb -m knock.qbrowser")}
 
@@ -142,5 +145,17 @@
 
   lan-ip {:doc "Get the LAN IP address of the current machine"
           :task (println (u/lan-ip))}
+
+  workers-demo {:doc "Demonstrate the asynchronous worker pool system"
+                :task (shell "bb -m knock.workers" "simple")}
+
+  workers-full-demo {:doc "Full demonstration of the asynchronous worker pool system"
+                     :task (shell "bb -m knock.workers" "demo")}
+
+  workers-enhanced {:doc "Enhanced workers demo with real-time monitoring"
+                    :task (shell "bb -m knock.workers" "enhanced")}
+
+  test-workers {:doc "Test workers system in tmux session"
+                :task (shell "./scripts/test-workers.sh")}
 ;;
   }}

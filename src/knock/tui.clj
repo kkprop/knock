@@ -19,7 +19,6 @@
 (defn i-filter [f]
   (b-res (b/gum :filter :in (clojure.java.io/input-stream f))))
 
-
 (defn filter-xs [xs]
   (b-res (b/gum :filter :in (join-line xs)) )
   )

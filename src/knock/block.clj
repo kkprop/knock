@@ -95,14 +95,14 @@
         (while (not (realized? p))
           (clear id)
           (send-text id (first @cur))
-          (Thread/sleep 1100))
+          (Thread/sleep (long 1100)))
           )
        (->> (range 3)
             (map (fn [i]
                    (let [xs (apply tripler @cur)]
                      (reset! cur xs)
                      )
-                   (Thread/sleep 1100)
+                   (Thread/sleep (long 1100))
                    ))
             (apply list)
             )
