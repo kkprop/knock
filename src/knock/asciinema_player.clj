@@ -488,21 +488,7 @@
     
     (println "\nReplay complete!")))
 
-;; Function to convert asciinema recording to PowerPoint
-(defn asciinema2ppt [input-file output-file]
-  (println "Converting" input-file "to PowerPoint presentation" output-file)
-  (let [result (try
-                 (let [process (.exec (Runtime/getRuntime)
-                                     (into-array String ["python3" "-m" "asciinema2ppt"
-                                                        "--input" input-file
-                                                        "--output" output-file]))]
-                   (.waitFor process)
-                   {:exit (.exitValue process)})
-                 (catch Exception e
-                   {:exit 1 :err (.getMessage e)}))]
-    (if (= 0 (:exit result))
-      (println "Conversion successful!")
-      (println "Conversion failed:" (:err result)))))
+
 
 ;; Main entry point for the asciinema player
 (defn -main [& args]
