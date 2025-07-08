@@ -4701,13 +4701,6 @@
     (str/join "\n")
   ))
 
-(comment
-  (println (strip
-            (slurp (->abs-path "~/1.txt"))
-            \' \, \"))
-  (re-seq #"[\d\w]+-[\d\w]+"  (slurp (->abs-path "~/1.txt")))
-  ;
-  )
 
 
 
@@ -4877,39 +4870,80 @@
        :res res})))
 
 (def trim-md (partial trim-leading "\\s" "- "))
-(defn parse-md [lines]
-  (let [xs (remove nil? (map trim-md (reverse lines)))]
-    (loop [xs xs
-           prev {:count nil :res ""}
-           block '()
-           result '()]
-      (if (empty? xs)
-        (cons block result)
-        (let [{:keys [count res] :as cur} (first xs)]
-          (println res block result "..." count (:count prev))
-          (if (nil? res)
-            (cons block result)
-            (cond
-              (nil? (:count prev)) (recur (rest xs) cur
-                                          (cons res block)
-                                          result)
-              (= count (:count prev)) (recur (rest xs) cur
-                                             (cons res block)
-                                             result)
-              (> count (:count prev)) (recur (rest xs) cur
-                                             (list res)
-                                             (cons block result))
-              :else (recur (rest xs) cur
-                           (cons res (list block))
-                           result))
 
-;;
-            ))))))
+
+
+;; Enhanced parse-md function supporting string input and pure indentation
+(defn parse-md
+  "Parse markdown-style indented lists into nested list structure.
+   Handles three cases:
+   1. Lines with '- ' prefix (markdown lists)  
+   2. Lines with indentation only (space-based hierarchy)
+   3. String input with newlines and indentation
+   Input can be either:
+   - Vector of strings (lines)
+   - Single string with newlines
+   Returns a nested list structure where siblings at the same level are grouped together."
+  [input]
+  (letfn [(get-indent [line]
+            "Get indentation level (number of leading spaces)"
+            (- (count line) (count (str/triml line))))
+          (clean-content [line]
+            "Remove leading dashes and trim whitespace"
+            (let [trimmed (str/trim line)]
+              (if (str/starts-with? trimmed "- ")
+                (str/trim (subs trimmed 2))
+                trimmed)))
+          (parse-lines [lines]
+            "Convert input to lines vector"
+            (cond
+              (string? lines) (str/split-lines lines)
+              (sequential? lines) lines
+              :else [lines]))
+          (parse-items [lines]
+            "Parse lines into items with indent levels"
+            (->> lines
+                 (map (fn [line]
+                        (let [content (clean-content line)]
+                          (when (not (empty? content))
+                            {:indent (get-indent line)
+                             :content content}))))
+                 (remove nil?)))
+          (build-nested [items]
+            "Build nested structure with proper sibling grouping"
+            (if (empty? items)
+              []
+              (let [min-indent (apply min (map :indent items))]
+                (loop [remaining items
+                       result []]
+                  (if (empty? remaining)
+                    result
+                    (let [current (first remaining)
+                          current-indent (:indent current)]
+                      (if (= current-indent min-indent)
+                        ;; Root level item
+                        (let [content (:content current)
+                              ;; Find all children until next root item
+                              children (take-while #(> (:indent %) min-indent) (rest remaining))
+                              after-children (drop-while #(> (:indent %) min-indent) (rest remaining))]
+                          (if (empty? children)
+                            ;; No children
+                            (recur after-children (conj result content))
+                            ;; Has children - process them as a group
+                            (let [nested-children (build-nested children)]
+                              ;; If nested children is a single item, don't wrap in extra vector
+                              (if (and (= 1 (count nested-children)) (string? (first nested-children)))
+                                (recur after-children (conj result [content (first nested-children)]))
+                                (recur after-children (conj result [content nested-children]))))))
+                        ;; Skip non-root items (processed as children)
+                        (recur (rest remaining) result))))))))]
+    (let [lines (parse-lines input)
+          items (parse-items lines)]
+      (build-nested items))))
+
 
 (defn parse-md-file [f]
   (parse-md (slurp-lines f)))
-
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -5281,6 +5315,16 @@
     )
   )
 
+;;print the function params then eval and print the result
+(defn eval! [f & xs]
+  (let [res (apply f xs)]
+    (println "function:" f "\n"  "args:\n"  xs)
+    (println res)
+    res
+    )
+  )
+
+
 (defn lan-ip []
   "Get the LAN IP address of the current machine"
   (try
@@ -5295,6 +5339,18 @@
         (str/trim (:out (run-cmd "ip route get 1 | awk '{print $7; exit}'")))
         (catch Exception e2
           nil)))))
+
+
+
+(defn saved [from to]
+  (percentage from (float (- to from)) )
+  )
+
+
+(defn profit [from to]
+  (saved from to)
+  )
+
 
 
 
