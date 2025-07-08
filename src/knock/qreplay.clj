@@ -1,7 +1,8 @@
 (ns knock.qreplay
   (:require [babashka.process :as p]
             [clojure.java.io :as io]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [knock.asciinema-player :as ap]))
 
 (defn list-cast-files []
   "List all .cast files in the ~/rec/ directory"
@@ -36,9 +37,9 @@
             (.delete (io/file temp-file))))))))
 
 (defn run-asciinema-player [cast-file]
-  "Run bb asciinema-player on the selected cast file"
+  "Run asciinema-player on the selected cast file"
   (let [full-path (str (System/getProperty "user.home") "/rec/" cast-file)]
-    (p/shell ["bb" "-m" "knock.asciinema-player" "--input" full-path])
+    (ap/-main "--input" full-path)
     ;; Wait for user confirmation before returning to menu
     (println "\nPress Enter to return to main menu...")
     (read-line)))
