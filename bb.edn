@@ -34,7 +34,15 @@
              [knock.ticker :as ticker]
              [clojure.string :as str]
              [knock.chat :as chat]
-             [knock.wn :as w])
+             [knock.wn :as w]
+             [knock.qcontext :as qc]
+             [knock.ticker-replay-main :as trm]
+             [knock.asciinema-player :as ap]
+             [knock.qreplay :as qr]
+             [knock.qdiff :as qd]
+             [knock.qbrowser :as qb]
+             [knock.qtmux :as qt]
+             [knock.workers :as workers])
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
               proc (process (str "bb nrepl-server " port) {:inherit true})]
           (wait/wait-for-port "localhost" port)
@@ -105,7 +113,7 @@
   watch (ticker/watch)
   live (ticker/live)
   ticker-replay {:doc "Replay ticker data with speed calculation and interactive controls"
-                :task (shell "bb -m knock.ticker-replay-main" (first *command-line-args*))}
+                :task (trm/-main (first *command-line-args*))}
 
   mock-laundry (println "cleaned:" (count (u/mock-laundry)))
 
@@ -117,19 +125,19 @@
   tips (chat/o)
 
   asciinema-player {:doc "Replay an asciinema cast file in the terminal"
-                   :task (shell (str "bb -m knock.asciinema-player " (clojure.string/join " " *command-line-args*)))}
+                   :task (apply ap/-main *command-line-args*)}
 
   q-context {:doc "Select a context file and launch Amazon Q with it"
-             :task (shell "bb -m knock.qcontext" (first *command-line-args*))}
+             :task (apply qc/q-context *command-line-args*)}
 
   qreplay {:doc "Select and play a .cast file from ~/rec/ directory"
-           :task (shell "bb -m knock.qreplay")}
+           :task (qr/-main)}
 
   qdiff {:doc "Compare and sync .clj files between two directories"
-         :task (shell "bb -m knock.qdiff" (first *command-line-args*) (second *command-line-args*))}
+         :task (qd/-main (first *command-line-args*) (second *command-line-args*))}
 
   qbrowser {:doc "Start MCP server for browser automation (background service)"
-            :task (shell "bb -m knock.qbrowser")}
+            :task (qb/-main)}
 
   qbrowser-start {:doc "Start QBrowser MCP server in background"
                   :task (shell "./scripts/start-qbrowser-server.sh")}
@@ -141,19 +149,19 @@
                  :task (shell "./scripts/test-qbrowser-client.sh")}
 
   q-tmux {:doc "Select tmux session with gum, start asciinema recording, and attach"
-          :task (shell "bb -m knock.qtmux")}
+          :task (qt/-main)}
 
   lan-ip {:doc "Get the LAN IP address of the current machine"
           :task (println (u/lan-ip))}
 
   workers-demo {:doc "Demonstrate the asynchronous worker pool system"
-                :task (shell "bb -m knock.workers" "simple")}
+                :task (workers/-main "simple")}
 
   workers-full-demo {:doc "Full demonstration of the asynchronous worker pool system"
-                     :task (shell "bb -m knock.workers" "demo")}
+                     :task (workers/-main "demo")}
 
   workers-enhanced {:doc "Enhanced workers demo with real-time monitoring"
-                    :task (shell "bb -m knock.workers" "enhanced")}
+                    :task (workers/-main "enhanced")}
 
   test-workers {:doc "Test workers system in tmux session"
                 :task (shell "./scripts/test-workers.sh")}
