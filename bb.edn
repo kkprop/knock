@@ -39,7 +39,6 @@
              [knock.ticker-replay-main :as trm]
              [knock.asciinema-player :as ap]
              [knock.qreplay :as qr]
-             [knock.qdiff :as qd]
              [knock.qbrowser :as qb]
              [knock.qtmux :as qt]
              [knock.workers :as workers])
@@ -133,8 +132,6 @@
   qreplay {:doc "Select and play a .cast file from ~/rec/ directory"
            :task (qr/-main)}
 
-  qdiff {:doc "Compare and sync .clj files between two directories"
-         :task (qd/-main (first *command-line-args*) (second *command-line-args*))}
 
   qbrowser {:doc "Start MCP server for browser automation (background service)"
             :task (qb/-main)}
