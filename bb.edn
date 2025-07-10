@@ -39,7 +39,6 @@
              [knock.ticker-replay-main :as trm]
              [knock.asciinema-player :as ap]
              [knock.qreplay :as qr]
-             [knock.qbrowser :as qb]
              [knock.qtmux :as qt]
              [knock.workers :as workers])
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
@@ -133,17 +132,6 @@
            :task (qr/-main)}
 
 
-  qbrowser {:doc "Start MCP server for browser automation (background service)"
-            :task (qb/-main)}
-
-  qbrowser-start {:doc "Start QBrowser MCP server in background"
-                  :task (shell "./scripts/start-qbrowser-server.sh")}
-
-  qbrowser-stop {:doc "Stop QBrowser MCP server"
-                 :task (shell "./scripts/stop-qbrowser-server.sh")}
-
-  qbrowser-test {:doc "Test QBrowser MCP server with sample requests"
-                 :task (shell "./scripts/test-qbrowser-client.sh")}
 
   q-tmux {:doc "Select tmux session with gum, start asciinema recording, and attach"
           :task (qt/-main)}
