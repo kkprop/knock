@@ -7,7 +7,7 @@
             [knock.utils :as utils])
   (:import [java.time LocalDateTime]
            [java.time.format DateTimeFormatter]
-           [java.util.concurrent Executors ScheduledExecutorService TimeUnit]))
+           [java.util.concurrent Executors TimeUnit]))
 
 (def ^:private clipboard-history (atom []))
 (def ^:private last-clipboard-content (atom nil))
@@ -166,7 +166,7 @@
                              history)))
               (save-history)
               (reset! board-needs-refresh true)
-              (println "📝 Queued for Roam (sending in background)...")
+              ;(println "📝 Queued for Roam (sending in background)...")
               
               ; Send to Roam in background thread
               (future
@@ -190,7 +190,7 @@
                       (roam/write g roam-content :page target-block :order "first")
                       (roam/write g roam-content :page target-block))
                     
-                    (println "✅ Successfully sent to Roam!")
+                    ;(println "✅ Successfully sent to Roam!")
                     
                     ; Mark item as successfully sent to Roam
                     (swap! clipboard-history 
@@ -204,7 +204,12 @@
                                    history)))
                     (save-history)
                     (reset! board-needs-refresh true)
-                    (println "📝 Item marked as sent to Roam"))
+                    ; Kill gum process to force immediate refresh of status change
+                    (try
+                      (utils/kill-cur-pid-by-name "gum")
+                      (catch Exception _))
+                    ;(println "📝 Item marked as sent to Roam")
+                     )
                   (catch Exception e
                     (println "❌ Failed to send to Roam:" (.getMessage e))
                     ; Mark as failed (no user interaction needed)
@@ -218,7 +223,11 @@
                                       %)
                                    history)))
                     (save-history)
-                    (reset! board-needs-refresh true))))
+                    (reset! board-needs-refresh true)
+                    ; Kill gum process to force immediate refresh of status change
+                    (try
+                      (utils/kill-cur-pid-by-name "gum")
+                      (catch Exception _))))
               
               {:action :roam :item sending-item :success true :async true}))
     
@@ -236,7 +245,7 @@
     
     :cancel {:action :cancel :item item}
     
-    {:action :unknown :item item}))
+    {:action :unknown :item item})))
 
 (defn- show-item-actions [item]
   ; Skip action selection - directly send to Roam

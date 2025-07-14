@@ -69,7 +69,7 @@
                       :text-align (if-nil-then text-align "left")}}]
 
     (try
-      (println "writing" data)
+      ;(println "writing" data)
       (post g "write" data)
       (catch Exception e
         (let [msg (.getMessage e)]
@@ -78,7 +78,8 @@
             (do
               (create-page g {:title (cur-daily-page-title) :uid (cur-daily-page)})
               (post g "write" data)
-              (println data))
+              ;(println data)
+              )
             msg))))))
 
 (defn q [g query & args]
@@ -315,7 +316,7 @@
                (not (< 1000 (count s)))
                ;;
                )
-      (println (front-most-app))
+      ;(println (front-most-app))
       (.cons-cap 101 :roam/prev s)
       ;(def s "148-153-61-217")
       (if (ip? (->ip s))
