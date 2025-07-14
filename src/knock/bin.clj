@@ -325,13 +325,7 @@
                     
                     ; Other exit codes - normal handling
                     :else
-                    (Thread/sleep 1000)))
-            
-            (catch Exception e
-              (reset-terminal)
-              (println "Error in display:" (.getMessage e))
-              (println "Retrying in 3 seconds...")
-              (Thread/sleep 3000))))))))))
+                    (Thread/sleep 1000)))))))))))
 
 (defn- interactive-board-loop []
   (loop []
