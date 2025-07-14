@@ -155,6 +155,13 @@
       ; Fallback to daily page if block lookup fails
       (roam/cur-daily-page))))
 
+(def ^:private roam-thread-pool (atom nil))
+
+(defn- get-roam-thread-pool []
+  (when-not @roam-thread-pool
+    (reset! roam-thread-pool (Executors/newFixedThreadPool 2)))
+  @roam-thread-pool)
+
 (defn- handle-item-action [item action]
   (case action
     :roam (do
@@ -170,66 +177,68 @@
               (reset! board-needs-refresh true)
               ;(println "📝 Queued for Roam (sending in background)...")
               
-              ; Send to Roam in background thread
-              (future
-                (try
-                  (let [g (roam/personal)
-                        content (:content item)
-                        
-                        ; Apply content decoration
-                        decorated-content (decorate-content content)
-                        
-                        ; Get target block (work vs personal)
-                        target-block (get-target-block g content)
-                        
-                        ; Format with timestamp like pb->roam
-                        timestamp (:exact-time item)
-                        roam-content (str decorated-content 
-                                         (when timestamp (str " `" timestamp "`")))]
-                    
-                    ; Send to Roam using the same pattern as pb->roam
-                    (if (is-ip-address? content)
-                      (roam/write g roam-content :page target-block :order "first")
-                      (roam/write g roam-content :page target-block))
-                    
-                    ;(println "✅ Successfully sent to Roam!")
-                    
-                    ; Mark item as successfully sent to Roam
-                    (swap! clipboard-history 
-                           (fn [history]
-                             (mapv #(if (= (:id %) (:id item))
-                                      (-> %
-                                          (dissoc :roam-sending)
-                                          (assoc :roam-sent true 
-                                                 :roam-sent-at (get-current-time)))
-                                      %)
-                                   history)))
-                    (save-history)
-                    (reset! board-needs-refresh true)
-                    ; Kill gum process to force immediate refresh of status change
-                    (try
-                      (utils/kill-cur-pid-by-name "gum")
-                      (catch Exception _))
-                    ;(println "📝 Item marked as sent to Roam")
-                     )
-                  (catch Exception e
-                    (println "❌ Failed to send to Roam:" (.getMessage e))
-                    ; Mark as failed (no user interaction needed)
-                    (swap! clipboard-history 
-                           (fn [history]
-                             (mapv #(if (= (:id %) (:id item))
-                                      (-> %
-                                          (dissoc :roam-sending)
-                                          (assoc :roam-send-failed true
-                                                 :roam-error (.getMessage e)))
-                                      %)
-                                   history)))
-                    (save-history)
-                    (reset! board-needs-refresh true)
-                    ; Kill gum process to force immediate refresh of status change
-                    (try
-                      (utils/kill-cur-pid-by-name "gum")
-                      (catch Exception _))))
+              ; Send to Roam in background thread using managed pool
+              (.submit (get-roam-thread-pool)
+                (fn []
+                  (try
+                    (let [g (roam/personal)
+                          content (:content item)
+                          
+                          ; Apply content decoration
+                          decorated-content (decorate-content content)
+                          
+                          ; Get target block (work vs personal)
+                          target-block (get-target-block g content)
+                          
+                          ; Format with timestamp like pb->roam
+                          timestamp (:exact-time item)
+                          roam-content (str decorated-content 
+                                           (when timestamp (str " `" timestamp "`")))]
+                      
+                      ; Send to Roam using the same pattern as pb->roam
+                      (if (is-ip-address? content)
+                        (roam/write g roam-content :page target-block :order "first")
+                        (roam/write g roam-content :page target-block))
+                      
+                      ;(println "✅ Successfully sent to Roam!")
+                      
+                      ; Mark item as successfully sent to Roam
+                      (swap! clipboard-history 
+                             (fn [history]
+                               (mapv #(if (= (:id %) (:id item))
+                                        (-> %
+                                            (dissoc :roam-sending)
+                                            (assoc :roam-sent true 
+                                                   :roam-sent-at (get-current-time)))
+                                        %)
+                                     history)))
+                      (save-history)
+                      (reset! board-needs-refresh true)
+                      ; Reduce gum killing frequency to prevent system overload
+                      ;(try
+                      ;  (utils/kill-cur-pid-by-name "gum")
+                      ;  (catch Exception _))
+                      ;(println "📝 Item marked as sent to Roam")
+                       )
+                    (catch Exception e
+                      (println "❌ Failed to send to Roam:" (.getMessage e))
+                      ; Mark as failed (no user interaction needed)
+                      (swap! clipboard-history 
+                             (fn [history]
+                               (mapv #(if (= (:id %) (:id item))
+                                        (-> %
+                                            (dissoc :roam-sending)
+                                            (assoc :roam-send-failed true
+                                                   :roam-error (.getMessage e)))
+                                        %)
+                                     history)))
+                      (save-history)
+                      (reset! board-needs-refresh true)
+                      ; Reduce gum killing frequency to prevent system overload
+                      ;(try
+                      ;  (utils/kill-cur-pid-by-name "gum")
+                      ;  (catch Exception _))
+                      ))))
               
               {:action :roam :item sending-item :success true :async true}))
     
@@ -247,7 +256,7 @@
     
     :cancel {:action :cancel :item item}
     
-    {:action :unknown :item item})))
+    {:action :unknown :item item}))
 
 (defn- show-item-actions [item]
   ; Skip action selection - directly send to Roam
@@ -318,15 +327,16 @@
   ;;       :cancel)))
 
 (defn- reset-terminal []
-  "Comprehensive terminal reset to fix formatting issues"
-  ; Multiple reset sequences to ensure clean state
-  (print "\033c")           ; Full terminal reset
-  (print "\033[2J")         ; Clear screen
-  (print "\033[H")          ; Home cursor
-  ;(print "\033[0m")         ; Reset all attributes
-  (print "\033[?25h")       ; Show cursor
+  "Minimal terminal reset that doesn't disrupt shell"
+  ; Comment out aggressive reset sequences that cause line formatting issues
+  ;(print "\033c")           ; Full terminal reset
+  ;(print "\033[2J")         ; Clear screen
+  ;(print "\033[H")          ; Home cursor
+  (print "\033[0m")         ; Reset all attributes only
+  ;(print "\033[?25h")       ; Show cursor
   (flush)
-  (Thread/sleep 200))       ; Longer pause for terminal to stabilize
+  ;(Thread/sleep 200)        ; Longer pause for terminal to stabilize
+  )
 
 (defn- show-clipboard-board []
   (let [items @clipboard-history]
