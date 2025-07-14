@@ -12,6 +12,8 @@
 (def ^:private last-clipboard-content (atom nil))
 (def ^:private watcher-running (atom false))
 (def ^:private executor (atom nil))
+(def ^:private last-history-count (atom 0))
+(def ^:private board-needs-refresh (atom true))
 (def ^:private history-file (str (System/getProperty "user.home") "/.knock-clipboard-history.json"))
 
 (defn- load-history []
@@ -91,7 +93,9 @@
     (reset! last-clipboard-content content)
     (let [item (create-bin-item content)]
       (swap! clipboard-history conj item)
-      (save-history))))
+      (save-history)
+      ; Trigger board refresh when new content is added
+      (reset! board-needs-refresh true))))
 
 (defn- group-by-hour [items]
   "Group items by display hour (HH:00) while preserving exact timestamps"
@@ -136,6 +140,8 @@
                                     %)
                                  history)))
                   (save-history)
+                  ; Trigger board refresh after updating item
+                  (reset! board-needs-refresh true)
                   (println "📝 Item marked as sent to Roam")
                   {:action :roam :item updated-item :success true}))
               (catch Exception e
@@ -294,13 +300,19 @@
 (defn- interactive-board-loop []
   (loop []
     (try
-      ; Show the board
-      (show-clipboard-board)
+      ; Check if clipboard history has changed
+      (let [current-count (count @clipboard-history)]
+        (when (or @board-needs-refresh 
+                  (not= current-count @last-history-count))
+          (reset! last-history-count current-count)
+          (reset! board-needs-refresh false)
+          ; Show the board
+          (show-clipboard-board)))
       (catch Exception e
         (println "Loop error:" (.getMessage e))
         (Thread/sleep 2000)))
     
-    ; Wait before showing again
+    ; Wait before checking again
     (Thread/sleep 1000)
     (recur)))
 
