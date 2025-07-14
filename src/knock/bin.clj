@@ -121,40 +121,106 @@
       (spit file-path (json/write-str item-data {:pretty true}))
       (println (str "🗑️  Saved to ~/bin/" filename)))))
 
+(defn- should-send-to-roam? [content prev-items]
+  "Apply pb->roam filtering logic to determine if content should be sent"
+  (and (not (str/blank? content))
+       (not (str/includes? content "-----BEGIN CERTIFICATE-----"))
+       (not (str/includes? content "-----BEGIN CERTIFICATE REQUEST-----"))
+       (not (str/includes? content "-----BEGIN RSA PRIVATE KEY-----"))
+       (not (some #(= content %) prev-items))  ; Check against previous items
+       (not (re-matches #"^\d+$" content))     ; Not just digits
+       (not (> (count content) 1000))          ; Not too long
+       ))
+
+(defn- decorate-content [content]
+  "Apply pb->roam content decoration logic"
+  (cond
+    (str/includes? content "::") (str "`" content "`")
+    (str/includes? content "摘录来自") content  ; Would need epub-clean function
+    :else content))
+
+(defn- is-ip-address? [s]
+  "Simple IP address detection"
+  (re-matches #"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$" s))
+
+(defn- get-target-block [g content]
+  "Determine target block based on content type (following pb->roam logic)"
+  (try
+    (if (is-ip-address? content)
+      (utils/mock-within 1800 roam/daily-note-block g "#Work")    ; Work block for IPs
+      (utils/mock-within 1800 roam/daily-note-block g "#Personal")) ; Personal block for others
+    (catch Exception e
+      ; Fallback to daily page if block lookup fails
+      (roam/cur-daily-page))))
+
 (defn- handle-item-action [item action]
   (case action
     :roam (do
-            (try
-              (println "📝 Sending to Roam...")
-              (let [g (roam/personal)  ; Load personal Roam graph config
-                    content (:content item)
-                    summary (:summary item)
-                    timestamp (:exact-time item)
-                    ; Format content for Roam with metadata
-                    roam-content (str "**Clipboard:** " summary "\n"
-                                     "**Time:** " timestamp "\n"
-                                     "**Content:**\n"
-                                     content)]
-                ; Send to Roam using existing write function
-                (roam/write g roam-content)
-                (println "✅ Successfully sent to Roam!")
-                
-                ; Mark item as sent to Roam and update history
-                (let [updated-item (assoc item :roam-sent true :roam-sent-at (get-current-time))]
-                  (swap! clipboard-history 
-                         (fn [history]
-                           (mapv #(if (= (:id %) (:id item))
-                                    updated-item
-                                    %)
-                                 history)))
-                  (save-history)
-                  ; Trigger board refresh after updating item
-                  (reset! board-needs-refresh true)
-                  (println "📝 Item marked as sent to Roam")
-                  {:action :roam :item updated-item :success true}))
-              (catch Exception e
-                (println "❌ Failed to send to Roam:" (.getMessage e))
-                {:action :roam :item item :success false :error (.getMessage e)})))
+            ; Immediately mark as sending and update UI
+            (let [sending-item (assoc item :roam-sending true)]
+              (swap! clipboard-history 
+                     (fn [history]
+                       (mapv #(if (= (:id %) (:id item))
+                                sending-item
+                                %)
+                             history)))
+              (save-history)
+              (reset! board-needs-refresh true)
+              (println "📝 Queued for Roam (sending in background)...")
+              
+              ; Send to Roam in background thread
+              (future
+                (try
+                  (let [g (roam/personal)
+                        content (:content item)
+                        
+                        ; Apply content decoration
+                        decorated-content (decorate-content content)
+                        
+                        ; Get target block (work vs personal)
+                        target-block (get-target-block g content)
+                        
+                        ; Format with timestamp like pb->roam
+                        timestamp (:exact-time item)
+                        roam-content (str decorated-content 
+                                         (when timestamp (str " `" timestamp "`")))]
+                    
+                    ; Send to Roam using the same pattern as pb->roam
+                    (if (is-ip-address? content)
+                      (roam/write g roam-content :page target-block :order "first")
+                      (roam/write g roam-content :page target-block))
+                    
+                    (println "✅ Successfully sent to Roam!")
+                    
+                    ; Mark item as successfully sent to Roam
+                    (swap! clipboard-history 
+                           (fn [history]
+                             (mapv #(if (= (:id %) (:id item))
+                                      (-> %
+                                          (dissoc :roam-sending)
+                                          (assoc :roam-sent true 
+                                                 :roam-sent-at (get-current-time)))
+                                      %)
+                                   history)))
+                    (save-history)
+                    (reset! board-needs-refresh true)
+                    (println "📝 Item marked as sent to Roam"))
+                  (catch Exception e
+                    (println "❌ Failed to send to Roam:" (.getMessage e))
+                    ; Mark as failed (no user interaction needed)
+                    (swap! clipboard-history 
+                           (fn [history]
+                             (mapv #(if (= (:id %) (:id item))
+                                      (-> %
+                                          (dissoc :roam-sending)
+                                          (assoc :roam-send-failed true
+                                                 :roam-error (.getMessage e)))
+                                      %)
+                                   history)))
+                    (save-history)
+                    (reset! board-needs-refresh true))))
+              
+              {:action :roam :item sending-item :success true :async true}))
     
     ;; Future actions (commented out for now)
     ;; :discard (do
@@ -182,24 +248,41 @@
   (println (str "📄 Summary: " (:summary item)))
   (println (str "📝 Created at: " (or (:exact-time item) (:hour item) "Unknown")))
   (println (str "📏 Length: " (:length item) " characters"))
-  (when (:roam-sent item)
-    (println "✅ Already sent to Roam"))
+  (cond
+    (:roam-sent item) (println "✅ Already sent to Roam")
+    (:roam-sending item) (println "🔄 Currently sending to Roam...")
+    (:roam-send-failed item) (println (str "❌ Failed to send to Roam: " (:roam-error item))))
   (println "\n📄 Full Content:")
   (println "----------------------------------------")
   (println (:content item))
   (println "----------------------------------------")
   (println "")
   
-  ; Automatically send to Roam
-  (if (:roam-sent item)
+  ; Handle different states
+  (cond
+    (:roam-sent item)
     (do
       (println "⚠️  This item was already sent to Roam.")
       (println "Press Enter to continue...")
       (read-line)
       :cancel)
+    
+    (:roam-sending item)
+    (do
+      (println "🔄 This item is currently being sent to Roam...")
+      (println "Press Enter to continue...")
+      (read-line)
+      :cancel)
+    
+    (:roam-send-failed item)
+    (do
+      (println "🔄 Retrying send to Roam...")
+      :roam)  ; Automatically retry without user prompt
+    
+    :else
     (do
       (println "📝 Sending to Roam...")
-      :roam))
+      :roam)))
   
   ;; Future action options (commented out for now)
   ;; (let [actions ["📝 Write to Roam" "🗑️  Discard" "📋 Copy to Clipboard" "❌ Cancel"]]
@@ -222,7 +305,6 @@
   ;;     (catch Exception e
   ;;       (println "Invalid choice, cancelling...")
   ;;       :cancel)))
-  )
 
 (defn- reset-terminal []
   "Comprehensive terminal reset to fix formatting issues"
@@ -256,7 +338,10 @@
                          (cons (str "⏰ " hour)
                                (for [item (reverse hour-items)]
                                  (str "    • " (:summary item) " (" (:length item) " chars) [" (:exact-time item) "]"
-                                      (when (:roam-sent item) " ✅"))))))]
+                                      (cond
+                                        (:roam-sent item) " ✅"
+                                        (:roam-sending item) " 🔄"
+                                        (:roam-send-failed item) " ❌"))))))]
         
         (if (empty? gum-items)
           (do
@@ -278,7 +363,7 @@
                                   :out temp-file
                                   :continue true}
                                  "gum" "choose" 
-                                 "--height" "20"
+                                 "--height" "60"
                                  "--header" "📋 Clipboard Timeline")]
               (if (zero? (:exit result))
                 (let [selected-line (str/trim (slurp temp-file))]
@@ -323,6 +408,12 @@
                       (println "Refreshing with new clipboard content...")
                       (Thread/sleep 500))
                     
+                    ; User cancelled selection (ESC or no selection) - return to main menu immediately
+                    (or (= 1 (:exit result)) (= 2 (:exit result)))
+                    (do
+                      ; Just return to main menu loop - no delay, no message
+                      nil)
+                    
                     ; Other exit codes - normal handling
                     :else
                     (Thread/sleep 1000)))))))))))
@@ -344,7 +435,7 @@
           (Thread/sleep 2000)))
       
       ; Wait before checking again
-      (Thread/sleep 1000)
+      (Thread/sleep 500)
       (recur))))
 
 (defn- start-clipboard-watcher []
