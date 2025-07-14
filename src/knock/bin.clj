@@ -47,12 +47,14 @@
 (defn- get-current-time []
   (LocalDateTime/now))
 
-(defn- format-time-exact [datetime]
+(defn- format-time-exact 
   "Keep exact time in metadata (HH:mm)"
+  [datetime]
   (.format datetime (DateTimeFormatter/ofPattern "HH:mm")))
 
-(defn- format-time-for-display [datetime]
+(defn- format-time-for-display 
   "Display time with hour granularity (HH:00)"
+  [datetime]
   (.format datetime (DateTimeFormatter/ofPattern "HH:00")))
 
 (defn- format-date [datetime]
@@ -65,7 +67,7 @@
         (let [content (str/trim (:out result))]
           (when-not (str/blank? content)
             content))))
-    (catch Exception e
+    (catch Exception _
       nil)))
 
 (defn- generate-summary [content]
