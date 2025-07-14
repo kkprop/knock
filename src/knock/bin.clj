@@ -3,7 +3,8 @@
             [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.data.json :as json]
-            [knock.roam :as roam])
+            [knock.roam :as roam]
+            [knock.utils :as utils])
   (:import [java.time LocalDateTime]
            [java.time.format DateTimeFormatter]
            [java.util.concurrent Executors ScheduledExecutorService TimeUnit]))
@@ -86,6 +87,8 @@
      :display-hour (format-time-for-display now)  ; Hour for display
      :date (format-date now)}))
 
+(def ^:private user-exit-requested (atom false))
+
 (defn- add-to-history [content]
   (when (and content 
              (not (str/blank? content))
@@ -95,7 +98,12 @@
       (swap! clipboard-history conj item)
       (save-history)
       ; Trigger board refresh when new content is added
-      (reset! board-needs-refresh true))))
+      (reset! board-needs-refresh true)
+      ; Kill any running gum processes to refresh the display immediately
+      ; Use SIGTERM instead of SIGKILL for cleaner termination
+      (try
+        (utils/kill-cur-pid-by-name "gum")
+        (catch Exception _)))))
 
 (defn- group-by-hour [items]
   "Group items by display hour (HH:00) while preserving exact timestamps"
@@ -166,8 +174,9 @@
 
 (defn- show-item-actions [item]
   ; Skip action selection - directly send to Roam
-  (print "\033[2J\033[H")
+  (print "\033[2J\033[H\033[0m") ; Enhanced screen clearing
   (flush)
+  (Thread/sleep 100) ; Brief pause to ensure terminal reset
   (println "📄 Selected Item Details")
   (println "========================")
   (println (str "📄 Summary: " (:summary item)))
@@ -215,12 +224,22 @@
   ;;       :cancel)))
   )
 
+(defn- reset-terminal []
+  "Comprehensive terminal reset to fix formatting issues"
+  ; Multiple reset sequences to ensure clean state
+  (print "\033c")           ; Full terminal reset
+  (print "\033[2J")         ; Clear screen
+  (print "\033[H")          ; Home cursor
+  (print "\033[0m")         ; Reset all attributes
+  (print "\033[?25h")       ; Show cursor
+  (flush)
+  (Thread/sleep 200))       ; Longer pause for terminal to stabilize
+
 (defn- show-clipboard-board []
   (let [items @clipboard-history]
     (if (empty? items)
       (do
-        (print "\033[2J\033[H") ; Clear screen and reset cursor
-        (flush)
+        (reset-terminal)
         (println "📋 Knock Clipboard Manager")
         (println "==========================")
         (println "🔍 Clipboard watcher active")
@@ -244,8 +263,7 @@
             (println "No items to display")
             (Thread/sleep 2000))
           (try
-            (print "\033[2J\033[H") ; Clear screen and reset cursor
-            (flush)
+            (reset-terminal)
             (println "📋 Knock Clipboard Manager")
             (println "==========================")
             (println "🔍 Clipboard watcher active")
@@ -288,33 +306,52 @@
                 (do
                   ; Clean up temp file
                   (try (.delete (io/file temp-file)) (catch Exception _))
-                  (Thread/sleep 2000))))
+                  ; Handle different exit scenarios
+                  (cond
+                    ; User pressed Ctrl+C (SIGINT) - exit the program
+                    (= 130 (:exit result))
+                    (do
+                      (reset! user-exit-requested true)
+                      (reset-terminal)
+                      (println "📋 Clipboard Manager stopped by user.")
+                      (System/exit 0))
+                    
+                    ; Process was killed programmatically (SIGTERM) - refresh
+                    (= 143 (:exit result))
+                    (do
+                      (reset-terminal)
+                      (println "Refreshing with new clipboard content...")
+                      (Thread/sleep 500))
+                    
+                    ; Other exit codes - normal handling
+                    :else
+                    (Thread/sleep 1000)))
             
             (catch Exception e
+              (reset-terminal)
               (println "Error in display:" (.getMessage e))
-              (println "Stack trace:")
-              (.printStackTrace e)
               (println "Retrying in 3 seconds...")
-              (Thread/sleep 3000))))))))
+              (Thread/sleep 3000))))))))))
 
 (defn- interactive-board-loop []
   (loop []
-    (try
-      ; Check if clipboard history has changed
-      (let [current-count (count @clipboard-history)]
-        (when (or @board-needs-refresh 
-                  (not= current-count @last-history-count))
-          (reset! last-history-count current-count)
-          (reset! board-needs-refresh false)
-          ; Show the board
-          (show-clipboard-board)))
-      (catch Exception e
-        (println "Loop error:" (.getMessage e))
-        (Thread/sleep 2000)))
-    
-    ; Wait before checking again
-    (Thread/sleep 1000)
-    (recur)))
+    (when-not @user-exit-requested
+      (try
+        ; Check if clipboard history has changed
+        (let [current-count (count @clipboard-history)]
+          (when (or @board-needs-refresh 
+                    (not= current-count @last-history-count))
+            (reset! last-history-count current-count)
+            (reset! board-needs-refresh false)
+            ; Show the board
+            (show-clipboard-board)))
+        (catch Exception e
+          (println "Loop error:" (.getMessage e))
+          (Thread/sleep 2000)))
+      
+      ; Wait before checking again
+      (Thread/sleep 1000)
+      (recur))))
 
 (defn- start-clipboard-watcher []
   (when-not @watcher-running
@@ -343,6 +380,13 @@
                                      (.shutdown @executor))))))))
 
 (defn -main [& args]
+  ; Add shutdown hook for proper terminal cleanup
+  (.addShutdownHook (Runtime/getRuntime)
+                    (Thread. (fn []
+                              (reset-terminal)
+                              (println "📋 Clipboard Manager stopped.")
+                              (println "Terminal reset complete."))))
+  
   (println "📋 Knock Clipboard Manager")
   (println "==========================")
   (println "🔍 Starting clipboard watcher...")
