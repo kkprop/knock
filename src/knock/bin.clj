@@ -251,7 +251,7 @@
 
 (defn- show-item-actions [item]
   ; Skip action selection - directly send to Roam
-  (print "\033[2J\033[H\033[0m") ; Enhanced screen clearing
+  ;(print "\033[2J\033[H\033[0m") ; Enhanced screen clearing
   (flush)
   (Thread/sleep 100) ; Brief pause to ensure terminal reset
   (println "📄 Selected Item Details")
@@ -323,7 +323,7 @@
   (print "\033c")           ; Full terminal reset
   (print "\033[2J")         ; Clear screen
   (print "\033[H")          ; Home cursor
-  (print "\033[0m")         ; Reset all attributes
+  ;(print "\033[0m")         ; Reset all attributes
   (print "\033[?25h")       ; Show cursor
   (flush)
   (Thread/sleep 200))       ; Longer pause for terminal to stabilize
