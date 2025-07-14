@@ -2,7 +2,8 @@
   (:require [babashka.process :as p]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [clojure.data.json :as json])
+            [clojure.data.json :as json]
+            [knock.roam :as roam])
   (:import [java.time LocalDateTime]
            [java.time.format DateTimeFormatter]
            [java.util.concurrent Executors ScheduledExecutorService TimeUnit]))
@@ -103,61 +104,102 @@
 (defn- handle-item-action [item action]
   (case action
     :roam (do
-            (println "📝 Prepared for Roam export")
-            {:action :roam :item item})
+            (try
+              (println "📝 Sending to Roam...")
+              (let [g (roam/personal)  ; Load personal Roam graph config
+                    content (:content item)
+                    summary (:summary item)
+                    timestamp (:exact-time item)
+                    ; Format content for Roam with metadata
+                    roam-content (str "**Clipboard:** " summary "\n"
+                                     "**Time:** " timestamp "\n"
+                                     "**Content:**\n"
+                                     content)]
+                ; Send to Roam using existing write function
+                (roam/write g roam-content)
+                (println "✅ Successfully sent to Roam!")
+                
+                ; Mark item as sent to Roam and update history
+                (let [updated-item (assoc item :roam-sent true :roam-sent-at (get-current-time))]
+                  (swap! clipboard-history 
+                         (fn [history]
+                           (mapv #(if (= (:id %) (:id item))
+                                    updated-item
+                                    %)
+                                 history)))
+                  (save-history)
+                  (println "📝 Item marked as sent to Roam")
+                  {:action :roam :item updated-item :success true}))
+              (catch Exception e
+                (println "❌ Failed to send to Roam:" (.getMessage e))
+                {:action :roam :item item :success false :error (.getMessage e)})))
     
-    :discard (do
-               (save-discarded-item item)
-               (swap! clipboard-history #(remove (fn [i] (= (:id i) (:id item))) %))
-               (save-history)
-               {:action :discard :item item})
-    
-    :copy (do
-            (p/shell {:in (:content item)} "pbcopy")
-            (println "📋 Copied to clipboard")
-            {:action :copy :item item})
+    ;; Future actions (commented out for now)
+    ;; :discard (do
+    ;;            (save-discarded-item item)
+    ;;            (swap! clipboard-history #(remove (fn [i] (= (:id i) (:id item))) %))
+    ;;            (save-history)
+    ;;            {:action :discard :item item})
+    ;; 
+    ;; :copy (do
+    ;;         (p/shell {:in (:content item)} "pbcopy")
+    ;;         (println "📋 Copied to clipboard")
+    ;;         {:action :copy :item item})
     
     :cancel {:action :cancel :item item}
     
     {:action :unknown :item item}))
 
 (defn- show-item-actions [item]
-  (let [actions ["📝 Write to Roam" "🗑️  Discard" "📋 Copy to Clipboard" "❌ Cancel"]]
-    
-    ; Clear screen and show item details directly
-    (print "\033[2J\033[H")
-    (flush)
-    (println "📄 Selected Item Details")
-    (println "========================")
-    (println (str "📄 Summary: " (:summary item)))
-    (println (str "📝 Created at: " (or (:exact-time item) (:hour item) "Unknown")))
-    (println (str "📏 Length: " (:length item) " characters"))
-    (println "\n📄 Full Content:")
-    (println "----------------------------------------")
-    (println (:content item))
-    (println "----------------------------------------")
-    (println "")
-    
-    ; Show action selection directly without waiting
-    (println "Choose an action:")
-    (doseq [[idx action] (map-indexed vector actions)]
-      (println (str (inc idx) ". " action)))
-    (println "")
-    (print "Enter choice (1-4): ")
-    (flush)
-    
-    (try
-      (let [choice (read-line)
-            choice-num (Integer/parseInt (str/trim choice))]
-        (case choice-num
-          1 :roam
-          2 :discard
-          3 :copy
-          4 :cancel
-          :cancel))
-      (catch Exception e
-        (println "Invalid choice, cancelling...")
-        :cancel))))
+  ; Skip action selection - directly send to Roam
+  (print "\033[2J\033[H")
+  (flush)
+  (println "📄 Selected Item Details")
+  (println "========================")
+  (println (str "📄 Summary: " (:summary item)))
+  (println (str "📝 Created at: " (or (:exact-time item) (:hour item) "Unknown")))
+  (println (str "📏 Length: " (:length item) " characters"))
+  (when (:roam-sent item)
+    (println "✅ Already sent to Roam"))
+  (println "\n📄 Full Content:")
+  (println "----------------------------------------")
+  (println (:content item))
+  (println "----------------------------------------")
+  (println "")
+  
+  ; Automatically send to Roam
+  (if (:roam-sent item)
+    (do
+      (println "⚠️  This item was already sent to Roam.")
+      (println "Press Enter to continue...")
+      (read-line)
+      :cancel)
+    (do
+      (println "📝 Sending to Roam...")
+      :roam))
+  
+  ;; Future action options (commented out for now)
+  ;; (let [actions ["📝 Write to Roam" "🗑️  Discard" "📋 Copy to Clipboard" "❌ Cancel"]]
+  ;;   (println "Choose an action:")
+  ;;   (doseq [[idx action] (map-indexed vector actions)]
+  ;;     (println (str (inc idx) ". " action)))
+  ;;   (println "")
+  ;;   (print "Enter choice (1-4): ")
+  ;;   (flush)
+  ;;   
+  ;;   (try
+  ;;     (let [choice (read-line)
+  ;;           choice-num (Integer/parseInt (str/trim choice))]
+  ;;       (case choice-num
+  ;;         1 :roam
+  ;;         2 :discard
+  ;;         3 :copy
+  ;;         4 :cancel
+  ;;         :cancel))
+  ;;     (catch Exception e
+  ;;       (println "Invalid choice, cancelling...")
+  ;;       :cancel)))
+  )
 
 (defn- show-clipboard-board []
   (let [items @clipboard-history]
@@ -180,7 +222,8 @@
                        (for [[hour hour-items] grouped]
                          (cons (str "⏰ " hour)
                                (for [item (reverse hour-items)]
-                                 (str "    • " (:summary item) " (" (:length item) " chars) [" (:exact-time item) "]")))))]
+                                 (str "    • " (:summary item) " (" (:length item) " chars) [" (:exact-time item) "]"
+                                      (when (:roam-sent item) " ✅"))))))]
         
         (if (empty? gum-items)
           (do
@@ -198,74 +241,40 @@
             (println "")
             
             ; Use timeline format in gum choose
-            (let [_ (println "DEBUG: About to call gum with" (count gum-items) "items")
-                  _ (println "DEBUG: First few items:")
-                  _ (doseq [item (take 3 gum-items)]
-                      (println "  " item))
-                  ; Test if gum is available
-                  gum-test (try 
-                             (p/shell {:out :string :err :string :continue true} "gum" "--version")
-                             (catch Exception e
-                               (println "ERROR: gum not found:" (.getMessage e))
-                               {:exit 1}))
-                  _ (if (zero? (:exit gum-test))
-                      (println "DEBUG: gum is available, version:" (:out gum-test))
-                      (println "DEBUG: gum is not available or failed"))
-                  ]
-              (if (zero? (:exit gum-test))
-                ; Gum is available, use temp file approach
-                (let [temp-file (str "/tmp/gum-selection-" (System/currentTimeMillis))
-                      _ (println "DEBUG: Using temp file:" temp-file)
-                      _ (flush)
-                      result (p/shell {:in (str/join "\n" gum-items)
-                                      :out temp-file
-                                      :continue true}
-                                     "gum" "choose" 
-                                     "--height" "20"
-                                     "--header" "📋 Clipboard Timeline")]
-                  (println "DEBUG: gum completed with exit code:" (:exit result))
-                  (if (zero? (:exit result))
-                    (let [selected-line (str/trim (slurp temp-file))]
-                      (println "DEBUG: selected line from file:" selected-line)
-                      ; Clean up temp file
-                      (try (.delete (io/file temp-file)) (catch Exception _))
-                      (when-not (str/blank? selected-line)
-                        ; Skip hour headers (lines starting with ⏰)
-                        (when-not (str/starts-with? selected-line "⏰")
-                          (let [; Extract summary from indented line (handle both 4-space and no-space formats)
-                                selected-summary (-> selected-line
-                                                   (str/replace #"^    • " "") ; Remove 4-space indentation
-                                                   (str/replace #"^• " "")     ; Remove no-space format
-                                                   (str/split #" \(")
-                                                   first)
-                                _ (println "DEBUG: extracted summary:" selected-summary)
-                                selected-item (->> @clipboard-history
-                                                 (filter #(= (:summary %) selected-summary))
-                                                 first)
-                                _ (println "DEBUG: clipboard history count:" (count @clipboard-history))
-                                _ (println "DEBUG: first few summaries:")
-                                _ (doseq [item (take 3 @clipboard-history)]
-                                    (println "  -" (:summary item)))]
-                            (println "DEBUG: found item:" (when selected-item (:summary selected-item)))
-                            (when selected-item
-                              (try
-                                (when-let [action (show-item-actions selected-item)]
-                                  (handle-item-action selected-item action))
-                                (catch Exception e
-                                  (println "ERROR in show-item-actions:" (.getMessage e))
-                                  (.printStackTrace e))))))))
-                    (do
-                      (println "Selection cancelled or failed, exit code:" (:exit result))
-                      ; Clean up temp file
-                      (try (.delete (io/file temp-file)) (catch Exception _))
-                      (Thread/sleep 2000))))
-                ; Gum not available, use fallback
+            (let [temp-file (str "/tmp/gum-selection-" (System/currentTimeMillis))
+                  result (p/shell {:in (str/join "\n" gum-items)
+                                  :out temp-file
+                                  :continue true}
+                                 "gum" "choose" 
+                                 "--height" "20"
+                                 "--header" "📋 Clipboard Timeline")]
+              (if (zero? (:exit result))
+                (let [selected-line (str/trim (slurp temp-file))]
+                  ; Clean up temp file
+                  (try (.delete (io/file temp-file)) (catch Exception _))
+                  (when-not (str/blank? selected-line)
+                    ; Skip hour headers (lines starting with ⏰)
+                    (when-not (str/starts-with? selected-line "⏰")
+                      (let [; Extract summary from indented line (handle both 4-space and no-space formats)
+                            selected-summary (-> selected-line
+                                               (str/replace #"^    • " "") ; Remove 4-space indentation
+                                               (str/replace #"^• " "")     ; Remove no-space format
+                                               (str/split #" \(")
+                                               first)
+                            selected-item (->> @clipboard-history
+                                             (filter #(= (:summary %) selected-summary))
+                                             first)]
+                        (when selected-item
+                          (try
+                            (when-let [action (show-item-actions selected-item)]
+                              (handle-item-action selected-item action))
+                            (catch Exception e
+                              (println "ERROR in show-item-actions:" (.getMessage e))
+                              (.printStackTrace e))))))))
                 (do
-                  (println "Gum not available, using simple selection:")
-                  (doseq [[idx item] (map-indexed vector (take 10 gum-items))]
-                    (when-not (str/starts-with? item "⏰")
-                      (println (str (inc idx) ". " item))))
-                  (Thread/sleep 5000))))
+                  ; Clean up temp file
+                  (try (.delete (io/file temp-file)) (catch Exception _))
+                  (Thread/sleep 2000))))
             
             (catch Exception e
               (println "Error in display:" (.getMessage e))
