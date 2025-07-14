@@ -383,10 +383,11 @@
                                              first)]
                         (when selected-item
                           (try
-                            (when-let [action (show-item-actions selected-item)]
-                              (handle-item-action selected-item action))
+                            ; Immediately handle the action without showing details screen
+                            (handle-item-action selected-item :roam)
+                            ; Return immediately to main menu - no user interaction needed
                             (catch Exception e
-                              (println "ERROR in show-item-actions:" (.getMessage e))
+                              (println "ERROR in handle-item-action:" (.getMessage e))
                               (.printStackTrace e))))))))
                 (do
                   ; Clean up temp file
