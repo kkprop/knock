@@ -19,16 +19,24 @@
     (when (.exists (io/file history-file))
       (let [data (json/read-str (slurp history-file) :key-fn keyword)]
         (reset! clipboard-history 
-                (mapv #(update % :create-time 
-                              (fn [time-str] 
-                                (LocalDateTime/parse time-str))) 
+                (mapv #(-> %
+                          (update :create-time 
+                                  (fn [time-str] 
+                                    (LocalDateTime/parse time-str)))
+                          (update :roam-sent-at 
+                                  (fn [time-str] 
+                                    (when time-str (LocalDateTime/parse time-str)))))
                       data))))
     (catch Exception e
       (println "Warning: Could not load clipboard history:" (.getMessage e)))))
 
 (defn- save-history []
   (try
-    (let [data (mapv #(update % :create-time str) @clipboard-history)]
+    (let [data (mapv #(-> %
+                         (update :create-time str)
+                         (update :roam-sent-at 
+                                 (fn [time] (when time (str time)))))
+                     @clipboard-history)]
       (spit history-file (json/write-str data {:pretty true})))
     (catch Exception e
       (println "Warning: Could not save clipboard history:" (.getMessage e)))))
