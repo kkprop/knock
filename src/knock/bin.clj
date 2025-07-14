@@ -124,7 +124,7 @@
 (defn- show-item-actions [item]
   (let [actions ["📝 Write to Roam" "🗑️  Discard" "📋 Copy to Clipboard" "❌ Cancel"]]
     
-    ; Clear screen and show item details
+    ; Clear screen and show item details directly
     (print "\033[2J\033[H")
     (flush)
     (println "📄 Selected Item Details")
@@ -137,13 +137,8 @@
     (println (:content item))
     (println "----------------------------------------")
     (println "")
-    (println "Press Enter to continue...")
-    (flush)
     
-    ; Wait for user to read the content
-    (read-line)
-    
-    ; Now show action selection
+    ; Show action selection directly without waiting
     (println "Choose an action:")
     (doseq [[idx action] (map-indexed vector actions)]
       (println (str (inc idx) ". " action)))
@@ -237,14 +232,20 @@
                       (when-not (str/blank? selected-line)
                         ; Skip hour headers (lines starting with ⏰)
                         (when-not (str/starts-with? selected-line "⏰")
-                          (let [; Extract summary from indented line (remove indentation and bullet)
+                          (let [; Extract summary from indented line (handle both 4-space and no-space formats)
                                 selected-summary (-> selected-line
-                                                   (str/replace #"^    • " "")
+                                                   (str/replace #"^    • " "") ; Remove 4-space indentation
+                                                   (str/replace #"^• " "")     ; Remove no-space format
                                                    (str/split #" \(")
                                                    first)
+                                _ (println "DEBUG: extracted summary:" selected-summary)
                                 selected-item (->> @clipboard-history
                                                  (filter #(= (:summary %) selected-summary))
-                                                 first)]
+                                                 first)
+                                _ (println "DEBUG: clipboard history count:" (count @clipboard-history))
+                                _ (println "DEBUG: first few summaries:")
+                                _ (doseq [item (take 3 @clipboard-history)]
+                                    (println "  -" (:summary item)))]
                             (println "DEBUG: found item:" (when selected-item (:summary selected-item)))
                             (when selected-item
                               (try
