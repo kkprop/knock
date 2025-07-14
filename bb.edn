@@ -40,7 +40,8 @@
              [knock.asciinema-player :as ap]
              [knock.qreplay :as qr]
              [knock.qtmux :as qt]
-             [knock.workers :as workers])
+             [knock.workers :as workers]
+             [knock.bin :as bin])
   nrepl (let [port (with-open [sock (java.net.ServerSocket. 0)] (.getLocalPort sock))
               proc (process (str "bb nrepl-server " port) {:inherit true})]
           (wait/wait-for-port "localhost" port)
@@ -150,5 +151,9 @@
 
   test-workers {:doc "Test workers system in tmux session"
                 :task (shell "./scripts/test-workers.sh")}
+
+  ;; Clipboard Manager - Unified Interface
+  bin {:doc "Start clipboard watcher with interactive timeline board"
+       :task (bin/-main)}
 ;;
   }}
