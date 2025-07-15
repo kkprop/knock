@@ -191,10 +191,8 @@
                           ; Get target block (work vs personal)
                           target-block (get-target-block g content)
                           
-                          ; Format with timestamp like pb->roam
-                          timestamp (:exact-time item)
-                          roam-content (str decorated-content 
-                                           (when timestamp (str " `" timestamp "`")))]
+                          ; Format without timestamp
+                          roam-content decorated-content]
                       
                       ; Send to Roam using the same pattern as pb->roam
                       (if (is-ip-address? content)
