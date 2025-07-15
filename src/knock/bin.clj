@@ -5,9 +5,7 @@
             [clojure.data.json :as json]
             [knock.roam :as roam]
             [knock.utils :as utils])
-  (:import [java.time LocalDateTime]
-           [java.time.format DateTimeFormatter]
-           [java.util.concurrent Executors TimeUnit]))
+  (:import [java.util.concurrent Executors TimeUnit]))
 
 (def ^:private clipboard-history (atom []))
 (def ^:private last-clipboard-content (atom nil))
@@ -25,10 +23,10 @@
                 (mapv #(-> %
                           (update :create-time 
                                   (fn [time-str] 
-                                    (LocalDateTime/parse time-str)))
+                                    (when time-str time-str))) ; Keep as string
                           (update :roam-sent-at 
                                   (fn [time-str] 
-                                    (when time-str (LocalDateTime/parse time-str)))))
+                                    (when time-str time-str)))) ; Keep as string
                       data))))
     (catch Exception e
       (println "Warning: Could not load clipboard history:" (.getMessage e)))))
@@ -36,7 +34,7 @@
 (defn- save-history []
   (try
     (let [data (mapv #(-> %
-                         (update :create-time str)
+                         (update :create-time str) ; Already string, just ensure
                          (update :roam-sent-at 
                                  (fn [time] (when time (str time)))))
                      @clipboard-history)]
@@ -45,20 +43,20 @@
       (println "Warning: Could not save clipboard history:" (.getMessage e)))))
 
 (defn- get-current-time []
-  (LocalDateTime/now))
+  (utils/cur-time-str))
 
 (defn- format-time-exact 
   "Keep exact time in metadata (HH:mm)"
   [datetime]
-  (.format datetime (DateTimeFormatter/ofPattern "HH:mm")))
+  (utils/cur-time-str "HH:mm"))
 
 (defn- format-time-for-display 
   "Display time with hour granularity (HH:00)"
   [datetime]
-  (.format datetime (DateTimeFormatter/ofPattern "HH:00")))
+  (utils/cur-time-str "HH:00"))
 
 (defn- format-date [datetime]
-  (.format datetime (DateTimeFormatter/ofPattern "yyyy-MM-dd")))
+  (utils/cur-date-str))
 
 (defn- get-clipboard-content []
   (try
@@ -79,15 +77,18 @@
     (str/replace summary #"\s+" " ")))
 
 (defn- create-bin-item [content]
-  (let [now (get-current-time)]
+  (let [now (get-current-time)
+        exact-time (format-time-exact now)
+        display-hour (format-time-for-display now)
+        date (format-date now)]
     {:id (str (System/currentTimeMillis))
      :content content
      :length (count content)
      :create-time now
      :summary (generate-summary content)
-     :exact-time (format-time-exact now)  ; Keep exact time
-     :display-hour (format-time-for-display now)  ; Hour for display
-     :date (format-date now)}))
+     :exact-time exact-time
+     :display-hour display-hour
+     :date date}))
 
 (def ^:private user-exit-requested (atom false))
 
@@ -108,10 +109,10 @@
         (catch Exception _)))))
 
 (defn- group-by-hour [items]
-  "Group items by display hour (HH:00) while preserving exact timestamps"
+  "Group items by date and display hour, with most recent first"
   (->> items
-       (group-by :display-hour)
-       (sort-by key)
+       (group-by (fn [item] [(:date item) (:display-hour item)]))
+       (sort-by (fn [[[date hour] _]] [date hour]))
        reverse))
 
 (defn- save-discarded-item [item]
@@ -329,11 +330,11 @@
 (defn- reset-terminal []
   "Minimal terminal reset that doesn't disrupt shell"
   ; Comment out aggressive reset sequences that cause line formatting issues
-  ;(print "\033c")           ; Full terminal reset
-  ;(print "\033[2J")         ; Clear screen
-  ;(print "\033[H")          ; Home cursor
+  (print "\033c")           ; Full terminal reset
+  (print "\033[2J")         ; Clear screen
+  (print "\033[H")          ; Home cursor
   (print "\033[0m")         ; Reset all attributes only
-  ;(print "\033[?25h")       ; Show cursor
+  (print "\033[?25h")       ; Show cursor
   (flush)
   ;(Thread/sleep 200)        ; Longer pause for terminal to stabilize
   )
@@ -353,16 +354,20 @@
         (Thread/sleep 3000))
       (let [; Create timeline format for gum input
             grouped (group-by-hour items)
-            ; Create timeline content with hour headers and indented items for gum
+            ; Create timeline content with date+hour headers and indented items for gum
             gum-items (flatten
-                       (for [[hour hour-items] grouped]
-                         (cons (str "⏰ " hour)
-                               (for [item (reverse hour-items)]
-                                 (str "    • " (:summary item) " (" (:length item) " chars) [" (:exact-time item) "]"
-                                      (cond
-                                        (:roam-sent item) " ✅"
-                                        (:roam-sending item) " 🔄"
-                                        (:roam-send-failed item) " ❌"))))))]
+                       (for [[[date hour] hour-items] grouped]
+                         (let [today (format-date (get-current-time))
+                               display-header (if (= date today)
+                                              (str "⏰ Today " hour)
+                                              (str "⏰ " date " " hour))]
+                           (cons display-header
+                                 (for [item (reverse hour-items)]
+                                   (str "    • " (:summary item) " (" (:length item) " chars) [" (:exact-time item) "]"
+                                        (cond
+                                          (:roam-sent item) " ✅"
+                                          (:roam-sending item) " 🔄"
+                                          (:roam-send-failed item) " ❌")))))))]
         
         (if (empty? gum-items)
           (do
