@@ -336,14 +336,13 @@
   (print "\033[0m")         ; Reset all attributes only
   (print "\033[?25h")       ; Show cursor
   (flush)
-  ;(Thread/sleep 200)        ; Longer pause for terminal to stabilize
+  (Thread/sleep 50)        ; Longer pause for terminal to stabilize
   )
 
 (defn- show-clipboard-board []
   (let [items @clipboard-history]
     (if (empty? items)
       (do
-        (reset-terminal)
         (println "📋 Knock Clipboard Manager")
         (println "==========================")
         (println "🔍 Clipboard watcher active")
@@ -351,6 +350,7 @@
         (println "")
         (println "📋 No clipboard history yet. Copy something to get started!")
         (println "Press Ctrl+C to exit")
+        (reset-terminal)
         (Thread/sleep 3000))
       (let [; Create timeline format for gum input
             grouped (group-by-hour items)
