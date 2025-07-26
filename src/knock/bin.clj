@@ -195,7 +195,7 @@
                         :append true))]
     (case action
       :roam (do
-              (log-msg (str "START: Roam sending for item ID: " (:id item)))
+              (log-msg (str "START: Async Roam sending for item ID: " (:id item)))
               ; Immediately mark as sending and update UI
               (let [sending-item (assoc item :roam-sending true)]
                 (log-msg "STEP 1: Marked item as sending")
@@ -206,69 +206,79 @@
                                   %)
                                history)))
                 (save-history)
+                (invalidate-cache)  ; Force immediate UI refresh
                 (log-msg "STEP 2: Updated clipboard history and saved")
                 
-                ; Send to Roam synchronously but quickly
-                (try
-                  (log-msg "STEP 3: Starting Roam connection")
-                  (let [g (roam/personal)]
-                    (log-msg "STEP 4: Got Roam connection")
-                    (let [content (:content item)
-                          
-                          ; Apply content decoration
-                          decorated-content (decorate-content content)
-                          
-                          ; Get target block (work vs personal)
-                          target-block (get-target-block g content)
-                          
-                          ; Format without timestamp
-                          roam-content decorated-content]
-                      
-                      (log-msg (str "STEP 5: Prepared content - original: '" content "', decorated: '" decorated-content "', target: " target-block))
-                      
-                      ; Send to Roam using the same pattern as pb->roam
-                      (if (is-ip-address? content)
-                        (do
-                          (log-msg "STEP 6a: Sending IP address to Work block")
-                          (roam/write g roam-content :page target-block :order "first"))
-                        (do
-                          (log-msg "STEP 6b: Sending regular content to Personal block")
-                          (roam/write g roam-content :page target-block)))
-                      
-                      (log-msg "STEP 7: Successfully sent to Roam")
-                      
-                      ; Mark item as successfully sent to Roam
+                ; Send to Roam asynchronously using go! for fluent UI
+                (utils/go!
+                  (try
+                    (log-msg "STEP 3: Starting async Roam connection")
+                    (let [g (roam/personal)]
+                      (log-msg "STEP 4: Got Roam connection")
+                      (let [content (:content item)
+                            
+                            ; Apply content decoration
+                            decorated-content (decorate-content content)
+                            
+                            ; Get target block (work vs personal)
+                            target-block (get-target-block g content)
+                            
+                            ; Format without timestamp
+                            roam-content decorated-content]
+                        
+                        (log-msg (str "STEP 5: Prepared content - original: '" content "', decorated: '" decorated-content "', target: " target-block))
+                        
+                        ; Send to Roam using the same pattern as pb->roam
+                        (if (is-ip-address? content)
+                          (do
+                            (log-msg "STEP 6a: Sending IP address to Work block")
+                            (roam/write g roam-content :page target-block :order "first"))
+                          (do
+                            (log-msg "STEP 6b: Sending regular content to Personal block")
+                            (roam/write g roam-content :page target-block)))
+                        
+                        (log-msg "STEP 7: Successfully sent to Roam")
+                        
+                        ; Mark item as successfully sent to Roam
+                        (swap! clipboard-history 
+                               (fn [history]
+                                 (mapv #(if (= (:id %) (:id item))
+                                          (-> %
+                                              (dissoc :roam-sending)
+                                              (assoc :roam-sent true 
+                                                     :roam-sent-at (get-current-time)))
+                                          %)
+                                       history)))
+                        (save-history)
+                        (invalidate-cache)  ; Force cache refresh for immediate UI update
+                        ; Trigger UI refresh by killing gum process to restart display
+                        (try
+                          (utils/kill-cur-pid-by-name "gum")
+                          (catch Exception _))
+                        (log-msg "STEP 8: Marked item as successfully sent and saved")))
+                    (catch Exception e
+                      (log-msg (str "ERROR: Exception during async Roam sending: " (.getMessage e)))
+                      (log-msg (str "ERROR: Stack trace: " (str/join "\n" (.getStackTrace e))))
+                      ; Mark as failed
                       (swap! clipboard-history 
                              (fn [history]
                                (mapv #(if (= (:id %) (:id item))
                                         (-> %
                                             (dissoc :roam-sending)
-                                            (assoc :roam-sent true 
-                                                   :roam-sent-at (get-current-time)))
+                                            (assoc :roam-send-failed true
+                                                   :roam-error (.getMessage e)))
                                         %)
                                      history)))
                       (save-history)
                       (invalidate-cache)  ; Force cache refresh for immediate UI update
-                      (log-msg "STEP 8: Marked item as successfully sent and saved")))
-                  (catch Exception e
-                    (log-msg (str "ERROR: Exception during Roam sending: " (.getMessage e)))
-                    (log-msg (str "ERROR: Stack trace: " (str/join "\n" (.getStackTrace e))))
-                    ; Mark as failed
-                    (swap! clipboard-history 
-                           (fn [history]
-                             (mapv #(if (= (:id %) (:id item))
-                                      (-> %
-                                          (dissoc :roam-sending)
-                                          (assoc :roam-send-failed true
-                                                 :roam-error (.getMessage e)))
-                                      %)
-                                   history)))
-                    (save-history)
-                    (invalidate-cache)  ; Force cache refresh for immediate UI update
-                    (log-msg "STEP 9: Marked item as failed and saved")))
+                      ; Trigger UI refresh by killing gum process to restart display
+                      (try
+                        (utils/kill-cur-pid-by-name "gum")
+                        (catch Exception _))
+                      (log-msg "STEP 9: Marked item as failed and saved")))
+                  (log-msg "END: Async Roam sending process completed"))
                 
-                (log-msg "END: Roam sending process completed")
-                {:action :roam :item sending-item :success true :async false})))
+                {:action :roam :item sending-item :success true :async true})))
     
     ;; Future actions (commented out for now)
     ;; :discard (do
