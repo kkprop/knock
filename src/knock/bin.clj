@@ -345,116 +345,119 @@
      :item-index @item-index}))
 
 (defn- show-clipboard-board []
-  "Optimized clipboard board with instant loading of recent items"
-  (let [;; Load only recent 50 items with caching - FAST!
-        recent-items (get-recent-items-fast 50)
-        total-count (if (.exists (io/file history-file))
-                     ;; Quick count without parsing entire file
-                     (let [content (slurp history-file)
-                           items (json/read-str content :key-fn keyword)]
-                       (count items))
-                     0)]
-    
-    (if (empty? recent-items)
-      (do
-        (println "📋 Knock Clipboard Manager")
-        (println "==========================")
-        (println "🔍 Clipboard watcher active")
-        (println "💡 Copy text to see it appear below")
-        (println "")
-        (println "📋 No clipboard history yet. Copy something to get started!")
-        (println "Press Ctrl+C to exit")
-        (reset-terminal)
-        (Thread/sleep 3000))
-      
-      ;; Create indexed display for instant selection
-      (let [{:keys [display-lines item-index]} (create-indexed-display-fast recent-items)]
+  "Optimized clipboard board with instant loading of recent items - loops until exit"
+  (loop [continue-loop true]
+    (when (and continue-loop (not @user-exit-requested))
+      (let [;; Load only recent 50 items with caching - FAST!
+            recent-items (get-recent-items-fast 50)
+            total-count (if (.exists (io/file history-file))
+                         ;; Quick count without parsing entire file
+                         (let [content (slurp history-file)
+                               items (json/read-str content :key-fn keyword)]
+                           (count items))
+                         0)]
         
-        (if (empty? display-lines)
+        (if (empty? recent-items)
           (do
-            (println "No items to display")
-            (Thread/sleep 2000))
-          (try
-            ;; Reset terminal before showing content
-            (print "\033[2J\033[H\033[0m")
-            (flush)
             (println "📋 Knock Clipboard Manager")
             (println "==========================")
             (println "🔍 Clipboard watcher active")
             (println "💡 Copy text to see it appear below")
-            (println (str "📊 Showing recent 50 items (total: " total-count ")"))
             (println "")
+            (println "📋 No clipboard history yet. Copy something to get started!")
+            (println "Press Ctrl+C to exit")
+            (reset-terminal)
+            (Thread/sleep 3000)
+            (recur true))  ; Continue looping
+          
+          ;; Create indexed display for instant selection
+          (let [{:keys [display-lines item-index]} (create-indexed-display-fast recent-items)]
             
-            ;; Use gum choose with indexed display
-            (let [temp-file (str "/tmp/gum-selection-" (System/currentTimeMillis))
-                  result (p/shell {:in (str/join "\n" display-lines)
-                                  :out temp-file
-                                  :continue true}
-                                 "gum" "choose" 
-                                 "--height" "30"
-                                 "--header" "📋 Recent Clipboard Items")]
-              (if (zero? (:exit result))
-                (let [selected-line (str/trim (slurp temp-file))]
-                  ;; Clean up temp file
-                  (try (.delete (io/file temp-file)) (catch Exception _))
-                  ;; Reset terminal state after gum choose exits
-                  (print "\033[0m")
-                  (flush)
-                  (when-not (str/blank? selected-line)
-                    ;; Skip hour headers (lines starting with ⏰)
-                    (when-not (str/starts-with? selected-line "⏰")
-                      ;; INSTANT LOOKUP - O(1) instead of linear search!
-                      (when-let [selected-item (get item-index selected-line)]
-                        (try
-                          ;; Get the action to perform
-                          (let [action (show-item-actions selected-item)]
-                            (when (= action :roam)
-                              (handle-item-action selected-item :roam)))
-                          ;; Trigger immediate refresh
-                          (reset! board-needs-refresh true)
-                          (catch Exception e
-                            (println "ERROR in item selection:" (.getMessage e))
-                            (.printStackTrace e)))))))
-                ;; Handle gum exit scenarios (same as before)
-                (do
-                  (try (.delete (io/file temp-file)) (catch Exception _))
-                  (print "\033[0m")
-                  (flush)
-                  (cond
-                    (= 130 (:exit result))
-                    (do
-                      (reset! user-exit-requested true)
-                      (reset-terminal)
-                      (println "📋 Clipboard Manager stopped by user.")
-                      (System/exit 0))
-                    (= 143 (:exit result))
-                    (do
-                      (reset-terminal)
-                      (println "Refreshing with new clipboard content...")
-                      (Thread/sleep 500))
-                    (or (= 1 (:exit result)) (= 2 (:exit result)))
-                    nil
-                    :else
-                    (Thread/sleep 1000)))))))))))
+            (if (empty? display-lines)
+              (do
+                (println "No items to display")
+                (Thread/sleep 2000)
+                (recur true))  ; Continue looping
+              
+              ;; Show the gum interface
+              (let [should-continue
+                    (try
+                      ;; Ensure clean terminal state before showing content
+                      (Thread/sleep 100)  ; Brief pause to ensure previous processes are done
+                      (print "\033[2J\033[H\033[0m")  ; Clear screen, home cursor, reset attributes
+                      (flush)
+                      (Thread/sleep 50)   ; Allow terminal to process the reset
+                      (println "📋 Knock Clipboard Manager")
+                      (println "==========================")
+                      (println "🔍 Clipboard watcher active")
+                      (println "💡 Copy text to see it appear below")
+                      (println (str "📊 Showing recent 50 items (total: " total-count ")"))
+                      (println "")
+                      
+                      ;; Use gum choose with indexed display
+                      (let [temp-file (str "/tmp/gum-selection-" (System/currentTimeMillis))
+                            result (p/shell {:in (str/join "\n" display-lines)
+                                            :out temp-file
+                                            :continue true}
+                                           "gum" "choose" 
+                                           "--height" "30"
+                                           "--header" "📋 Recent Clipboard Items")]
+                        (if (zero? (:exit result))
+                          (let [selected-line (str/trim (slurp temp-file))]
+                            ;; Clean up temp file
+                            (try (.delete (io/file temp-file)) (catch Exception _))
+                            ;; Reset terminal state after gum choose exits
+                            (print "\033[0m")
+                            (flush)
+                            (when-not (str/blank? selected-line)
+                              ;; Skip hour headers (lines starting with ⏰)
+                              (when-not (str/starts-with? selected-line "⏰")
+                                ;; INSTANT LOOKUP - O(1) instead of linear search!
+                                (when-let [selected-item (get item-index selected-line)]
+                                  (try
+                                    ;; Get the action to perform
+                                    (let [action (show-item-actions selected-item)]
+                                      (when (= action :roam)
+                                        (handle-item-action selected-item :roam)))
+                                    (catch Exception e
+                                      (println "ERROR in item selection:" (.getMessage e))
+                                      (.printStackTrace e))))))
+                            ;; Continue looping after processing selection
+                            true)
+                          ;; Handle gum exit scenarios
+                          (do
+                            (try (.delete (io/file temp-file)) (catch Exception _))
+                            (print "\033[0m")
+                            (flush)
+                            (cond
+                              (= 130 (:exit result))
+                              (do
+                                (reset! user-exit-requested true)
+                                (reset-terminal)
+                                (println "📋 Clipboard Manager stopped by user.")
+                                (System/exit 0))
+                              (= 143 (:exit result))
+                              (do
+                                (reset-terminal)
+                                (println "Refreshing with new clipboard content...")
+                                (Thread/sleep 500)
+                                true)  ; Continue looping after refresh
+                              (or (= 1 (:exit result)) (= 2 (:exit result)))
+                              true  ; User cancelled, continue looping
+                              :else
+                              (do
+                                (Thread/sleep 1000)
+                                true))))) ; Continue looping for any other exit codes
+                      (catch Exception e
+                        (println "Error in clipboard board:" (.getMessage e))
+                        (Thread/sleep 1000)
+                        true))] ; Continue looping on error
+                
+                (recur should-continue))))))))) ; Use the flag to determine if we should continue
 
 (defn- interactive-board-loop []
-  (loop []
-    (when-not @user-exit-requested
-      (try
-        ; Check if clipboard history has changed
-        (let [current-count (count @clipboard-history)]
-          (when @board-needs-refresh
-            (reset! last-history-count current-count)
-            (reset! board-needs-refresh false)
-            ; Show the board
-            (show-clipboard-board)))
-        (catch Exception e
-          (println "Loop error:" (.getMessage e))
-          (Thread/sleep 2000)))
-      
-      ; Wait before checking again - reduced for faster response
-      (Thread/sleep 100)
-      (recur))))
+  ;; show-clipboard-board now handles its own looping, so just call it once
+  (show-clipboard-board))
 
 (defn- start-clipboard-watcher []
   (when-not @watcher-running
