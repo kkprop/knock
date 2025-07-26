@@ -435,7 +435,7 @@
                     (or (= 1 (:exit result)) (= 2 (:exit result)))
                     nil
                     :else
-                    (Thread/sleep 1000))))))))))))
+                    (Thread/sleep 1000)))))))))))
 
 (defn- interactive-board-loop []
   (loop []
