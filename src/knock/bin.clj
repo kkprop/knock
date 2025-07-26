@@ -139,7 +139,10 @@
   "Apply pb->roam content decoration logic"
   (cond
     (str/includes? content "::") (str "`" content "`")
-    (str/includes? content "摘录来自") content  ; Would need epub-clean function
+    (str/includes? content "摘录来自") (-> content
+                                        (str/split #"摘录来自\n")
+                                        first
+                                        str/trim)
     :else content))
 
 (defn- is-ip-address? [s]
@@ -175,7 +178,6 @@
                                 %)
                              history)))
               (save-history)
-              (reset! board-needs-refresh true)
               ;(println "📝 Queued for Roam (sending in background)...")
               
               ; Send to Roam in background thread using managed pool
@@ -212,7 +214,6 @@
                                         %)
                                      history)))
                       (save-history)
-                      (reset! board-needs-refresh true)
                       ; Reduce gum killing frequency to prevent system overload
                       ;(try
                       ;  (utils/kill-cur-pid-by-name "gum")
@@ -232,7 +233,6 @@
                                         %)
                                      history)))
                       (save-history)
-                      (reset! board-needs-refresh true)
                       ; Reduce gum killing frequency to prevent system overload
                       ;(try
                       ;  (utils/kill-cur-pid-by-name "gum")
@@ -258,50 +258,12 @@
     {:action :unknown :item item}))
 
 (defn- show-item-actions [item]
-  ; Skip action selection - directly send to Roam
-  ;(print "\033[2J\033[H\033[0m") ; Enhanced screen clearing
-  (flush)
-  (Thread/sleep 100) ; Brief pause to ensure terminal reset
-  (println "📄 Selected Item Details")
-  (println "========================")
-  (println (str "📄 Summary: " (:summary item)))
-  (println (str "📝 Created at: " (or (:exact-time item) (:hour item) "Unknown")))
-  (println (str "📏 Length: " (:length item) " characters"))
+  ; Handle different states without clearing screen or detailed display
   (cond
-    (:roam-sent item) (println "✅ Already sent to Roam")
-    (:roam-sending item) (println "🔄 Currently sending to Roam...")
-    (:roam-send-failed item) (println (str "❌ Failed to send to Roam: " (:roam-error item))))
-  (println "\n📄 Full Content:")
-  (println "----------------------------------------")
-  (println (:content item))
-  (println "----------------------------------------")
-  (println "")
-  
-  ; Handle different states
-  (cond
-    (:roam-sent item)
-    (do
-      (println "⚠️  This item was already sent to Roam.")
-      (println "Press Enter to continue...")
-      (read-line)
-      :cancel)
-    
-    (:roam-sending item)
-    (do
-      (println "🔄 This item is currently being sent to Roam...")
-      (println "Press Enter to continue...")
-      (read-line)
-      :cancel)
-    
-    (:roam-send-failed item)
-    (do
-      (println "🔄 Retrying send to Roam...")
-      :roam)  ; Automatically retry without user prompt
-    
-    :else
-    (do
-      (println "📝 Sending to Roam...")
-      :roam)))
+    (:roam-sent item) :cancel     ; Already sent, do nothing
+    (:roam-sending item) :cancel  ; Currently sending, do nothing  
+    (:roam-send-failed item) :roam ; Retry failed items
+    :else :roam))                 ; Send new items
   
   ;; Future action options (commented out for now)
   ;; (let [actions ["📝 Write to Roam" "🗑️  Discard" "📋 Copy to Clipboard" "❌ Cancel"]]
@@ -327,19 +289,15 @@
 
 (defn- reset-terminal []
   "Minimal terminal reset that doesn't disrupt shell"
-  ; Comment out aggressive reset sequences that cause line formatting issues
-  (print "\033c")           ; Full terminal reset
-  (print "\033[2J")         ; Clear screen
-  (print "\033[H")          ; Home cursor
-  (print "\033[0m")         ; Reset all attributes only
-  (print "\033[?25h")       ; Show cursor
+  (print "\033[2J\033[H\033[0m")  ; Clear screen, home cursor, reset attributes
   (flush)
-  (Thread/sleep 50)        ; Longer pause for terminal to stabilize
-  )
+  (Thread/sleep 100))
 
 (defn- show-clipboard-board []
-  (let [items @clipboard-history]
-    (if (empty? items)
+  (let [items @clipboard-history
+        ; Only show the most recent 50 items for performance
+        recent-items (take-last 50 items)]
+    (if (empty? recent-items)
       (do
         (println "📋 Knock Clipboard Manager")
         (println "==========================")
@@ -351,7 +309,7 @@
         (reset-terminal)
         (Thread/sleep 3000))
       (let [; Create timeline format for gum input
-            grouped (group-by-hour items)
+            grouped (group-by-hour recent-items)
             ; Create timeline content with date+hour headers and indented items for gum
             gum-items (flatten
                        (for [[[date hour] hour-items] grouped]
@@ -372,13 +330,14 @@
             (println "No items to display")
             (Thread/sleep 2000))
           (try
-            (reset-terminal)
+            ; Reset terminal before showing content to ensure clean display
+            (print "\033[2J\033[H\033[0m")  ; Clear screen, home cursor, reset attributes
+            (flush)
             (println "📋 Knock Clipboard Manager")
             (println "==========================")
             (println "🔍 Clipboard watcher active")
             (println "💡 Copy text to see it appear below")
-            (when (> (count @clipboard-history) 50)
-              (println (str "📊 Total items: " (count @clipboard-history))))
+            (println (str "📊 Showing recent 50 items (total: " (count items) ")"))
             (println "")
             
             ; Use timeline format in gum choose
@@ -387,12 +346,15 @@
                                   :out temp-file
                                   :continue true}
                                  "gum" "choose" 
-                                 "--height" "60"
-                                 "--header" "📋 Clipboard Timeline")]
+                                 "--height" "30"
+                                 "--header" "📋 Recent Clipboard Items")]
               (if (zero? (:exit result))
                 (let [selected-line (str/trim (slurp temp-file))]
                   ; Clean up temp file
                   (try (.delete (io/file temp-file)) (catch Exception _))
+                  ; Reset terminal state after gum choose exits
+                  (print "\033[0m")  ; Reset all attributes
+                  (flush)
                   (when-not (str/blank? selected-line)
                     ; Skip hour headers (lines starting with ⏰)
                     (when-not (str/starts-with? selected-line "⏰")
@@ -402,20 +364,27 @@
                                                (str/replace #"^• " "")     ; Remove no-space format
                                                (str/split #" \(")
                                                first)
-                            selected-item (->> @clipboard-history
+                            ; Search in recent items only for performance
+                            selected-item (->> recent-items
                                              (filter #(= (:summary %) selected-summary))
                                              first)]
                         (when selected-item
                           (try
-                            ; Immediately handle the action without showing details screen
-                            (handle-item-action selected-item :roam)
-                            ; Return immediately to main menu - no user interaction needed
+                            ; Get the action to perform
+                            (let [action (show-item-actions selected-item)]
+                              (when (= action :roam)
+                                (handle-item-action selected-item :roam)))
+                            ; Trigger immediate refresh to restart gum choose
+                            (reset! board-needs-refresh true)
                             (catch Exception e
-                              (println "ERROR in handle-item-action:" (.getMessage e))
+                              (println "ERROR in item selection:" (.getMessage e))
                               (.printStackTrace e))))))))
                 (do
                   ; Clean up temp file
                   (try (.delete (io/file temp-file)) (catch Exception _))
+                  ; Reset terminal state after gum choose exits
+                  (print "\033[0m")  ; Reset all attributes
+                  (flush)
                   ; Handle different exit scenarios
                   (cond
                     ; User pressed Ctrl+C (SIGINT) - exit the program
@@ -449,8 +418,7 @@
       (try
         ; Check if clipboard history has changed
         (let [current-count (count @clipboard-history)]
-          (when (or @board-needs-refresh 
-                    (not= current-count @last-history-count))
+          (when @board-needs-refresh
             (reset! last-history-count current-count)
             (reset! board-needs-refresh false)
             ; Show the board
@@ -459,8 +427,8 @@
           (println "Loop error:" (.getMessage e))
           (Thread/sleep 2000)))
       
-      ; Wait before checking again
-      (Thread/sleep 500)
+      ; Wait before checking again - reduced for faster response
+      (Thread/sleep 100)
       (recur))))
 
 (defn- start-clipboard-watcher []
