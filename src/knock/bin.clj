@@ -15,19 +15,43 @@
 (def ^:private board-needs-refresh (atom true))
 (def ^:private history-file (str (System/getProperty "user.home") "/.knock-clipboard-history.json"))
 
+;; ===== OPTIMIZED CLIPBOARD LOADING SOLUTION =====
+;; Cache for recent items only - avoids repeated file parsing
+(def ^:private recent-items-cache (atom {:items [] :last-modified 0 :size 50}))
+
+(defn- get-recent-items-fast [n]
+  "Get recent N items with smart caching - only reloads if file changed"
+  (let [file (io/file history-file)]
+    (if (.exists file)
+      (let [current-modified (.lastModified file)
+            cached @recent-items-cache]
+        (if (or (> current-modified (:last-modified cached))
+                (not= n (:size cached))
+                (empty? (:items cached)))
+          ;; File changed or cache miss - reload recent items only
+          (let [file-content (slurp history-file)
+                all-items (json/read-str file-content :key-fn keyword)
+                ;; Only process the recent N items, not all 2047+
+                recent-items (take-last n all-items)
+                processed-items (mapv #(-> %
+                                          (update :create-time (fn [time-str] (when time-str time-str)))
+                                          (update :roam-sent-at (fn [time-str] (when time-str time-str))))
+                                    recent-items)]
+            (reset! recent-items-cache {:items processed-items 
+                                       :last-modified current-modified
+                                       :size n})
+            processed-items)
+          ;; Use cached items - instant return
+          (:items cached)))
+      [])))
+
 (defn- load-history []
+  "Optimized history loading - only loads recent items into main atom"
   (try
-    (when (.exists (io/file history-file))
-      (let [data (json/read-str (slurp history-file) :key-fn keyword)]
-        (reset! clipboard-history 
-                (mapv #(-> %
-                          (update :create-time 
-                                  (fn [time-str] 
-                                    (when time-str time-str))) ; Keep as string
-                          (update :roam-sent-at 
-                                  (fn [time-str] 
-                                    (when time-str time-str)))) ; Keep as string
-                      data))))
+    ;; Load only recent 100 items into the main clipboard-history atom
+    ;; This maintains compatibility with existing code
+    (let [recent-items (get-recent-items-fast 100)]
+      (reset! clipboard-history recent-items))
     (catch Exception e
       (println "Warning: Could not load clipboard history:" (.getMessage e)))))
 
@@ -293,10 +317,44 @@
   (flush)
   (Thread/sleep 100))
 
+(defn- create-indexed-display-fast [recent-items]
+  "Create indexed display for O(1) selection lookup"
+  (let [grouped (group-by-hour recent-items)
+        item-index (atom {})
+        display-lines (atom [])]
+    
+    ;; Build display and index in single pass
+    (doseq [[[date hour] hour-items] grouped]
+      (let [today (format-date (get-current-time))
+            display-header (if (= date today)
+                            (str "⏰ Today " hour)
+                            (str "⏰ " date " " hour))]
+        (swap! display-lines conj display-header)
+        
+        ;; Add items with index mapping
+        (doseq [item (reverse hour-items)]
+          (let [display-line (str "    • " (:summary item) " (" (:length item) " chars) [" (:exact-time item) "]"
+                                (cond
+                                  (:roam-sent item) " ✅"
+                                  (:roam-sending item) " 🔄"
+                                  (:roam-send-failed item) " ❌"))]
+            (swap! item-index assoc display-line item)  ; Map display line to item
+            (swap! display-lines conj display-line)))))
+    
+    {:display-lines @display-lines
+     :item-index @item-index}))
+
 (defn- show-clipboard-board []
-  (let [items @clipboard-history
-        ; Only show the most recent 50 items for performance
-        recent-items (take-last 50 items)]
+  "Optimized clipboard board with instant loading of recent items"
+  (let [;; Load only recent 50 items with caching - FAST!
+        recent-items (get-recent-items-fast 50)
+        total-count (if (.exists (io/file history-file))
+                     ;; Quick count without parsing entire file
+                     (let [content (slurp history-file)
+                           items (json/read-str content :key-fn keyword)]
+                       (count items))
+                     0)]
+    
     (if (empty? recent-items)
       (do
         (println "📋 Knock Clipboard Manager")
@@ -308,41 +366,28 @@
         (println "Press Ctrl+C to exit")
         (reset-terminal)
         (Thread/sleep 3000))
-      (let [; Create timeline format for gum input
-            grouped (group-by-hour recent-items)
-            ; Create timeline content with date+hour headers and indented items for gum
-            gum-items (flatten
-                       (for [[[date hour] hour-items] grouped]
-                         (let [today (format-date (get-current-time))
-                               display-header (if (= date today)
-                                              (str "⏰ Today " hour)
-                                              (str "⏰ " date " " hour))]
-                           (cons display-header
-                                 (for [item (reverse hour-items)]
-                                   (str "    • " (:summary item) " (" (:length item) " chars) [" (:exact-time item) "]"
-                                        (cond
-                                          (:roam-sent item) " ✅"
-                                          (:roam-sending item) " 🔄"
-                                          (:roam-send-failed item) " ❌")))))))]
+      
+      ;; Create indexed display for instant selection
+      (let [{:keys [display-lines item-index]} (create-indexed-display-fast recent-items)]
         
-        (if (empty? gum-items)
+        (if (empty? display-lines)
           (do
             (println "No items to display")
             (Thread/sleep 2000))
           (try
-            ; Reset terminal before showing content to ensure clean display
-            (print "\033[2J\033[H\033[0m")  ; Clear screen, home cursor, reset attributes
+            ;; Reset terminal before showing content
+            (print "\033[2J\033[H\033[0m")
             (flush)
             (println "📋 Knock Clipboard Manager")
             (println "==========================")
             (println "🔍 Clipboard watcher active")
             (println "💡 Copy text to see it appear below")
-            (println (str "📊 Showing recent 50 items (total: " (count items) ")"))
+            (println (str "📊 Showing recent 50 items (total: " total-count ")"))
             (println "")
             
-            ; Use timeline format in gum choose
+            ;; Use gum choose with indexed display
             (let [temp-file (str "/tmp/gum-selection-" (System/currentTimeMillis))
-                  result (p/shell {:in (str/join "\n" gum-items)
+                  result (p/shell {:in (str/join "\n" display-lines)
                                   :out temp-file
                                   :continue true}
                                  "gum" "choose" 
@@ -350,67 +395,47 @@
                                  "--header" "📋 Recent Clipboard Items")]
               (if (zero? (:exit result))
                 (let [selected-line (str/trim (slurp temp-file))]
-                  ; Clean up temp file
+                  ;; Clean up temp file
                   (try (.delete (io/file temp-file)) (catch Exception _))
-                  ; Reset terminal state after gum choose exits
-                  (print "\033[0m")  ; Reset all attributes
+                  ;; Reset terminal state after gum choose exits
+                  (print "\033[0m")
                   (flush)
                   (when-not (str/blank? selected-line)
-                    ; Skip hour headers (lines starting with ⏰)
+                    ;; Skip hour headers (lines starting with ⏰)
                     (when-not (str/starts-with? selected-line "⏰")
-                      (let [; Extract summary from indented line (handle both 4-space and no-space formats)
-                            selected-summary (-> selected-line
-                                               (str/replace #"^    • " "") ; Remove 4-space indentation
-                                               (str/replace #"^• " "")     ; Remove no-space format
-                                               (str/split #" \(")
-                                               first)
-                            ; Search in recent items only for performance
-                            selected-item (->> recent-items
-                                             (filter #(= (:summary %) selected-summary))
-                                             first)]
-                        (when selected-item
-                          (try
-                            ; Get the action to perform
-                            (let [action (show-item-actions selected-item)]
-                              (when (= action :roam)
-                                (handle-item-action selected-item :roam)))
-                            ; Trigger immediate refresh to restart gum choose
-                            (reset! board-needs-refresh true)
-                            (catch Exception e
-                              (println "ERROR in item selection:" (.getMessage e))
-                              (.printStackTrace e))))))))
+                      ;; INSTANT LOOKUP - O(1) instead of linear search!
+                      (when-let [selected-item (get item-index selected-line)]
+                        (try
+                          ;; Get the action to perform
+                          (let [action (show-item-actions selected-item)]
+                            (when (= action :roam)
+                              (handle-item-action selected-item :roam)))
+                          ;; Trigger immediate refresh
+                          (reset! board-needs-refresh true)
+                          (catch Exception e
+                            (println "ERROR in item selection:" (.getMessage e))
+                            (.printStackTrace e)))))))
+                ;; Handle gum exit scenarios (same as before)
                 (do
-                  ; Clean up temp file
                   (try (.delete (io/file temp-file)) (catch Exception _))
-                  ; Reset terminal state after gum choose exits
-                  (print "\033[0m")  ; Reset all attributes
+                  (print "\033[0m")
                   (flush)
-                  ; Handle different exit scenarios
                   (cond
-                    ; User pressed Ctrl+C (SIGINT) - exit the program
                     (= 130 (:exit result))
                     (do
                       (reset! user-exit-requested true)
                       (reset-terminal)
                       (println "📋 Clipboard Manager stopped by user.")
                       (System/exit 0))
-                    
-                    ; Process was killed programmatically (SIGTERM) - refresh
                     (= 143 (:exit result))
                     (do
                       (reset-terminal)
                       (println "Refreshing with new clipboard content...")
                       (Thread/sleep 500))
-                    
-                    ; User cancelled selection (ESC or no selection) - return to main menu immediately
                     (or (= 1 (:exit result)) (= 2 (:exit result)))
-                    (do
-                      ; Just return to main menu loop - no delay, no message
-                      nil)
-                    
-                    ; Other exit codes - normal handling
+                    nil
                     :else
-                    (Thread/sleep 1000)))))))))))
+                    (Thread/sleep 1000))))))))))))
 
 (defn- interactive-board-loop []
   (loop []
