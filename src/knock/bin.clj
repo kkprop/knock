@@ -19,6 +19,10 @@
 ;; Cache for recent items only - avoids repeated file parsing
 (def ^:private recent-items-cache (atom {:items [] :last-modified 0 :size 50}))
 
+(defn- invalidate-cache []
+  "Force cache invalidation for immediate UI updates"
+  (reset! recent-items-cache {:items [] :last-modified 0 :size 50}))
+
 (defn- get-recent-items-fast [n]
   "Get recent N items with smart caching - only reloads if file changed"
   (let [file (io/file history-file)]
@@ -183,33 +187,33 @@
       ; Fallback to daily page if block lookup fails
       (roam/cur-daily-page))))
 
-(def ^:private roam-thread-pool (atom nil))
-
-(defn- get-roam-thread-pool []
-  (when-not @roam-thread-pool
-    (reset! roam-thread-pool (Executors/newFixedThreadPool 2)))
-  @roam-thread-pool)
-
 (defn- handle-item-action [item action]
-  (case action
-    :roam (do
-            ; Immediately mark as sending and update UI
-            (let [sending-item (assoc item :roam-sending true)]
-              (swap! clipboard-history 
-                     (fn [history]
-                       (mapv #(if (= (:id %) (:id item))
-                                sending-item
-                                %)
-                             history)))
-              (save-history)
-              ;(println "📝 Queued for Roam (sending in background)...")
-              
-              ; Send to Roam in background thread using managed pool
-              (.submit (get-roam-thread-pool)
-                (fn []
-                  (try
-                    (let [g (roam/personal)
-                          content (:content item)
+  (let [log-file "/tmp/roam-sending-debug.log"
+        log-msg (fn [msg] 
+                  (spit log-file 
+                        (str (get-current-time) " - " msg "\n") 
+                        :append true))]
+    (case action
+      :roam (do
+              (log-msg (str "START: Roam sending for item ID: " (:id item)))
+              ; Immediately mark as sending and update UI
+              (let [sending-item (assoc item :roam-sending true)]
+                (log-msg "STEP 1: Marked item as sending")
+                (swap! clipboard-history 
+                       (fn [history]
+                         (mapv #(if (= (:id %) (:id item))
+                                  sending-item
+                                  %)
+                               history)))
+                (save-history)
+                (log-msg "STEP 2: Updated clipboard history and saved")
+                
+                ; Send to Roam synchronously but quickly
+                (try
+                  (log-msg "STEP 3: Starting Roam connection")
+                  (let [g (roam/personal)]
+                    (log-msg "STEP 4: Got Roam connection")
+                    (let [content (:content item)
                           
                           ; Apply content decoration
                           decorated-content (decorate-content content)
@@ -220,12 +224,18 @@
                           ; Format without timestamp
                           roam-content decorated-content]
                       
+                      (log-msg (str "STEP 5: Prepared content - original: '" content "', decorated: '" decorated-content "', target: " target-block))
+                      
                       ; Send to Roam using the same pattern as pb->roam
                       (if (is-ip-address? content)
-                        (roam/write g roam-content :page target-block :order "first")
-                        (roam/write g roam-content :page target-block))
+                        (do
+                          (log-msg "STEP 6a: Sending IP address to Work block")
+                          (roam/write g roam-content :page target-block :order "first"))
+                        (do
+                          (log-msg "STEP 6b: Sending regular content to Personal block")
+                          (roam/write g roam-content :page target-block)))
                       
-                      ;(println "✅ Successfully sent to Roam!")
+                      (log-msg "STEP 7: Successfully sent to Roam")
                       
                       ; Mark item as successfully sent to Roam
                       (swap! clipboard-history 
@@ -238,32 +248,27 @@
                                         %)
                                      history)))
                       (save-history)
-                      ; Reduce gum killing frequency to prevent system overload
-                      ;(try
-                      ;  (utils/kill-cur-pid-by-name "gum")
-                      ;  (catch Exception _))
-                      ;(println "📝 Item marked as sent to Roam")
-                       )
-                    (catch Exception e
-                      (println "❌ Failed to send to Roam:" (.getMessage e))
-                      ; Mark as failed (no user interaction needed)
-                      (swap! clipboard-history 
-                             (fn [history]
-                               (mapv #(if (= (:id %) (:id item))
-                                        (-> %
-                                            (dissoc :roam-sending)
-                                            (assoc :roam-send-failed true
-                                                   :roam-error (.getMessage e)))
-                                        %)
-                                     history)))
-                      (save-history)
-                      ; Reduce gum killing frequency to prevent system overload
-                      ;(try
-                      ;  (utils/kill-cur-pid-by-name "gum")
-                      ;  (catch Exception _))
-                      ))))
-              
-              {:action :roam :item sending-item :success true :async true}))
+                      (invalidate-cache)  ; Force cache refresh for immediate UI update
+                      (log-msg "STEP 8: Marked item as successfully sent and saved")))
+                  (catch Exception e
+                    (log-msg (str "ERROR: Exception during Roam sending: " (.getMessage e)))
+                    (log-msg (str "ERROR: Stack trace: " (str/join "\n" (.getStackTrace e))))
+                    ; Mark as failed
+                    (swap! clipboard-history 
+                           (fn [history]
+                             (mapv #(if (= (:id %) (:id item))
+                                      (-> %
+                                          (dissoc :roam-sending)
+                                          (assoc :roam-send-failed true
+                                                 :roam-error (.getMessage e)))
+                                      %)
+                                   history)))
+                    (save-history)
+                    (invalidate-cache)  ; Force cache refresh for immediate UI update
+                    (log-msg "STEP 9: Marked item as failed and saved")))
+                
+                (log-msg "END: Roam sending process completed")
+                {:action :roam :item sending-item :success true :async false})))
     
     ;; Future actions (commented out for now)
     ;; :discard (do
@@ -280,36 +285,6 @@
     :cancel {:action :cancel :item item}
     
     {:action :unknown :item item}))
-
-(defn- show-item-actions [item]
-  ; Handle different states without clearing screen or detailed display
-  (cond
-    (:roam-sent item) :cancel     ; Already sent, do nothing
-    (:roam-sending item) :cancel  ; Currently sending, do nothing  
-    (:roam-send-failed item) :roam ; Retry failed items
-    :else :roam))                 ; Send new items
-  
-  ;; Future action options (commented out for now)
-  ;; (let [actions ["📝 Write to Roam" "🗑️  Discard" "📋 Copy to Clipboard" "❌ Cancel"]]
-  ;;   (println "Choose an action:")
-  ;;   (doseq [[idx action] (map-indexed vector actions)]
-  ;;     (println (str (inc idx) ". " action)))
-  ;;   (println "")
-  ;;   (print "Enter choice (1-4): ")
-  ;;   (flush)
-  ;;   
-  ;;   (try
-  ;;     (let [choice (read-line)
-  ;;           choice-num (Integer/parseInt (str/trim choice))]
-  ;;       (case choice-num
-  ;;         1 :roam
-  ;;         2 :discard
-  ;;         3 :copy
-  ;;         4 :cancel
-  ;;         :cancel))
-  ;;     (catch Exception e
-  ;;       (println "Invalid choice, cancelling...")
-  ;;       :cancel)))
 
 (defn- reset-terminal []
   "Minimal terminal reset that doesn't disrupt shell"
@@ -338,8 +313,8 @@
                                   (:roam-sent item) " ✅"
                                   (:roam-sending item) " 🔄"
                                   (:roam-send-failed item) " ❌"))]
-            (swap! item-index assoc display-line item)  ; Map display line to item
-            (swap! display-lines conj display-line)))))
+            (swap! item-index assoc (str/trim display-line) item)  ; Index with trimmed line
+            (swap! display-lines conj display-line)))))  ; Close inner doseq and outer let and outer doseq
     
     {:display-lines @display-lines
      :item-index @item-index}))
@@ -348,8 +323,8 @@
   "Optimized clipboard board with instant loading of recent items - loops until exit"
   (loop [continue-loop true]
     (when (and continue-loop (not @user-exit-requested))
-      (let [;; Load only recent 50 items with caching - FAST!
-            recent-items (get-recent-items-fast 50)
+      (let [;; Use live clipboard-history atom for immediate UI updates - FAST!
+            recent-items (take-last 50 @clipboard-history)
             total-count (if (.exists (io/file history-file))
                          ;; Quick count without parsing entire file
                          (let [content (slurp history-file)
@@ -403,25 +378,44 @@
                                            "--height" "30"
                                            "--header" "📋 Recent Clipboard Items")]
                         (if (zero? (:exit result))
-                          (let [selected-line (str/trim (slurp temp-file))]
+                          (let [selected-line (str/trim (slurp temp-file))
+                                log-file "/tmp/roam-sending-debug.log"
+                                log-msg (fn [msg] 
+                                          (spit log-file 
+                                                (str (get-current-time) " - " msg "\n") 
+                                                :append true))]
+                            (log-msg (str "GUM: Selection made - selected-line: '" selected-line "'"))
                             ;; Clean up temp file
                             (try (.delete (io/file temp-file)) (catch Exception _))
                             ;; Reset terminal state after gum choose exits
                             (print "\033[0m")
                             (flush)
                             (when-not (str/blank? selected-line)
+                              (log-msg "GUM: Selected line is not blank")
                               ;; Skip hour headers (lines starting with ⏰)
-                              (when-not (str/starts-with? selected-line "⏰")
-                                ;; INSTANT LOOKUP - O(1) instead of linear search!
-                                (when-let [selected-item (get item-index selected-line)]
-                                  (try
-                                    ;; Get the action to perform
-                                    (let [action (show-item-actions selected-item)]
-                                      (when (= action :roam)
-                                        (handle-item-action selected-item :roam)))
-                                    (catch Exception e
-                                      (println "ERROR in item selection:" (.getMessage e))
-                                      (.printStackTrace e))))))
+                              (if (str/starts-with? selected-line "⏰")
+                                (log-msg "GUM: Skipping hour header")
+                                (do
+                                  (log-msg "GUM: Processing item selection")
+                                  ;; INSTANT LOOKUP - O(1) instead of linear search!
+                                  (if-let [selected-item (get item-index selected-line)]
+                                    (do
+                                      (log-msg (str "GUM: Found item in index - ID: " (:id selected-item)))
+                                      (log-msg (str "SELECTION: Item selected - ID: " (:id selected-item) ", content: '" (:content selected-item) "'"))
+                                      (log-msg (str "SELECTION: Item status - roam-sent: " (:roam-sent selected-item) ", roam-sending: " (:roam-sending selected-item)))
+                                      (try
+                                        ;; Send to Roam if item hasn't been sent yet and isn't currently sending
+                                        (if (or (:roam-sent selected-item) 
+                                                (:roam-sending selected-item))
+                                          (log-msg "SELECTION: Item already sent or sending - skipping")
+                                          (do
+                                            (log-msg "SELECTION: Item eligible for Roam sending - calling handle-item-action")
+                                            (handle-item-action selected-item :roam)))
+                                        (catch Exception e
+                                          (log-msg (str "SELECTION ERROR: " (.getMessage e)))
+                                          (println "ERROR in item selection:" (.getMessage e))
+                                          (.printStackTrace e))))
+                                    (log-msg "GUM: Item not found in index")))))
                             ;; Continue looping after processing selection
                             true)
                           ;; Handle gum exit scenarios
